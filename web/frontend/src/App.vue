@@ -1,9 +1,11 @@
 <script setup>
+import { Analytics } from '@vercel/analytics/vue';
 import ExplorerPage from "./pages/ExplorerPage.vue";
 import ChatWidget from "./components/ChatWidget.vue";
 </script>
 
 <template>
+  <Analytics />
   <a class="skip" href="#main">Skip to content</a>
   <div class="layout">
     <div id="main" class="layout__main">
