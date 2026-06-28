@@ -19,14 +19,18 @@ const panel = ref(null);
 function openSettings() { panel.value?.openSettings(); }
 function clearChat() { panel.value?.clearChat(); }
 
-// Window size (px). CSS caps these to the viewport, so large values are safe.
-const W = ref(400);
-const H = ref(560);
+// Window size (px). Default fills the page width (matches the web), with a small
+// margin. CSS caps these to the viewport, so large values are safe.
 const MIN_W = 300;
 const MIN_H = 380;
+const MAX_W = 1400;
+const initW = Math.min(window.innerWidth - 48, MAX_W);
+const initH = Math.min(window.innerHeight - 130, 760);
+const W = ref(initW);
+const H = ref(initH);
 // Remember the pre-maximize size so we can restore it.
-let prevW = 400;
-let prevH = 560;
+let prevW = initW;
+let prevH = initH;
 
 function toggleOpen() {
   open.value = !open.value;
@@ -42,7 +46,7 @@ function toggleMax() {
   } else {
     prevW = W.value;
     prevH = H.value;
-    W.value = Math.min(window.innerWidth - 32, 1100);
+    W.value = Math.min(window.innerWidth - 32, 1400);
     H.value = Math.min(window.innerHeight - 110, 1000);
     maximized.value = true;
   }
@@ -75,7 +79,7 @@ function onResizeMove(e) {
   const p = point(e);
   const dw = startX - p.clientX; // drag left → wider
   const dh = startY - p.clientY; // drag up   → taller
-  const maxW = Math.min(window.innerWidth - 32, 1100);
+  const maxW = Math.min(window.innerWidth - 32, 1400);
   const maxH = Math.min(window.innerHeight - 110, 1000);
   W.value = Math.max(MIN_W, Math.min(maxW, startW + dw));
   H.value = Math.max(MIN_H, Math.min(maxH, startH + dh));
@@ -91,7 +95,7 @@ function onResizeEnd() {
 // Keyboard resize for accessibility (focus the grip, use arrow keys).
 function onResizeKey(e) {
   const step = e.shiftKey ? 60 : 20;
-  const maxW = Math.min(window.innerWidth - 32, 1100);
+  const maxW = Math.min(window.innerWidth - 32, 1400);
   const maxH = Math.min(window.innerHeight - 110, 1000);
   if (e.key === "ArrowLeft") W.value = Math.min(maxW, W.value + step);
   else if (e.key === "ArrowRight") W.value = Math.max(MIN_W, W.value - step);
