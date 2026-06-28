@@ -54,7 +54,8 @@ function lookupToken() {
   token.load({ token_address: v });
 }
 
-onMounted(() => chain.load());
+// Network status disembunyikan sementara — tidak perlu memuat chain-info.
+// onMounted(() => chain.load());
 </script>
 
 <template>
@@ -66,6 +67,7 @@ onMounted(() => chain.load());
 
     <ScreenerPanel />
 
+    <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
       <div class="panel__head">
         <h2 id="chain-h">Network status</h2>
@@ -76,6 +78,7 @@ onMounted(() => chain.load());
       <p v-if="chain.error.value" class="panel__error" role="alert">{{ chain.error.value }}</p>
       <StatList :items="chainStats" :loading="chain.loading.value" />
     </section>
+    -->
 
     <section class="panel" aria-labelledby="token-h">
       <h2 id="token-h">Token lookup</h2>
