@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { screenToken, screenAndAlert, batchScreen, isValidMint } from "./screener/screen.js";
+import { runAutoScan } from "./screener/autoScreen.js";
+import { sendAlert } from "./screener/telegram.js";
 import { ALLOWED, solscanFetch } from "./solscan.js";
 import { publicStatus, getState, applySettings, testTarget } from "./ai/settings.js";
 import { streamChat } from "./ai/anthropic.js";
@@ -108,6 +110,46 @@ app.post("/api/batch-screen", async (req, res) => {
   }
 });
 
+// ---- 10x Radar (auto screener) -------------------------------------------
+// Discovers trending Solana tokens, screens them, keeps the ones that fit the
+// "high upside" profile, and (de-duped) pushes new picks to Telegram.
+let latestScan = { scannedAt: 0, preset: "balanced", discovered: 0, candidatesScanned: 0, matches: [], newlyAlerted: 0 };
+const alertedMints = new Set();
+
+async function runRadarOnce(preset) {
+  const result = await runAutoScan({
+    solscanKey: solscanKey(),
+    nowMs: Date.now(),
+    preset: preset || process.env.RADAR_PRESET || "balanced",
+  });
+  // Alert only tokens we haven't alerted before (cap per run to avoid spam).
+  const tg = telegram();
+  const fresh = result.matches.filter((m) => !alertedMints.has(m.address));
+  for (const m of fresh.slice(0, 5)) {
+    alertedMints.add(m.address);
+    await sendAlert(m.report, tg);
+  }
+  latestScan = {
+    scannedAt: result.scannedAt,
+    preset: result.preset,
+    discovered: result.discovered,
+    candidatesScanned: result.candidatesScanned,
+    newlyAlerted: fresh.length,
+    matches: result.matches.map(({ report, ...m }) => m), // strip heavy report for the client
+  };
+  return latestScan;
+}
+
+app.get("/api/auto-screen", async (req, res) => {
+  try {
+    res.json(await runRadarOnce(req.query.preset));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+app.get("/api/auto-screen/latest", (_req, res) => res.json(latestScan));
+
 // ---- Generic Solscan proxy (allowlisted) — keep LAST so it doesn't shadow ----
 app.get("/api/:resource", async (req, res) => {
   if (!ALLOWED[req.params.resource]) {
@@ -121,6 +163,12 @@ app.get("/api/:resource", async (req, res) => {
 // imported and invoked as a serverless function instead (see /api/index.js), so
 // we must NOT call listen() there.
 if (!process.env.VERCEL) {
+  // Local auto-scan interval (0 disables). Vercel uses a Cron job instead.
+  const radarMins = Number(process.env.RADAR_INTERVAL_MIN || 15);
+  if (radarMins > 0) {
+    setInterval(() => runRadarOnce().catch(() => {}), radarMins * 60_000);
+    console.log(`[radar] auto-scan tiap ${radarMins} menit`);
+  }
   app.listen(PORT, () => {
     console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
   });

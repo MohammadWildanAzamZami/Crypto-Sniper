@@ -3,6 +3,7 @@ import { computed } from "vue";
 import AppButton from "../components/AppButton.vue";
 import StatList from "../components/StatList.vue";
 import ScreenerPanel from "../components/ScreenerPanel.vue";
+import RadarPanel from "../components/RadarPanel.vue";
 import { useResource } from "../composables/useSolscan.js";
 
 const chain = useResource("chain-info");
@@ -28,6 +29,8 @@ const chainStats = computed(() => {
       <h1>Solana Token Screener</h1>
       <p class="page__sub">GEM Score™ screening untuk token Solana.</p>
     </header>
+
+    <RadarPanel />
 
     <ScreenerPanel />
 
