@@ -174,11 +174,11 @@ onMounted(loadStatus);
   grid-template-rows: 1fr auto;
   height: 100%;
   min-height: 0;
-  background-color: #efeae2;
-  /* subtle WhatsApp-like doodle tint */
+  background-color: #0b1220;
+  /* subtle dotted tint */
   background-image:
-    radial-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px),
-    radial-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px);
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 22px 22px;
   background-position: 0 0, 11px 11px;
 }
@@ -197,13 +197,13 @@ onMounted(loadStatus);
   max-width: 90%;
   padding: 7px 12px;
   font-size: 12px;
-  color: #54656f;
+  color: #cdd9e5;
   text-align: center;
-  background: #fff4d6;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.4);
   border-radius: 8px;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
 }
-.wa__link { background: none; border: none; color: #027eb5; cursor: pointer; padding: 0; font: inherit; }
+.wa__link { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0; font: inherit; }
 
 .wa__empty {
   margin: auto;
@@ -212,29 +212,28 @@ onMounted(loadStatus);
   gap: 8px;
   max-width: 88%;
   text-align: center;
-  color: #54656f;
+  color: #9fb3c8;
   font-size: 13px;
 }
 .wa__suggest {
   text-align: left;
-  background: #ffffff;
-  border: none;
+  background: #1e293b;
+  border: 1px solid rgba(96, 165, 250, 0.25);
   border-radius: 8px;
-  color: #111b21;
+  color: #e9edf1;
   padding: 9px 12px;
   font-size: 12px;
   cursor: pointer;
   word-break: break-all;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
 }
-.wa__suggest:hover { background: #f5f5f3; }
+.wa__suggest:hover { background: #24344d; border-color: rgba(96, 165, 250, 0.6); }
 
 .wa__err {
   align-self: center;
   margin: 4px 0;
   padding: 6px 12px;
-  background: #fde2e1;
-  color: #b42318;
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
   border-radius: 8px;
   font-size: 12px;
   max-width: 90%;
@@ -245,16 +244,16 @@ onMounted(loadStatus);
   align-self: flex-start;
   display: inline-flex;
   gap: 4px;
-  background: #fff;
+  background: #1e293b;
   padding: 9px 12px;
   border-radius: 8px;
   border-top-left-radius: 0;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
   margin: 2px 4px;
 }
 .wa__typing span {
   width: 7px; height: 7px;
-  background: #9aa6ac;
+  background: #64748b;
   border-radius: 50%;
   animation: wa-bounce 1.2s infinite ease-in-out;
 }

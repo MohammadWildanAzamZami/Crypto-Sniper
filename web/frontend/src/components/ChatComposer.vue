@@ -58,7 +58,7 @@ function onKeydown(e) {
   align-items: flex-end;
   gap: 8px;
   padding: 8px 10px;
-  background: #f0f2f5;
+  background: #0f1830;
 }
 .composer__input {
   flex: 1;
@@ -66,17 +66,16 @@ function onKeydown(e) {
   min-height: 42px;
   max-height: 120px;
   padding: 11px 16px;
-  background: #ffffff;
-  color: #111b21;
-  border: none;
+  background: #1e293b;
+  color: #e9edf1;
+  border: 1px solid rgba(96, 165, 250, 0.25);
   border-radius: 21px;
   font-family: var(--font-family-stack, system-ui, sans-serif);
   font-size: 14px;
   line-height: 20px;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
 }
 .composer__input::placeholder { color: #8696a0; }
-.composer__input:focus-visible { outline: none; }
+.composer__input:focus-visible { outline: none; border-color: #2563eb; }
 .composer__input:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .composer__send {
@@ -85,17 +84,17 @@ function onKeydown(e) {
   height: 44px;
   border: none;
   border-radius: 50%;
-  background: #00a884;
+  background: #2563eb;
   color: #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: background 0.15s ease, transform 0.1s ease;
 }
-.composer__send:hover { background: #029177; }
+.composer__send:hover { background: #1d4ed8; }
 .composer__send:active { transform: scale(0.94); }
-.composer__send:disabled { background: #a8c7bd; cursor: not-allowed; }
-.composer__send:focus-visible { outline: 2px solid #025c4c; outline-offset: 2px; }
+.composer__send:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+.composer__send:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px;
