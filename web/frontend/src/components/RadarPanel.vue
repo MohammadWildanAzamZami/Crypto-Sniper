@@ -22,6 +22,12 @@ function ago(ms) {
   return `${Math.round(s / 3600)} jam lalu`;
 }
 
+function closeScan() {
+  scan.value = { scannedAt: 0, candidatesScanned: 0, matches: [] };
+  error.value = "";
+  copied.value = "";
+}
+
 async function runScan() {
   if (loading.value) return;
   loading.value = true;
@@ -57,9 +63,14 @@ async function buy(m) {
           Auto-screening token Solana berpotensi tinggi. Heuristik, bukan nasihat keuangan — DYOR.
         </p>
       </div>
-      <button class="scanbtn" :disabled="loading" @click="runScan">
-        {{ loading ? "Memindai…" : "Scan Sekarang" }}
-      </button>
+      <div class="head-actions">
+        <button class="scanbtn" :disabled="loading" @click="runScan">
+          {{ loading ? "Memindai…" : "Scan Sekarang" }}
+        </button>
+        <button v-if="scan.scannedAt" class="closebtn" :disabled="loading" @click="closeScan">
+          Tutup
+        </button>
+      </div>
     </div>
 
     <p v-if="!scan.scannedAt && !loading && !error" class="hint">
@@ -135,6 +146,21 @@ async function buy(m) {
 .scanbtn:disabled { opacity: 0.6; cursor: not-allowed; }
 .scanbtn:focus-visible { outline: 2px solid #4d9fff; outline-offset: 2px; }
 
+.head-actions { display: flex; gap: var(--space-3); flex: none; }
+.closebtn {
+  padding: 0 var(--space-5);
+  height: var(--control-height);
+  border: 1px solid var(--border-default);
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  cursor: pointer;
+}
+.closebtn:hover { border-color: var(--text-error); color: var(--text-error); }
+.closebtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.closebtn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
 .meta { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
@@ -179,6 +205,7 @@ async function buy(m) {
 
 @media (max-width: 560px) {
   .panel__head { flex-direction: column; }
-  .scanbtn { width: 100%; }
+  .head-actions { width: 100%; }
+  .scanbtn { flex: 1; }
 }
 </style>
