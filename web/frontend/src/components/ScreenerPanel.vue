@@ -57,6 +57,14 @@ const tokenMint = computed(() => {
   return m ? m[1] : report.value?.token?.address || "";
 });
 
+function clearResult() {
+  report.value = null;
+  error.value = "";
+  buyHint.value = "";
+  inputError.value = "";
+  address.value = "";
+}
+
 async function buyViaTrojan() {
   const mint = tokenMint.value;
   if (mint) {
@@ -124,6 +132,7 @@ async function screen() {
         @submit="screen"
       />
       <AppButton type="submit" :loading="loading">Screen</AppButton>
+      <button type="button" class="btn-del" @click="clearResult">Hapus</button>
     </form>
 
     <p v-if="error" class="panel__error" role="alert">{{ error }}</p>
@@ -238,6 +247,19 @@ async function screen() {
 .panel__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
 
 .lookup { display: flex; align-items: flex-end; gap: var(--space-5); flex-wrap: wrap; }
+.btn-del {
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border: 1px solid #dc2626;
+  border-radius: var(--control-radius);
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.btn-del:hover { background: #b91c1c; }
+.btn-del:focus-visible { outline: 2px solid #f87171; outline-offset: 2px; }
 .lookup > :first-child { flex: 1; min-width: 240px; }
 
 .result { display: grid; gap: var(--space-6); }
