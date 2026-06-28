@@ -5,9 +5,14 @@
 
 const TG_API = "https://api.telegram.org";
 
-/** Build a one-click Trojan buy deep-link for a token mint. */
+/**
+ * Build a Trojan deep-link for a token mint. Opens Telegram on the Trojan bot
+ * with the token address as the `start` payload, so tapping "Start" loads the
+ * token's buy panel directly. The mint is base58 (only [A-Za-z0-9], no 0OIl),
+ * which is within Telegram's allowed start-parameter charset.
+ */
 export function trojanBuyLink(tokenAddress) {
-  return `https://t.me/solana_trojanbot?start=buy_${tokenAddress}`;
+  return `https://t.me/solana_trojanbot?start=${tokenAddress}`;
 }
 
 /** Render a GEM Score report as a Telegram HTML message. */
