@@ -1,10 +1,9 @@
 <script setup>
 /**
- * ChatMessage — one chat bubble. Variants:
- *   user      — the question
- *   assistant — the answer (rendered markdown, may stream in)
- *   tool      — a "🔧 fetched X…" chip shown while/after the AI calls a tool
- * Assistant answers go through a safe markdown renderer (HTML-escaped).
+ * ChatMessage — one WhatsApp-style chat bubble.
+ *   user      — outgoing bubble (green, right)
+ *   assistant — incoming bubble (white, left, rendered markdown)
+ *   tool      — a centered system pill ("used screen_token")
  */
 import { computed } from "vue";
 import { renderMarkdown } from "../lib/markdown.js";
@@ -12,79 +11,122 @@ import { renderMarkdown } from "../lib/markdown.js";
 const props = defineProps({
   role: { type: String, required: true }, // user | assistant | tool
   text: { type: String, default: "" },
-  tool: { type: Object, default: null }, // { name, status, isError }
+  tool: { type: Object, default: null },  // { name, status, isError }
+  time: { type: String, default: "" },
 });
 
 const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.text) : ""));
 </script>
 
 <template>
-  <div v-if="role === 'tool'" class="chip" :class="{ 'chip--err': tool?.isError }">
-    <span class="chip__spin" v-if="tool?.status === 'start'" aria-hidden="true" />
-    <span v-else aria-hidden="true">{{ tool?.isError ? "⚠️" : "✓" }}</span>
-    <span>{{ tool?.status === "start" ? "calling" : "used" }} <code>{{ tool?.name }}</code></span>
+  <!-- tool call: centered system-style pill -->
+  <div v-if="role === 'tool'" class="wa-sys">
+    <span class="wa-sys__pill" :class="{ 'wa-sys__pill--err': tool?.isError }">
+      <span class="wa-sys__spin" v-if="tool?.status === 'start'" aria-hidden="true" />
+      <span v-else aria-hidden="true">{{ tool?.isError ? "⚠️" : "✓" }}</span>
+      {{ tool?.status === "start" ? "memanggil" : "memakai" }} {{ tool?.name }}
+    </span>
   </div>
 
-  <div v-else class="msg" :class="`msg--${role}`">
-    <div class="msg__role">{{ role === "user" ? "You" : "Analyst" }}</div>
-    <div v-if="role === 'assistant'" class="msg__body" v-html="html" />
-    <div v-else class="msg__body msg__body--plain">{{ text }}</div>
+  <!-- message bubble -->
+  <div v-else class="wa-row" :class="role === 'user' ? 'wa-row--out' : 'wa-row--in'">
+    <div class="wa-bubble" :class="role === 'user' ? 'wa-bubble--out' : 'wa-bubble--in'">
+      <div v-if="role === 'assistant'" class="wa-bubble__text" v-html="html" />
+      <div v-else class="wa-bubble__text wa-bubble__text--plain">{{ text }}</div>
+      <span v-if="time" class="wa-bubble__time">{{ time }}</span>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.msg { display: grid; gap: var(--space-2); }
-.msg__role { font-size: var(--font-size-xs); color: var(--text-muted); }
-.msg__body { font-size: var(--font-size-sm); color: var(--text-body); line-height: var(--line-height-base); }
-.msg__body--plain { white-space: pre-wrap; word-break: break-word; }
+/* ---- rows / alignment ---- */
+.wa-row { display: flex; padding: 1px 4px; }
+.wa-row--out { justify-content: flex-end; }
+.wa-row--in { justify-content: flex-start; }
 
-.msg--user .msg__body {
-  background: var(--bg-raised);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3) var(--space-5);
+/* ---- bubble ---- */
+.wa-bubble {
+  position: relative;
+  max-width: 82%;
+  padding: 6px 9px 7px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 19px;
+  color: #111b21;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.wa-bubble--out { background: #d9fdd3; border-top-right-radius: 0; }
+.wa-bubble--in  { background: #ffffff;  border-top-left-radius: 0; }
+
+/* little tails at the top corner */
+.wa-bubble--out::before {
+  content: "";
+  position: absolute; top: 0; right: -8px;
+  width: 0; height: 0;
+  border-left: 8px solid #d9fdd3;
+  border-bottom: 8px solid transparent;
+}
+.wa-bubble--in::before {
+  content: "";
+  position: absolute; top: 0; left: -8px;
+  width: 0; height: 0;
+  border-right: 8px solid #ffffff;
+  border-bottom: 8px solid transparent;
 }
 
-/* Markdown elements inside assistant answers */
-.msg__body :deep(p) { margin: 0 0 var(--space-3); }
-.msg__body :deep(p:last-child) { margin-bottom: 0; }
-.msg__body :deep(code) {
+.wa-bubble__text--plain { white-space: pre-wrap; }
+.wa-bubble__time {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  color: #667781;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+/* ---- markdown inside assistant bubbles (dark text on white) ---- */
+.wa-bubble__text :deep(p) { margin: 0 0 6px; }
+.wa-bubble__text :deep(p:last-child) { margin-bottom: 0; }
+.wa-bubble__text :deep(ul), .wa-bubble__text :deep(ol) { margin: 4px 0; padding-left: 20px; }
+.wa-bubble__text :deep(code) {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 0.92em;
-  background: var(--bg-raised);
+  font-size: 0.9em;
+  background: rgba(11, 20, 26, 0.06);
   padding: 1px 4px;
-  border-radius: var(--radius-xs);
+  border-radius: 4px;
   word-break: break-all;
 }
-.msg__body :deep(pre) {
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: var(--space-4);
+.wa-bubble__text :deep(pre) {
+  background: rgba(11, 20, 26, 0.06);
+  border-radius: 6px;
+  padding: 8px 10px;
   overflow-x: auto;
+  margin: 4px 0;
 }
-.msg__body :deep(pre code) { background: none; padding: 0; word-break: normal; }
-.msg__body :deep(a) { color: var(--text-link); }
-.msg__body :deep(a:hover) { color: var(--text-link-hover); }
+.wa-bubble__text :deep(pre code) { background: none; padding: 0; word-break: normal; }
+.wa-bubble__text :deep(a) { color: #027eb5; }
+.wa-bubble__text :deep(strong) { font-weight: 600; }
 
-.chip {
+/* ---- tool / system pill ---- */
+.wa-sys { display: flex; justify-content: center; padding: 4px; }
+.wa-sys__pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  background: var(--bg-raised);
-  border: 1px solid var(--border-subtle);
+  gap: 6px;
+  font-size: 12px;
+  color: #54656f;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  padding: 2px var(--space-4);
-  width: fit-content;
+  padding: 4px 12px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
 }
-.chip--err { color: var(--text-warning); border-color: var(--text-warning); }
-.chip code { font-family: ui-monospace, monospace; }
-.chip__spin {
+.wa-sys__pill--err { color: #b54708; }
+.wa-sys__spin {
   width: 10px; height: 10px;
   border: 2px solid currentColor; border-top-color: transparent;
-  border-radius: 50%; animation: chip-spin 0.6s linear infinite;
+  border-radius: 50%; animation: wa-spin 0.6s linear infinite;
 }
-@keyframes chip-spin { to { transform: rotate(360deg); } }
+@keyframes wa-spin { to { transform: rotate(360deg); } }
 </style>

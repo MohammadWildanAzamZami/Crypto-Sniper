@@ -14,6 +14,11 @@ import ChatPanel from "./ChatPanel.vue";
 const open = ref(false);
 const maximized = ref(false);
 
+// Ref to the inner ChatPanel so the header buttons can drive it.
+const panel = ref(null);
+function openSettings() { panel.value?.openSettings(); }
+function clearChat() { panel.value?.clearChat(); }
+
 // Window size (px). CSS caps these to the viewport, so large values are safe.
 const W = ref(400);
 const H = ref(560);
@@ -124,23 +129,29 @@ function onResizeKey(e) {
         </svg>
       </button>
 
-      <!-- Window chrome -->
+      <!-- WhatsApp-style contact header -->
       <div class="cw__bar">
-        <span class="cw__bar-title">💬 Analyst</span>
+        <div class="cw__contact">
+          <span class="cw__avatar" aria-hidden="true">🤖</span>
+          <span class="cw__contact-text">
+            <span class="cw__contact-name">Analyst</span>
+            <span class="cw__contact-status">online</span>
+          </span>
+        </div>
         <div class="cw__bar-actions">
-          <button class="cw__btn" type="button" :title="maximized ? 'Restore size' : 'Maximize'"
-            :aria-label="maximized ? 'Restore size' : 'Maximize'" @click="toggleMax">
+          <button class="cw__btn" type="button" title="Pengaturan" aria-label="Pengaturan" @click="openSettings">⚙</button>
+          <button class="cw__btn" type="button" title="Hapus chat" aria-label="Hapus chat" @click="clearChat">🗑</button>
+          <button class="cw__btn" type="button" :title="maximized ? 'Kecilkan' : 'Perbesar'"
+            :aria-label="maximized ? 'Kecilkan' : 'Perbesar'" @click="toggleMax">
             {{ maximized ? "🗗" : "🗖" }}
           </button>
-          <button class="cw__btn" type="button" title="Close chat" aria-label="Close chat" @click="close">
-            ✕
-          </button>
+          <button class="cw__btn" type="button" title="Tutup chat" aria-label="Tutup chat" @click="close">✕</button>
         </div>
       </div>
 
       <!-- The actual chat -->
       <div class="cw__body">
-        <ChatPanel />
+        <ChatPanel ref="panel" />
       </div>
     </div>
   </transition>
@@ -224,37 +235,47 @@ function onResizeKey(e) {
   place-items: center;
   border: none;
   background: transparent;
-  color: var(--text-muted, #999);
+  color: rgba(255, 255, 255, 0.7);
   cursor: nwse-resize;
   border-top-left-radius: var(--radius-lg, 14px);
 }
-.cw__resize:hover { color: var(--text-body, #ddd); }
+.cw__resize:hover { color: #fff; }
 .cw__resize:focus-visible { outline: 2px solid var(--border-focus, #6ea8fe); outline-offset: -2px; }
 
 .cw__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2, 6px) var(--space-3, 10px) var(--space-2, 6px) 28px;
-  background: var(--bg-raised, #242424);
-  border-bottom: 1px solid var(--border-subtle, #2e2e2e);
+  padding: 8px 8px 8px 28px;
+  background: #008069; /* WhatsApp header green */
 }
-.cw__bar-title { font-size: var(--font-size-sm, 13px); font-weight: 600; color: var(--text-heading, #fff); }
-.cw__bar-actions { display: flex; gap: 2px; }
+.cw__contact { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cw__avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  display: grid; place-items: center;
+  font-size: 18px; line-height: 1;
+  flex: none;
+}
+.cw__contact-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.cw__contact-name { font-size: 15px; font-weight: 600; color: #fff; }
+.cw__contact-status { font-size: 12px; color: rgba(255, 255, 255, 0.85); }
+
+.cw__bar-actions { display: flex; gap: 2px; flex: none; }
 .cw__btn {
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   border: none; background: transparent; cursor: pointer;
-  color: var(--text-muted, #aaa); border-radius: var(--radius-sm, 6px);
-  font-size: 13px; line-height: 1;
+  color: #fff; border-radius: 50%;
+  font-size: 14px; line-height: 1;
 }
-.cw__btn:hover { background: var(--bg-card, #333); color: var(--text-body, #eee); }
-.cw__btn:focus-visible { outline: 2px solid var(--border-focus, #6ea8fe); outline-offset: 1px; }
+.cw__btn:hover { background: rgba(255, 255, 255, 0.18); }
+.cw__btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 
 .cw__body {
   min-height: 0;
   overflow: hidden;
-  padding: var(--space-5, 16px);
-  background: var(--bg-subtle, #1a1a1a);
+  background: #efeae2;
 }
 
 /* Open/close animation */
