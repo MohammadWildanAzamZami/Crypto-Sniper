@@ -14,10 +14,8 @@ import AppInput from "./AppInput.vue";
 const address = ref("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const inputError = ref("");
 const loading = ref(false);
-const alerting = ref(false);
 const error = ref("");
 const report = ref(null);
-const alertStatus = ref("");
 
 const SOLANA_ADDR = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -66,7 +64,6 @@ async function screen() {
   if (!v) return;
   loading.value = true;
   error.value = "";
-  alertStatus.value = "";
   report.value = null;
   try {
     const res = await fetch(`/api/screen?token_address=${encodeURIComponent(v)}`);
@@ -83,32 +80,6 @@ async function screen() {
   }
 }
 
-async function sendAlert() {
-  const v = validate();
-  if (!v) return;
-  alerting.value = true;
-  alertStatus.value = "";
-  try {
-    const res = await fetch("/api/screen-and-alert", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token_address: v }),
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      alertStatus.value = `❌ ${body?.error || "Alert failed"}`;
-    } else {
-      report.value = body.report;
-      alertStatus.value = body.alert?.sent
-        ? "✅ Telegram alert sent."
-        : `⚠️ ${body.alert?.reason || "Alert not sent"}`;
-    }
-  } catch {
-    alertStatus.value = "❌ Network error sending alert.";
-  } finally {
-    alerting.value = false;
-  }
-}
 </script>
 
 <template>
@@ -132,13 +103,9 @@ async function sendAlert() {
         @submit="screen"
       />
       <AppButton type="submit" :loading="loading">Screen</AppButton>
-      <AppButton variant="secondary" :loading="alerting" @click="sendAlert">
-        Alert Telegram
-      </AppButton>
     </form>
 
     <p v-if="error" class="panel__error" role="alert">{{ error }}</p>
-    <p v-if="alertStatus" class="panel__note" role="status">{{ alertStatus }}</p>
 
     <div v-if="report" class="result">
       <!-- Score + verdict -->
