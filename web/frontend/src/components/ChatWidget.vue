@@ -19,13 +19,12 @@ const panel = ref(null);
 function openSettings() { panel.value?.openSettings(); }
 function clearChat() { panel.value?.clearChat(); }
 
-// Window size (px). Default fills the page width (matches the web), with a small
-// margin. CSS caps these to the viewport, so large values are safe.
+// Window size (px). Small floating box by default. CSS caps these to the
+// viewport, so large values are safe.
 const MIN_W = 300;
 const MIN_H = 380;
-const MAX_W = 1400;
-const initW = Math.min(window.innerWidth - 48, MAX_W);
-const initH = Math.min(window.innerHeight - 130, 760);
+const initW = Math.min(window.innerWidth - 32, 400);
+const initH = Math.min(window.innerHeight - 130, 560);
 const W = ref(initW);
 const H = ref(initH);
 // Remember the pre-maximize size so we can restore it.
