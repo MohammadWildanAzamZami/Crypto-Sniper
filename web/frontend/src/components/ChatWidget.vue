@@ -8,7 +8,7 @@
  * overflows the screen even on small displays. ChatPanel keeps all its
  * logic; this component only owns presentation/placement.
  */
-import { ref } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import ChatPanel from "./ChatPanel.vue";
 
 const open = ref(false);
@@ -19,17 +19,39 @@ const panel = ref(null);
 function openSettings() { panel.value?.openSettings(); }
 function clearChat() { panel.value?.clearChat(); }
 
-// Window size (px). Small floating box by default. CSS caps these to the
-// viewport, so large values are safe.
+// Window size (px). Responsive across screen sizes ("multi ukuran"):
+//   phones      → near full-screen
+//   tablets     → medium floating box
+//   desktop     → compact floating box
+// Re-applied on window resize until the user manually drags/maximizes.
 const MIN_W = 300;
 const MIN_H = 380;
-const initW = Math.min(window.innerWidth - 32, 400);
-const initH = Math.min(window.innerHeight - 130, 560);
-const W = ref(initW);
-const H = ref(initH);
+
+function responsiveSize() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (vw <= 480) return { w: vw - 16, h: vh - 96 };          // phone: almost full
+  if (vw <= 900) return { w: 380, h: Math.min(vh - 120, 620) }; // tablet / small window
+  return { w: 400, h: Math.min(vh - 130, 560) };             // desktop: compact
+}
+
+const _init = responsiveSize();
+const W = ref(_init.w);
+const H = ref(_init.h);
 // Remember the pre-maximize size so we can restore it.
-let prevW = initW;
-let prevH = initH;
+let prevW = _init.w;
+let prevH = _init.h;
+// Once the user drags or maximizes, stop auto-adapting to keep their chosen size.
+let manualSize = false;
+
+function applyResponsive() {
+  if (manualSize) return;
+  const s = responsiveSize();
+  W.value = s.w;
+  H.value = s.h;
+}
+onMounted(() => window.addEventListener("resize", applyResponsive));
+onBeforeUnmount(() => window.removeEventListener("resize", applyResponsive));
 
 function toggleOpen() {
   open.value = !open.value;
@@ -49,6 +71,7 @@ function toggleMax() {
     H.value = Math.min(window.innerHeight - 110, 1000);
     maximized.value = true;
   }
+  manualSize = true;
 }
 
 // --- Custom resize from the top-left corner (window is anchored bottom-right,
@@ -68,6 +91,7 @@ function onResizeStart(e) {
   startW = W.value;
   startH = H.value;
   maximized.value = false;
+  manualSize = true;
   window.addEventListener("mousemove", onResizeMove);
   window.addEventListener("mouseup", onResizeEnd);
   window.addEventListener("touchmove", onResizeMove, { passive: false });
