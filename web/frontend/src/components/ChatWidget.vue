@@ -30,9 +30,9 @@ const MIN_H = 380;
 function responsiveSize() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  if (vw <= 480) return { w: vw - 16, h: vh - 96 };          // phone: almost full
-  if (vw <= 900) return { w: 380, h: Math.min(vh - 120, 620) }; // tablet / small window
-  return { w: 400, h: Math.min(vh - 130, 560) };             // desktop: compact
+  if (vw <= 480) return { w: vw - 24, h: Math.min(vh - 110, 520) }; // phone: small
+  if (vw <= 900) return { w: 320, h: Math.min(vh - 130, 460) };     // tablet / small window
+  return { w: 340, h: Math.min(vh - 150, 460) };                    // desktop: compact
 }
 
 const _init = responsiveSize();
