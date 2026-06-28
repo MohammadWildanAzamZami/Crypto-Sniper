@@ -75,7 +75,7 @@ function onKeydown(e) {
   line-height: 20px;
 }
 .composer__input::placeholder { color: #8696a0; }
-.composer__input:focus-visible { outline: none; border-color: #2563eb; }
+.composer__input:focus-visible { outline: none; border-color: #0057b7; }
 .composer__input:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .composer__send {
@@ -84,14 +84,14 @@ function onKeydown(e) {
   height: 44px;
   border: none;
   border-radius: 50%;
-  background: #2563eb;
+  background: #0057b7;
   color: #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: background 0.15s ease, transform 0.1s ease;
 }
-.composer__send:hover { background: #1d4ed8; }
+.composer__send:hover { background: #004494; }
 .composer__send:active { transform: scale(0.94); }
 .composer__send:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
 .composer__send:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }

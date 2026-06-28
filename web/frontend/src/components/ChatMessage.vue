@@ -57,7 +57,7 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   word-wrap: break-word;
   overflow-wrap: anywhere;
 }
-.wa-bubble--out { background: #2563eb; border-top-right-radius: 0; color: #ffffff; }
+.wa-bubble--out { background: #0057b7; border-top-right-radius: 0; color: #ffffff; }
 .wa-bubble--in  { background: #1e293b; border-top-left-radius: 0; }
 
 /* little tails at the top corner */
@@ -65,7 +65,7 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   content: "";
   position: absolute; top: 0; right: -8px;
   width: 0; height: 0;
-  border-left: 8px solid #2563eb;
+  border-left: 8px solid #0057b7;
   border-bottom: 8px solid transparent;
 }
 .wa-bubble--in::before {
