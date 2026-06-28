@@ -1,73 +1,197 @@
-# 🟣🔎 solscan-mcp: A Solscan API MCP Server in Rust
-[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/wowinter13/solscan-mcp)](https://archestra.ai/mcp-catalog/wowinter13__solscan-mcp)
+# 💎 Memecoin-Screener — Solana Token Screener (GEM Score™)
 
-## Overview
+Screener token Solana dengan **GEM Score™ (0–100)** + alert Telegram, dibangun di
+atas [SolScanMcp](https://github.com/wowinter13/solscan-mcp). Tujuannya: menilai
+sebuah token memecoin secara cepat dari data publik (likuiditas, momentum,
+kepercayaan) dan mengirim sinyal ke Telegram.
 
-A Model Context Protocol (MCP) server for interacting with the Solscan Pro API for Solana blockchain data. This server provides tools to query token information, account activities, and transaction details on the Solana blockchain via Large Language Models.
+> ⚠️ **Bukan nasihat keuangan.** GEM Score hanya heuristik dari data publik.
+> Memecoin bisa jatuh ke nol — **DYOR (Do Your Own Research)**.
 
+---
 
-## Examples
+## ✨ Fitur utama
 
-Simple prompts: 
+- **GEM Score™ 0–100** — skor gabungan 3 pilar (Likuiditas 40 / Momentum 35 / Trust & Age 25).
+- **Web app** — UI Vue 3 + proxy Express untuk screening lewat browser.
+- **Alert Telegram** — kirim hasil screening ke chat Telegram.
+- **MCP server** — bisa dipakai dari Claude Desktop sebagai tool.
+- **Tanpa API key pun jalan** — backbone-nya [DexScreener](https://dexscreener.com) (publik, gratis). Solscan Pro hanya untuk *enrich* data holder (opsional).
+- **Aman** — tidak pernah menyentuh wallet / seed phrase / private key. "Buy" hanya berupa deep-link ke Trojan bot.
 
+---
 
-https://github.com/user-attachments/assets/2f2586b2-ed9d-4d4d-bda4-0154b9b98cde
+## 🧱 Tech stack
 
+| Bagian | Teknologi |
+|--------|-----------|
+| Frontend | Vue 3 + Vite |
+| Backend / proxy | Node.js + Express |
+| MCP server | Node.js (stdio, zero-dependency) |
+| MCP asli (opsional) | Rust (Solscan Pro API, 37 tools) |
+| Sumber data | DexScreener (utama), Solscan Pro (opsional) |
 
+---
 
+## 📂 Struktur folder
 
-_You can also use it for much more complex queries, like analyzing criminal activity combining multiple MCPs and correct context._
-
-_For example, upload a csv list of suspected addresses, then using perplexity-mcp research tool LLM will add info to context window on how investigators define criminal wallets based on their activity (mev, dusting, poisoning, sandwiched, etc) -> solscan-mcp will use this context to investigate the wallets and provide a report._
-
-
-## Features
-
-For detailed documentation of all available tools, see [TOOLS.md](TOOLS.md).
-
-## Installation
-
-Prerequisites:
-- Rust toolchain (install via [rustup](https://rustup.rs/)) – for regular usage
-- Docker – for Docker usage
-- Solscan Pro API key. You can obtain one from [Solscan APIs](https://solscan.io/apis).
-
-### Regular
-
-```bash
-cargo install solscan-mcp
-
-where solscan-mcp # -> /Users/$username/.cargo/bin/solscan-mcp
+```
+SolScanMcp/
+├── src/                       # MCP server versi Rust (opsional, butuh Rust)
+├── web/
+│   ├── server/                # Backend Express (proxy + screener)
+│   │   ├── screener/          # ⭐ INTI: sources.js, gemScore.js, telegram.js, screen.js
+│   │   ├── ai/                # integrasi AI/chat
+│   │   ├── index.js           # entry point server (port 8787)
+│   │   └── .env.example       # contoh konfigurasi (copy jadi .env)
+│   ├── frontend/              # UI Vue 3 (port 5173)
+│   │   └── src/components/ScreenerPanel.vue   # ⭐ panel GEM Score
+│   ├── mcp/server.js          # MCP server versi Node (untuk Claude Desktop)
+│   └── SCREENER.md            # dokumentasi detail screener
+├── CLAUDE.md / HANDOVER.md / TOOLS.md   # catatan arsitektur & daftar tools
+└── README.md                  # file ini
 ```
 
-Add the following to your `claude_desktop_config.json` or `claude_config.json`:
+> 💡 **Kalau mau nambah/edit logika screener, mulai dari `web/server/screener/`.**
+> Kalau mau ubah tampilan, ke `web/frontend/src/components/ScreenerPanel.vue`.
 
+---
+
+## 🚀 Cara menjalankan (untuk kolaborator)
+
+### 1. Prasyarat
+- **Node.js** v18+ (disarankan v20/v24). Cek: `node -v`
+- **Git**. Cek: `git --version`
+- (Opsional) **Rust** — hanya kalau mau build MCP versi Rust di `src/`.
+
+### 2. Clone repo
+```bash
+git clone https://github.com/MohammadWildanAzamZami/Memecoin-Screener.git
+cd Memecoin-Screener
+```
+
+### 3. Install dependency
+> `node_modules` sengaja **tidak** diupload ke GitHub, jadi harus install sendiri.
+```bash
+cd web/server
+npm install
+
+cd ../frontend
+npm install
+```
+
+### 4. Konfigurasi environment
+```bash
+# dari folder web/server
+# Windows PowerShell:
+Copy-Item .env.example .env
+# Linux/Mac:
+cp .env.example .env
+```
+Lalu buka `web/server/.env` dan isi (semua opsional — screener tetap jalan tanpa ini):
+```ini
+SOLSCAN_API_KEY=        # opsional, untuk data holder
+TELEGRAM_BOT_TOKEN=     # opsional, untuk alert Telegram
+TELEGRAM_CHAT_ID=       # opsional
+PORT=8787
+```
+
+### 5. Jalankan (butuh 2 terminal)
+```bash
+# Terminal 1 — backend
+cd web/server
+npm run dev          # http://localhost:8787
+
+# Terminal 2 — frontend
+cd web/frontend
+npm run dev          # http://localhost:5173  ← buka ini di browser
+```
+Buka **http://localhost:5173** → panel **GEM Score™ Screener** ada di atas.
+USDC sudah preload sebagai demo. Klik **Screen** untuk menilai, klik
+**Alert Telegram** untuk kirim ke Telegram (butuh `TELEGRAM_*` di `.env`).
+
+---
+
+## 📊 Cara kerja GEM Score (0–100)
+
+| Pilar | Bobot | Sinyal yang dinilai |
+|-------|-------|---------------------|
+| **Liquidity & Market** | 40 | kedalaman likuiditas, volume 24 jam, rasio volume/likuiditas |
+| **Momentum** | 35 | pergerakan harga 1 jam / 6 jam, rasio buy/sell, jumlah transaksi |
+| **Trust & Age** | 25 | umur pair, jumlah pair DEX, jumlah holder (via Solscan, opsional) |
+
+**Gerbang verdict:**
+- 🟢 **≥ 70 → STRONG**
+- 🟡 **50–69 → WATCH**
+- 🔴 **< 50 → SKIP**
+
+---
+
+## 🔌 HTTP API (proxy di port 8787)
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| `GET`  | `/api/screen?token_address=<mint>` | laporan GEM Score lengkap |
+| `POST` | `/api/screen-and-alert` `{ token_address }` | laporan + kirim Telegram |
+| `POST` | `/api/batch-screen` `{ addresses: [...] }` | screening banyak token, terurut |
+| `GET`  | `/api/health` | status `{ ok, hasKey, telegram }` |
+
+---
+
+## 🤖 Pakai dari Claude Desktop (MCP)
+
+Tambahkan ke `%APPDATA%\Claude\claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "solscan-mcp": {
-      "command": "/Users/$username/.cargo/bin/solscan-mcp",
-      "args": [],
+    "solana-screener": {
+      "command": "node",
+      "args": ["PATH\\KE\\Memecoin-Screener\\web\\mcp\\server.js"],
       "env": {
-        "SOLSCAN_API_KEY": "your_solscan_api_key"
+        "SOLSCAN_API_KEY": "opsional",
+        "TELEGRAM_BOT_TOKEN": "opsional",
+        "TELEGRAM_CHAT_ID": "opsional"
       }
     }
   }
 }
 ```
+Tools yang tersedia: `screen_token`, `screen_and_alert`, `batch_screen`,
+`get_holder_analysis`, `check_bonding_curve`.
 
-### Docker
+---
 
-WIP, will be available soon.
+## 🤝 Cara berkontribusi (untuk teman)
 
+1. Minta diundang sebagai **collaborator** (Settings → Collaborators di GitHub), atau **fork** repo ini.
+2. Buat branch baru untuk fiturmu:
+   ```bash
+   git checkout -b fitur-baru
+   ```
+3. Edit kode, lalu commit:
+   ```bash
+   git add .
+   git commit -m "Tambah: deskripsi singkat perubahan"
+   ```
+4. Push branch:
+   ```bash
+   git push -u origin fitur-baru
+   ```
+5. Buka **Pull Request** di GitHub agar bisa direview sebelum di-merge ke `main`.
 
+> 🔒 **JANGAN PERNAH commit file `.env` atau API key asli.** File `.env` sudah
+> di-ignore. Gunakan `.env.example` sebagai template.
 
-## Code quality Notes
+---
 
-I treat MCPs like useful scripts, as the structure of the APIs they rely on can always change. So, api.rs could definitely be split into multiple APIs based on Solscan namespaces. My main goal was to make it work and be easy to maintain, while ensuring errors are ignored without breaking the flow (unlike many MCPs I've tested in Python/TS, which crash painfully when they don't gracefully handle simple errors).
+## 🛡️ Keamanan & disclaimer
 
+- Screener **tidak pernah** menangani wallet, seed phrase, atau private key.
+- Fitur "Buy via Trojan" hanya deep-link `t.me/solana_trojanbot?start=buy_<mint>` — manusia yang mengonfirmasi sendiri di dalam Trojan.
+- GEM Score adalah heuristik atas data publik, **bukan nasihat keuangan**. Memecoin sangat berisiko — DYOR.
 
-## License
+---
 
-MIT
-# Memecoin-Screener
+## 📄 Lisensi
+
+MIT — lihat repo asal [wowinter13/solscan-mcp](https://github.com/wowinter13/solscan-mcp).
