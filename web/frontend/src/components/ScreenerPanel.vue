@@ -198,7 +198,6 @@ async function screen() {
 
       <!-- Actions -->
       <div class="actions">
-        <a class="link" :href="report.token.url" target="_blank" rel="noopener">📈 DexScreener</a>
         <a class="link link--buy" :href="report.trojanLink" target="_blank" rel="noopener">
           🤖 Buy via Trojan
         </a>
@@ -294,8 +293,10 @@ async function screen() {
 .link:hover { color: var(--text-link-hover); }
 .link--buy {
   padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  border: 1px solid #16a34a; border-radius: var(--radius-sm);
+  background: #16a34a; color: #fff; font-weight: var(--font-weight-medium);
 }
+.link--buy:hover { background: #15803d; color: #fff; }
 
 .disclaimer { margin: 0; font-size: var(--font-size-xs); color: var(--text-muted); font-style: italic; }
 
