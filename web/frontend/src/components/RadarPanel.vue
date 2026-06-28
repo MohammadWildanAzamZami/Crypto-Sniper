@@ -5,13 +5,12 @@
  * an interval (local) / Vercel Cron (cloud) and pushes new picks to Telegram.
  * Heuristic only — memecoins are extremely risky. Not financial advice.
  */
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref } from "vue";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [] });
 const loading = ref(false);
 const error = ref("");
 const copied = ref("");
-let poll = null;
 
 const usd = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
 
@@ -21,13 +20,6 @@ function ago(ms) {
   if (s < 60) return `${s} dtk lalu`;
   if (s < 3600) return `${Math.round(s / 60)} mnt lalu`;
   return `${Math.round(s / 3600)} jam lalu`;
-}
-
-async function loadLatest() {
-  try {
-    const r = await fetch("/api/auto-screen/latest");
-    if (r.ok) scan.value = await r.json();
-  } catch { /* offline; ignore */ }
 }
 
 async function runScan() {
@@ -54,12 +46,6 @@ async function buy(m) {
   } catch { /* clipboard blocked; user can still open the bot */ }
   window.open("https://t.me/solana_trojanbot", "_blank", "noopener");
 }
-
-onMounted(() => {
-  loadLatest();
-  poll = setInterval(loadLatest, 60_000); // pick up background (interval/cron) scans
-});
-onBeforeUnmount(() => clearInterval(poll));
 </script>
 
 <template>
@@ -76,12 +62,14 @@ onBeforeUnmount(() => clearInterval(poll));
       </button>
     </div>
 
-    <p class="meta">
+    <p v-if="!scan.scannedAt && !loading && !error" class="hint">
+      Klik <b>Scan Sekarang</b> untuk memulai pemindaian.
+    </p>
+
+    <p v-if="scan.scannedAt" class="meta">
       Pindai terakhir: <b>{{ ago(scan.scannedAt) }}</b>
-      <template v-if="scan.scannedAt">
-        · {{ scan.candidatesScanned }} dicek · <b>{{ scan.matches.length }}</b> kandidat
-        <span v-if="scan.preset">· mode {{ scan.preset }}</span>
-      </template>
+      · {{ scan.candidatesScanned }} dicek · <b>{{ scan.matches.length }}</b> kandidat
+      <span v-if="scan.preset">· mode {{ scan.preset }}</span>
     </p>
 
     <p v-if="error" class="err" role="alert">⚠️ {{ error }}</p>
@@ -148,6 +136,7 @@ onBeforeUnmount(() => clearInterval(poll));
 .scanbtn:focus-visible { outline: 2px solid #4d9fff; outline-offset: 2px; }
 
 .meta { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
+.hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 .empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
 
