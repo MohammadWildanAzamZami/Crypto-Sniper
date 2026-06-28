@@ -227,10 +227,10 @@ async function screen() {
 
       <!-- Actions -->
       <div class="actions">
+        <button type="button" class="btn-del" @click="clearResult">Hapus</button>
         <button type="button" class="link link--buy" @click="buyViaTrojan">
           🤖 Buy via Trojan
         </button>
-        <button type="button" class="btn-del" @click="clearResult">Hapus</button>
       </div>
       <p v-if="buyHint" class="panel__note" role="status">{{ buyHint }}</p>
 
