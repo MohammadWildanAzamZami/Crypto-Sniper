@@ -115,6 +115,13 @@ app.get("/api/:resource", async (req, res) => {
   res.status(status).json(body);
 });
 
-app.listen(PORT, () => {
-  console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
-});
+// Local dev / self-hosting: run a normal HTTP listener. On Vercel the app is
+// imported and invoked as a serverless function instead (see /api/index.js), so
+// we must NOT call listen() there.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

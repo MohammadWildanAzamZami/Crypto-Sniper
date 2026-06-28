@@ -1,0 +1,16 @@
+{
+  "name": "memecoin-screener",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Root manifest for Vercel: builds the Vue frontend and bundles the Express backend as a serverless function.",
+  "scripts": {
+    "build": "cd web/frontend && npm install && npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
