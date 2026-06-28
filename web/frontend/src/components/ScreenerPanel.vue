@@ -132,7 +132,6 @@ async function screen() {
         @submit="screen"
       />
       <AppButton type="submit" :loading="loading">Screen</AppButton>
-      <button type="button" class="btn-del" @click="clearResult">Hapus</button>
     </form>
 
     <p v-if="error" class="panel__error" role="alert">{{ error }}</p>
@@ -231,6 +230,7 @@ async function screen() {
         <button type="button" class="link link--buy" @click="buyViaTrojan">
           🤖 Buy via Trojan
         </button>
+        <button type="button" class="btn-del" @click="clearResult">Hapus</button>
       </div>
       <p v-if="buyHint" class="panel__note" role="status">{{ buyHint }}</p>
 
