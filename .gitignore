@@ -1,0 +1,27 @@
+# Rust
+/target
+
+# Node
+node_modules/
+**/node_modules/
+
+# Secrets / environment
+.env
+*.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+web/frontend/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
