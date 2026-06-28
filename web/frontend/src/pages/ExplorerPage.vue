@@ -26,7 +26,7 @@ const chainStats = computed(() => {
   <main class="page">
     <header class="page__head">
       <h1>Solana Token Screener</h1>
-      <p class="page__sub">TOKEN lookup</p>
+      <p class="page__sub">GEM Score™ screening untuk token Solana.</p>
     </header>
 
     <ScreenerPanel />
