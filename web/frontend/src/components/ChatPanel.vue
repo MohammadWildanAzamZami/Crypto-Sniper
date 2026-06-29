@@ -174,10 +174,7 @@ onMounted(loadStatus);
   grid-template-rows: 1fr auto;
   height: 100%;
   min-height: 0;
-  background-color: #0a0f17;
-  /* black with a WhatsApp-style doodle pattern (inline SVG, no external file) */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.045' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 20h30a6 6 0 0 1 6 6v15a6 6 0 0 1-6 6H30l-11 9v-9a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6z'/%3E%3Cpath d='M126 26c-4-8-17-6-17 4 0 9 17 17 17 17s17-8 17-17c0-10-13-12-17-4z'/%3E%3Ccircle cx='34' cy='112' r='13'/%3E%3Cpath d='M28 115q6 6 12 0'/%3E%3Crect x='104' y='100' width='30' height='20' rx='3'/%3E%3Ccircle cx='119' cy='110' r='5'/%3E%3Cpath d='M70 70l18 8-18 8 4-8z'/%3E%3Cpath d='M120 64v18M111 73h18'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 105px 105px;
+  background-color: #000000;
 }
 
 .wa__scroll {
