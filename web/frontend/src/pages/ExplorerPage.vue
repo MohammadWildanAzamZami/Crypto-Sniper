@@ -4,6 +4,8 @@ import AppButton from "../components/AppButton.vue";
 import StatList from "../components/StatList.vue";
 import ScreenerPanel from "../components/ScreenerPanel.vue";
 import RadarPanel from "../components/RadarPanel.vue";
+import ManualScoringPanel from "../components/ManualScoringPanel.vue";
+import ChecklistPanel from "../components/ChecklistPanel.vue";
 import { useResource } from "../composables/useSolscan.js";
 
 const chain = useResource("chain-info");
@@ -34,6 +36,16 @@ const chainStats = computed(() => {
 
     <ScreenerPanel />
 
+    <div class="page__divider" role="separator" aria-hidden="true"></div>
+    <header class="page__head">
+      <h2>Alat screening manual</h2>
+      <p class="page__sub">Untuk menilai token dengan tangan langsung dari DexScreener &amp; RugCheck.</p>
+    </header>
+
+    <ManualScoringPanel />
+
+    <ChecklistPanel />
+
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
       <div class="panel__head">
@@ -59,6 +71,7 @@ const chainStats = computed(() => {
 }
 .page__head { display: grid; gap: var(--space-3); }
 .page__sub { margin: 0; color: var(--text-muted); font-size: var(--font-size-md); }
+.page__divider { height: 1px; background: var(--border-default); margin: var(--space-3) 0; }
 
 .panel { display: grid; gap: var(--space-6); }
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
