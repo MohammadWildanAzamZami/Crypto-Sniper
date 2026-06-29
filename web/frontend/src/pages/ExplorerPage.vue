@@ -28,23 +28,27 @@ const chainStats = computed(() => {
 <template>
   <main class="page">
     <header class="page__head">
-      <h1>Solana Token Screener</h1>
-      <p class="page__sub">GEM Score™ screening untuk token Solana.</p>
-    </header>
-
-    <RadarPanel />
-
-    <ScreenerPanel />
-
-    <div class="page__divider" role="separator" aria-hidden="true"></div>
-    <header class="page__head">
-      <h2>Alat screening manual</h2>
-      <p class="page__sub">Untuk menilai token dengan tangan langsung dari DexScreener &amp; RugCheck.</p>
+      <p class="eyebrow">Solana · DexScreener / RugCheck</p>
+      <h1>Screening Memecoin Solana</h1>
+      <p class="page__sub">
+        Masukkan data yang kamu lihat langsung di DexScreener &amp; RugCheck untuk menghitung skor
+        risiko. Radar &amp; GEM Score otomatis ada di bawah.
+      </p>
     </header>
 
     <ManualScoringPanel />
 
     <ChecklistPanel />
+
+    <div class="page__divider" role="separator" aria-hidden="true"></div>
+    <header class="page__head">
+      <h2>Alat otomatis · data live</h2>
+      <p class="page__sub">Screening berbasis data DexScreener/RugCheck secara otomatis.</p>
+    </header>
+
+    <RadarPanel />
+
+    <ScreenerPanel />
 
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
@@ -72,6 +76,14 @@ const chainStats = computed(() => {
 .page__head { display: grid; gap: var(--space-3); }
 .page__sub { margin: 0; color: var(--text-muted); font-size: var(--font-size-md); }
 .page__divider { height: 1px; background: var(--border-default); margin: var(--space-3) 0; }
+.eyebrow {
+  margin: 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-success);
+}
 
 .panel { display: grid; gap: var(--space-6); }
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
