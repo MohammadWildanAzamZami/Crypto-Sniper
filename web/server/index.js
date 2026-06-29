@@ -8,7 +8,7 @@ import { ALLOWED, solscanFetch } from "./solscan.js";
 import { publicStatus, getState, applySettings, testTarget } from "./ai/settings.js";
 import { streamChat } from "./ai/anthropic.js";
 import { localChat } from "./ai/local.js";
-import { loadRadarState, saveRadarState } from "./radarStore.js";
+import { getLatestScan, setLatestScan, markAlerted, radarBackend } from "./radarStore.js";
 
 dotenv.config();
 
@@ -113,10 +113,9 @@ app.post("/api/batch-screen", async (req, res) => {
 
 // ---- 10x Radar (auto screener) -------------------------------------------
 // Discovers trending Solana tokens, screens them, keeps the ones that fit the
-// "high upside" profile, and (de-duped) pushes new picks to Telegram.
-// Seed from disk so a restart doesn't re-alert tokens or drop the last result.
-const { latestScan: persistedScan, alertedMints } = loadRadarState();
-let latestScan = persistedScan;
+// "high upside" profile, and (de-duped) pushes new picks to Telegram. State
+// lives in radarStore (Upstash Redis when configured, else a file / memory) so
+// it survives restarts and de-dupes correctly across serverless instances.
 
 async function runRadarOnce(preset) {
   const result = await runAutoScan({
@@ -124,22 +123,27 @@ async function runRadarOnce(preset) {
     nowMs: Date.now(),
     preset: preset || process.env.RADAR_PRESET || "balanced",
   });
-  // Alert only tokens we haven't alerted before (cap per run to avoid spam).
+  // Claim + alert up to 5 NEW picks. markAlerted is atomic (Redis SADD), so two
+  // instances scanning at once won't both alert the same mint. Only the tokens
+  // we actually send get claimed — the rest stay eligible for the next run.
   const tg = telegram();
-  const fresh = result.matches.filter((m) => !alertedMints.has(m.address));
-  for (const m of fresh.slice(0, 5)) {
-    alertedMints.add(m.address);
-    await sendAlert(m.report, tg);
+  let newlyAlerted = 0;
+  for (const m of result.matches) {
+    if (newlyAlerted >= 5) break;
+    if (await markAlerted(m.address)) {
+      await sendAlert(m.report, tg);
+      newlyAlerted++;
+    }
   }
-  latestScan = {
+  const latestScan = {
     scannedAt: result.scannedAt,
     preset: result.preset,
     discovered: result.discovered,
     candidatesScanned: result.candidatesScanned,
-    newlyAlerted: fresh.length,
+    newlyAlerted,
     matches: result.matches.map(({ report, ...m }) => m), // strip heavy report for the client
   };
-  saveRadarState({ latestScan, alertedMints }); // survive restarts; no-op on read-only FS
+  await setLatestScan(latestScan);
   return latestScan;
 }
 
@@ -151,7 +155,13 @@ app.get("/api/auto-screen", async (req, res) => {
   }
 });
 
-app.get("/api/auto-screen/latest", (_req, res) => res.json(latestScan));
+app.get("/api/auto-screen/latest", async (_req, res) => {
+  try {
+    res.json(await getLatestScan());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
 
 // ---- Generic Solscan proxy (allowlisted) — keep LAST so it doesn't shadow ----
 app.get("/api/:resource", async (req, res) => {
@@ -174,6 +184,7 @@ if (!process.env.VERCEL) {
   }
   app.listen(PORT, () => {
     console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
+    console.log(`[radar] state backend: ${radarBackend()}`);
   });
 }
 

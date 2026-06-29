@@ -203,11 +203,12 @@ Wire into `claude_desktop_config.json` like the Rust server, pointing `command` 
 8. **Web app has no routing** — everything lives on `ExplorerPage` (Screener, Radar,
    Settings panels + chat widget); fine for now, but a Vue Router split would help as
    surfaces grow. Note the panels are real now (the old "one example page" is gone).
-9. ~~**Radar state is in-memory**~~ — FIXED: `latestScan` + `alertedMints` now persist
-   to a gitignored `web/server/.radar-state.json` (via `radarStore.js`) and reload on
-   boot, so a restart no longer re-alerts tokens or drops the last result. The dedupe
-   set is capped at 1000 mints. Still NOT shared across serverless instances on Vercel
-   — a shared KV store is needed for true multi-instance dedupe.
+9. ~~**Radar state is in-memory**~~ — FIXED: `radarStore.js` now abstracts three
+   backends and picks one automatically: **Upstash Redis** (when
+   `UPSTASH_REDIS_REST_URL` + `_TOKEN` are set) for correct dedupe across serverless
+   instances (atomic `SADD`), else a gitignored `web/server/.radar-state.json` file,
+   else in-memory. Set `UPSTASH_*` in Vercel env to make multi-instance dedupe correct;
+   without it, single-instance/local use still works via the file/memory fallback.
 10. ~~**Settings store is in-memory**~~ — FIXED: settings now persist to a gitignored
     `web/server/.settings.json` and reload on boot (overlaid on `.env` defaults). On
     read-only/ephemeral filesystems (Vercel) the save no-ops and it falls back to the
