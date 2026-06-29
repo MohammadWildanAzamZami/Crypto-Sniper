@@ -91,7 +91,7 @@ async function mapPool(items, limit, fn) {
  * candidatesScanned, matches[] } sorted best-first. Each match carries the full
  * `report` (used for Telegram alerts; strip it before sending to the browser).
  */
-export async function runAutoScan({ solscanKey, nowMs, preset = "balanced", limit = 28, concurrency = 6 } = {}) {
+export async function runAutoScan({ solscanKey, nowMs, preset = "balanced", limit = 18, concurrency = 9 } = {}) {
   const criteria = PRESETS[preset] || PRESETS.balanced;
   const now = nowMs ?? Date.now();
 
@@ -99,7 +99,8 @@ export async function runAutoScan({ solscanKey, nowMs, preset = "balanced", limi
 
   const screened = await mapPool(mints, concurrency, async (mint) => {
     try {
-      const report = await screenToken(mint, { solscanKey, nowMs: now });
+      // skipLock: keep the bulk scan fast (RugCheck is the slow call).
+      const report = await screenToken(mint, { solscanKey, nowMs: now, skipLock: true });
       const evalRes = evaluateMoonshot(report, criteria, now);
       return { report, ...evalRes };
     } catch {

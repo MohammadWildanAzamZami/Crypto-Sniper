@@ -17,7 +17,7 @@ export function isValidMint(addr) {
  * @param {string} tokenAddress
  * @param {object} opts  { solscanKey, nowMs }
  */
-export async function screenToken(tokenAddress, { solscanKey, nowMs } = {}) {
+export async function screenToken(tokenAddress, { solscanKey, nowMs, skipLock = false } = {}) {
   const addr = tokenAddress.trim();
   if (!isValidMint(addr)) throw new Error("Invalid Solana mint address (base58, 32–44 chars).");
 
@@ -26,9 +26,11 @@ export async function screenToken(tokenAddress, { solscanKey, nowMs } = {}) {
     throw new Error("Token not listed on any Solana DEX (no DexScreener data). Too new or invalid.");
   }
   // Holder + lock enrichment run in parallel; both degrade to null on failure.
+  // skipLock skips the (slow) RugCheck call — used by the bulk 10x Radar scan so
+  // it stays fast; the single-token screener still fetches the lock.
   const [holders, lock] = await Promise.all([
     fetchSolscanHolders(addr, solscanKey),
-    fetchRugcheckLock(addr),
+    skipLock ? Promise.resolve(null) : fetchRugcheckLock(addr),
   ]);
   const report = computeGemScore(metrics, holders, nowMs ?? null, lock);
   report.trojanLink = trojanBuyLink(addr);
