@@ -157,7 +157,11 @@ async function buy(m) {
   font: inherit;
   cursor: pointer;
 }
-.closebtn:hover { border-color: var(--text-error); color: var(--text-error); }
+.closebtn:hover { 
+  border-color: var(--text-error); 
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--text-error); 
+}
 .closebtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .closebtn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
