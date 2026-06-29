@@ -1,9 +1,21 @@
 // Server-side settings store. Secrets (Solscan key, AI key) live ONLY here in
-// memory, seeded from .env at boot. The browser can read STATUS (booleans) and
-// write new values, but GET never returns a secret. This matches the brief's
+// memory, seeded from .env at boot, then OVERLAID with anything the user saved
+// via the Settings panel (persisted to a gitignored .settings.json on disk so
+// keys survive a restart). The browser can read STATUS (booleans) and write new
+// values, but GET never returns a secret. This matches the brief's
 // non-negotiable: keys are the proxy's secrets, exactly like before.
 
 import { solscanFetch } from "../solscan.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// Sits next to .env in web/server/. Holds the same secrets, so it MUST stay
+// gitignored (see .gitignore). On read-only/ephemeral filesystems (e.g. Vercel)
+// the load/save below no-op gracefully — env-seeded values still work.
+const STORE_PATH = fileURLToPath(new URL("../.settings.json", import.meta.url));
+
+// Fields we persist. solscanTier is a runtime probe result, deliberately not saved.
+const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "claudePath", "telegram"];
 
 const state = {
   solscanKey: process.env.SOLSCAN_API_KEY || "",
@@ -17,6 +29,38 @@ const state = {
     chatId: process.env.TELEGRAM_CHAT_ID || "",
   },
 };
+
+// Overlay persisted settings on top of the .env-seeded defaults. A saved value
+// reflects the user's most recent intent, so it wins over .env.
+function loadPersisted() {
+  try {
+    const saved = JSON.parse(readFileSync(STORE_PATH, "utf8"));
+    for (const key of PERSISTED) {
+      if (saved[key] == null) continue;
+      if (key === "telegram" && typeof saved.telegram === "object") {
+        state.telegram = { ...state.telegram, ...saved.telegram };
+      } else {
+        state[key] = saved[key];
+      }
+    }
+  } catch {
+    /* no file yet, or unreadable FS — keep .env defaults */
+  }
+}
+
+// Write the current persisted fields to disk. Swallows errors so a read-only FS
+// (Vercel) never breaks the request that triggered the save.
+function savePersisted() {
+  try {
+    const out = {};
+    for (const key of PERSISTED) out[key] = state[key];
+    writeFileSync(STORE_PATH, JSON.stringify(out, null, 2), "utf8");
+  } catch {
+    /* read-only/ephemeral FS — settings stay in-memory for this process */
+  }
+}
+
+loadPersisted();
 
 // What the browser is allowed to see — status only, never the secret values.
 export function publicStatus() {
@@ -51,6 +95,7 @@ export function applySettings(patch = {}) {
     if (typeof patch.telegram.chatId === "string" && patch.telegram.chatId !== "")
       state.telegram.chatId = patch.telegram.chatId;
   }
+  savePersisted(); // persist so the keys survive a restart
   return publicStatus();
 }
 

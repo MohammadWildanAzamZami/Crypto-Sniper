@@ -10,6 +10,9 @@ node_modules/
 *.env
 .env.*
 !.env.example
+# Persisted Settings-panel store (holds the same API keys as .env)
+.settings.json
+**/.settings.json
 
 # Build output
 dist/
