@@ -13,6 +13,9 @@ node_modules/
 # Persisted Settings-panel store (holds the same API keys as .env)
 .settings.json
 **/.settings.json
+# Persisted 10x Radar runtime state (latest scan + alerted mints)
+.radar-state.json
+**/.radar-state.json
 
 # Build output
 dist/

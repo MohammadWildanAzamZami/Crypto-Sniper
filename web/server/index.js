@@ -8,6 +8,7 @@ import { ALLOWED, solscanFetch } from "./solscan.js";
 import { publicStatus, getState, applySettings, testTarget } from "./ai/settings.js";
 import { streamChat } from "./ai/anthropic.js";
 import { localChat } from "./ai/local.js";
+import { loadRadarState, saveRadarState } from "./radarStore.js";
 
 dotenv.config();
 
@@ -113,8 +114,9 @@ app.post("/api/batch-screen", async (req, res) => {
 // ---- 10x Radar (auto screener) -------------------------------------------
 // Discovers trending Solana tokens, screens them, keeps the ones that fit the
 // "high upside" profile, and (de-duped) pushes new picks to Telegram.
-let latestScan = { scannedAt: 0, preset: "balanced", discovered: 0, candidatesScanned: 0, matches: [], newlyAlerted: 0 };
-const alertedMints = new Set();
+// Seed from disk so a restart doesn't re-alert tokens or drop the last result.
+const { latestScan: persistedScan, alertedMints } = loadRadarState();
+let latestScan = persistedScan;
 
 async function runRadarOnce(preset) {
   const result = await runAutoScan({
@@ -137,6 +139,7 @@ async function runRadarOnce(preset) {
     newlyAlerted: fresh.length,
     matches: result.matches.map(({ report, ...m }) => m), // strip heavy report for the client
   };
+  saveRadarState({ latestScan, alertedMints }); // survive restarts; no-op on read-only FS
   return latestScan;
 }
 
