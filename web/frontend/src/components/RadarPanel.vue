@@ -93,8 +93,11 @@ async function buy(m) {
       <li v-for="m in scan.matches" :key="m.address" class="card">
         <div class="card__top">
           <div class="card__id">
-            <span class="card__sym">{{ m.symbol }}</span>
-            <span class="card__name">{{ m.name }}</span>
+            <div class="card__line1">
+              <span class="card__sym">{{ m.symbol }}</span>
+              <span class="card__name">{{ m.name }}</span>
+            </div>
+            <code class="card__addr" :title="m.address">{{ m.address }}</code>
           </div>
           <div class="card__badges">
             <span class="badge badge--x" v-if="m.upsideX">~{{ m.upsideX }}x potensi</span>
@@ -181,9 +184,11 @@ async function buy(m) {
   border-radius: var(--radius-sm);
 }
 .card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.card__id { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card__line1 { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
 .card__sym { font-weight: var(--font-weight-bold); color: var(--text-heading); font-size: var(--font-size-lg); }
 .card__name { color: var(--text-muted); font-size: var(--font-size-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__addr { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 11px; color: var(--text-muted); word-break: break-all; }
 .card__badges { display: flex; gap: var(--space-2); flex: none; }
 .badge { font-size: var(--font-size-xs); padding: 2px var(--space-3); border-radius: 999px; font-weight: var(--font-weight-medium); }
 .badge--x { background: #16a34a; color: #fff; }
