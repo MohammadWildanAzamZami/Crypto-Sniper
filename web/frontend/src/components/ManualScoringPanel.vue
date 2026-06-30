@@ -322,21 +322,38 @@ const TOGGLES = {
 .check input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--text-error); flex: none; }
 
 .result {
+  position: sticky;
+  bottom: 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-6);
   text-align: center;
   display: grid;
   gap: var(--space-2);
+  background: var(--bg-card);
+  transition: all var(--motion-duration-instant) var(--motion-ease);
 }
-.result__label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
-.result__score { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); line-height: 1; font-variant-numeric: tabular-nums; }
+.result__label {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.result__score {
+  font-family: var(--font-family-mono);
+  font-size: 42px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 .result__verdict { font-weight: var(--font-weight-medium); }
 .result__sub { font-size: var(--font-size-sm); color: var(--text-muted); }
-.lvl-good { border-color: var(--text-success); }
+.lvl-good { background: radial-gradient(circle at 50% 0%, rgba(124, 242, 176, 0.16), var(--bg-card)); border-color: var(--text-success); }
 .lvl-good .result__score { color: var(--text-success); }
+.lvl-mid { background: radial-gradient(circle at 50% 0%, rgba(242, 183, 116, 0.16), var(--bg-card)); border-color: var(--text-warning); }
 .lvl-mid .result__score { color: var(--text-warning); }
-.lvl-bad { border-color: var(--text-error); }
+.lvl-bad { background: radial-gradient(circle at 50% 0%, rgba(242, 124, 124, 0.16), var(--bg-card)); border-color: var(--text-error); }
 .lvl-bad .result__score { color: var(--text-error); }
 
 .breakdown { margin-top: var(--space-4); border-top: 1px solid var(--border-default); padding-top: var(--space-4); text-align: left; display: grid; gap: var(--space-1); font-size: var(--font-size-xs); }

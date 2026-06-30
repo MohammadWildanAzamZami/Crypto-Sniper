@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { screenToken, screenAndAlert, batchScreen, isValidMint } from "./screener/screen.js";
 import { runAutoScan } from "./screener/autoScreen.js";
 import { sendAlert } from "./screener/telegram.js";
@@ -171,6 +173,14 @@ app.get("/api/:resource", async (req, res) => {
   const { status, body } = await solscanFetch(req.params.resource, req.query, solscanKey());
   res.status(status).json(body);
 });
+
+// ---- Serve the built frontend (single-port mode) ----
+// Run `npm run build` in web/frontend first. Static assets are served from the
+// Vite dist/, and any non-/api route falls back to index.html (SPA).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(__dirname, "../frontend/dist");
+app.use(express.static(distDir));
+app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(distDir, "index.html")));
 
 // Local dev / self-hosting: run a normal HTTP listener. On Vercel the app is
 // imported and invoked as a serverless function instead (see /api/index.js), so

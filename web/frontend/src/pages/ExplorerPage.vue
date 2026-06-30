@@ -31,24 +31,26 @@ const chainStats = computed(() => {
       <p class="eyebrow">Solana · DexScreener / RugCheck</p>
       <h1>Screening Memecoin Solana</h1>
       <p class="page__sub">
-        Masukkan data yang kamu lihat langsung di DexScreener &amp; RugCheck untuk menghitung skor
-        risiko. Radar &amp; GEM Score otomatis ada di bawah.
+        🚀 10x Radar &amp; GEM Score otomatis di atas. Kalkulator manual untuk input data
+        DexScreener &amp; RugCheck ada di bawah.
+      </p>
+    </header>
+
+    <RadarPanel />
+
+    <ScreenerPanel />
+
+    <div class="page__divider" role="separator" aria-hidden="true"></div>
+    <header class="page__head">
+      <h2>Kalkulator manual</h2>
+      <p class="page__sub">
+        Masukkan data yang kamu lihat langsung di DexScreener &amp; RugCheck untuk menghitung skor risiko.
       </p>
     </header>
 
     <ManualScoringPanel />
 
     <ChecklistPanel />
-
-    <div class="page__divider" role="separator" aria-hidden="true"></div>
-    <header class="page__head">
-      <h2>Alat otomatis · data live</h2>
-      <p class="page__sub">Screening berbasis data DexScreener/RugCheck secara otomatis.</p>
-    </header>
-
-    <RadarPanel />
-
-    <ScreenerPanel />
 
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
