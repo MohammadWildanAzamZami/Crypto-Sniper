@@ -6,7 +6,7 @@
  */
 import { ref, reactive, onMounted } from "vue";
 import AppButton from "./AppButton.vue";
-import { apiUrl } from "../lib/api.js";
+import { apiUrl, authHeaders, getAdminToken, setAdminToken } from "../lib/api.js";
 
 const emit = defineEmits(["close", "updated"]);
 
@@ -27,6 +27,10 @@ const saving = ref(false);
 const testMsg = reactive({ solscan: "", ai: "" });
 const showSolscan = ref(false);
 const showAi = ref(false);
+// Admin token (only needed when the backend has ADMIN_TOKEN set, e.g. public host).
+const adminToken = ref(getAdminToken());
+const showAdmin = ref(false);
+const saveMsg = ref("");
 
 const MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
@@ -39,18 +43,36 @@ async function load() {
   form.model = s.model;
 }
 
+// Persist the admin token to this browser whenever it changes.
+function persistAdminToken() {
+  setAdminToken(adminToken.value);
+}
+
 async function save() {
   saving.value = true;
+  saveMsg.value = "";
+  persistAdminToken();
   try {
     const r = await fetch(apiUrl("/api/settings"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(form),
     });
-    Object.assign(status, await r.json());
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      // 401/403 → admin gate. Tell the user to set the admin token.
+      saveMsg.value = `⚠️ ${body.error || `Gagal menyimpan (${r.status})`}`;
+      return false;
+    }
+    Object.assign(status, body);
     form.solscanKey = "";
     form.aiKey = "";
+    saveMsg.value = "✅ Tersimpan";
     emit("updated", { ...status });
+    return true;
+  } catch {
+    saveMsg.value = "⚠️ Network error — backend tidak terjangkau.";
+    return false;
   } finally {
     saving.value = false;
   }
@@ -59,13 +81,15 @@ async function save() {
 async function test(target) {
   testMsg[target] = "Testing…";
   // Save first so the server has the latest values to test against.
-  await save();
+  const ok = await save();
+  if (!ok) { testMsg[target] = saveMsg.value; return; }
   const r = await fetch(apiUrl("/api/settings/test"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ target }),
   });
-  const out = await r.json();
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok) { testMsg[target] = `⚠️ ${out.error || `Gagal (${r.status})`}`; return; }
   testMsg[target] = `${out.ok ? "✅" : "⚠️"} ${out.detail}`;
   await load();
 }
@@ -80,6 +104,26 @@ onMounted(load);
         <h2>Settings</h2>
         <AppButton variant="ghost" @click="emit('close')">Close ✕</AppButton>
       </header>
+
+      <!-- Admin access (only needed when the backend sets ADMIN_TOKEN) -->
+      <section class="grp">
+        <h3>Admin access</h3>
+        <p class="hint">
+          Hanya perlu jika backend di-host publik dan menyetel <code>ADMIN_TOKEN</code>.
+          Token disimpan di browser ini saja dan dikirim sebagai Bearer saat menyimpan/menguji.
+        </p>
+        <div class="row">
+          <input
+            class="inp"
+            :type="showAdmin ? 'text' : 'password'"
+            v-model="adminToken"
+            @change="persistAdminToken"
+            placeholder="admin token…"
+            autocomplete="off"
+          />
+          <AppButton variant="ghost" @click="showAdmin = !showAdmin">{{ showAdmin ? "Hide" : "Show" }}</AppButton>
+        </div>
+      </section>
 
       <!-- Solscan -->
       <section class="grp">
@@ -150,6 +194,7 @@ onMounted(load);
       </section>
 
       <footer class="sheet__foot">
+        <span class="hint" aria-live="polite">{{ saveMsg }}</span>
         <AppButton :loading="saving" @click="save">Save</AppButton>
       </footer>
     </aside>
@@ -180,6 +225,7 @@ onMounted(load);
 .grp__head { display: flex; align-items: center; justify-content: space-between; }
 .grp h3 { margin: 0; font-size: var(--font-size-lg); }
 .hint { margin: 0; font-size: var(--font-size-xs); color: var(--text-muted); }
+.hint code { font-family: var(--font-family-mono); color: var(--text-body); }
 .lbl { font-size: var(--font-size-sm); color: var(--text-body); }
 
 .row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
