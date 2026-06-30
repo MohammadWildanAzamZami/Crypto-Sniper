@@ -2,7 +2,7 @@
 /**
  * RadarPanel — "10x Radar". Auto-screens trending Solana tokens and lists the
  * ones with high-upside potential. Scan manually, and the backend also scans on
- * an interval (local) / Vercel Cron (cloud) and pushes new picks to Telegram.
+ * an interval and pushes new picks to Telegram.
  * Heuristic only — memecoins are extremely risky. Not financial advice.
  */
 import { ref } from "vue";

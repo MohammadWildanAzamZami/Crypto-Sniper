@@ -10,8 +10,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // Sits next to .env in web/server/. Holds the same secrets, so it MUST stay
-// gitignored (see .gitignore). On read-only/ephemeral filesystems (e.g. Vercel)
-// the load/save below no-op gracefully — env-seeded values still work.
+// gitignored (see .gitignore). On read-only/ephemeral filesystems the load/save
+// below no-op gracefully — env-seeded values still work.
 const STORE_PATH = fileURLToPath(new URL("../.settings.json", import.meta.url));
 
 // Fields we persist. solscanTier is a runtime probe result, deliberately not saved.
@@ -49,7 +49,7 @@ function loadPersisted() {
 }
 
 // Write the current persisted fields to disk. Swallows errors so a read-only FS
-// (Vercel) never breaks the request that triggered the save.
+// never breaks the request that triggered the save.
 function savePersisted() {
   try {
     const out = {};

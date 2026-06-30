@@ -4,8 +4,8 @@
 //
 //   1. Upstash Redis (REST)  — when UPSTASH_REDIS_REST_URL + _TOKEN are set.
 //      The ONLY backend that is correct across multiple serverless instances:
-//      dedupe uses an atomic Redis SADD, so two Vercel instances scanning at the
-//      same time can't both alert the same mint. Uses plain fetch (no SDK dep).
+//      dedupe uses an atomic Redis SADD, so two instances scanning at the same
+//      time can't both alert the same mint. Uses plain fetch (no SDK dep).
 //   2. File (.radar-state.json) — local/single-instance with a writable disk.
 //   3. In-memory — read-only/ephemeral FS and no Redis; resets on restart.
 //
@@ -80,7 +80,7 @@ function fileSave() {
     const mints = Array.from(memAlerted).slice(-MAX_ALERTED); // Set preserves insertion order
     writeFileSync(FILE_PATH, JSON.stringify({ latestScan: memLatest, alertedMints: mints }, null, 2), "utf8");
   } catch {
-    /* read-only/ephemeral FS (Vercel) — keep state in-memory for this process */
+    /* read-only/ephemeral FS — keep state in-memory for this process */
   }
 }
 

@@ -58,7 +58,7 @@ app.post("/api/chat", async (req, res) => {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
-    // Disable proxy/CDN buffering (Vercel/nginx) so SSE chunks stream live.
+    // Disable proxy/CDN buffering (e.g. nginx) so SSE chunks stream live.
     "X-Accel-Buffering": "no",
   });
   res.flushHeaders?.();
