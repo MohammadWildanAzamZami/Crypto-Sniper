@@ -2,9 +2,10 @@
 # Render injects PORT; the server reads process.env.PORT. Deploy via
 # https://dashboard.render.com → New → Blueprint → pick this repo.
 #
-# Leave secret keys UNSET for a safe public deploy: Radar/Screener still work via
-# DexScreener's free API. Only add SOLSCAN_API_KEY / ANTHROPIC / TELEGRAM if you
-# also add request auth — these endpoints are otherwise open to anyone.
+# Safe to expose publicly: writes (settings/alert/batch) are gated behind
+# ADMIN_TOKEN, and chat/scan are rate-limited + daily-budgeted (see middleware/
+# guard.js). Radar/Screener work with no keys at all (DexScreener free API).
+# `sync: false` env vars are NOT stored in git — Render prompts for them on deploy.
 services:
   - type: web
     name: memecoin-screener-api
@@ -16,3 +17,13 @@ services:
     envVars:
       - key: RADAR_INTERVAL_MIN
         value: "15"
+      # Per-day cap on public AI chat calls (bounds token spend).
+      - key: CHAT_DAILY_MAX
+        value: "200"
+      # Set to enable AI Chat for the public (otherwise chat shows "no key").
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Required to administer settings remotely (Authorization: Bearer <token>).
+      # Without it, write endpoints are blocked from non-loopback callers.
+      - key: ADMIN_TOKEN
+        sync: false

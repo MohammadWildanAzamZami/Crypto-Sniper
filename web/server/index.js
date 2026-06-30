@@ -12,6 +12,7 @@ import { publicStatus, getState, applySettings, testTarget } from "./ai/settings
 import { streamChat } from "./ai/anthropic.js";
 import { localChat } from "./ai/local.js";
 import { getLatestScan, setLatestScan, markAlerted, radarBackend } from "./radarStore.js";
+import { rateLimit, chatBudget, requireAdmin } from "./middleware/guard.js";
 
 dotenv.config();
 
@@ -27,8 +28,19 @@ if (!solscanKey()) {
 }
 
 const app = express();
+// Behind Render/Heroku/nginx the client IP is in X-Forwarded-For; trust one hop
+// so req.ip (used by the rate limiter) is the real caller, not the proxy.
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json());
+
+// Baseline per-IP limit on the whole API so nobody can hammer the free backend.
+app.use("/api", rateLimit({ windowMs: 60_000, max: Number(process.env.RATE_LIMIT_MAX || 120), name: "global" }));
+
+// Stricter limits for the expensive endpoints.
+const chatLimit = rateLimit({ windowMs: 60_000, max: Number(process.env.CHAT_RATE_MAX || 8), name: "chat" });
+const chatDaily = chatBudget({ max: Number(process.env.CHAT_DAILY_MAX || 200) });
+const scanLimit = rateLimit({ windowMs: 60_000, max: Number(process.env.SCAN_RATE_MAX || 6), name: "scan" });
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ...publicStatus() });
@@ -37,18 +49,18 @@ app.get("/api/health", (_req, res) => {
 // ---- Settings (keys stay server-side; GET returns status only) -----------
 app.get("/api/settings", (_req, res) => res.json(publicStatus()));
 
-app.post("/api/settings", (req, res) => {
+app.post("/api/settings", requireAdmin, (req, res) => {
   res.json(applySettings(req.body || {}));
 });
 
-app.post("/api/settings/test", async (req, res) => {
+app.post("/api/settings/test", requireAdmin, async (req, res) => {
   const target = String(req.body?.target || "");
   res.json(await testTarget(target));
 });
 
 // ---- AI analyst chat (SSE stream) ----------------------------------------
 // Holds the AI key server-side, runs the tool-calling loop, streams the reply.
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", chatLimit, chatDaily, async (req, res) => {
   const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
   if (messages.length === 0) {
     return res.status(400).json({ error: "Provide a non-empty 'messages' array." });
@@ -94,7 +106,7 @@ app.get("/api/screen", async (req, res) => {
   }
 });
 
-app.post("/api/screen-and-alert", async (req, res) => {
+app.post("/api/screen-and-alert", requireAdmin, async (req, res) => {
   const addr = String(req.body?.token_address || req.query.token_address || "");
   if (!isValidMint(addr)) return res.status(400).json({ error: "Invalid Solana mint address." });
   try {
@@ -104,7 +116,7 @@ app.post("/api/screen-and-alert", async (req, res) => {
   }
 });
 
-app.post("/api/batch-screen", async (req, res) => {
+app.post("/api/batch-screen", requireAdmin, async (req, res) => {
   const addresses = Array.isArray(req.body?.addresses) ? req.body.addresses : [];
   if (addresses.length === 0) return res.status(400).json({ error: "Provide a non-empty 'addresses' array." });
   try {
@@ -150,7 +162,7 @@ async function runRadarOnce(preset) {
   return latestScan;
 }
 
-app.get("/api/auto-screen", async (req, res) => {
+app.get("/api/auto-screen", scanLimit, async (req, res) => {
   try {
     res.json(await runRadarOnce(req.query.preset));
   } catch (err) {

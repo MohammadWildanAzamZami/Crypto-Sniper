@@ -27,11 +27,21 @@ Yang di bawah ini perlu **kamu klik sekali** di dashboard.
 4. Catat URL-nya, mis. `https://memecoin-screener-api.onrender.com`.
 5. Tes: buka `…onrender.com/api/health` → harus `{"ok":true,...}`.
 
-> **Keamanan:** biarkan SOLSCAN/ANTHROPIC/TELEGRAM **kosong**. Radar & Screener
-> tetap jalan via DexScreener (gratis). Endpoint `/api/settings` & `/api/chat`
-> belum ada autentikasi, jadi jangan taruh API key berbayar di backend publik
-> sampai ditambah proteksi. (Catatan Render Free: service "tidur" setelah idle,
-> request pertama bisa lambat ~30 dtk.)
+> **Keamanan (sudah ada proteksi):** backend kini aman dipublikasikan —
+> - Endpoint tulis (`/api/settings`, `/api/screen-and-alert`, `/api/batch-screen`)
+>   **digate `ADMIN_TOKEN`**; tanpa token, request dari luar (non-loopback) ditolak.
+> - `/api/chat` & `/api/auto-screen` **dibatasi rate** per-IP, plus **budget harian**
+>   chat (`CHAT_DAILY_MAX`, default 200) agar token AI tidak jebol.
+> - Radar & Screener tetap jalan **tanpa key** (DexScreener gratis).
+>
+> Untuk mengaktifkan **Chat AI publik**: set env `ANTHROPIC_API_KEY` di Render.
+> Untuk bisa mengelola settings dari jauh: set env `ADMIN_TOKEN` (string acak),
+> lalu kirim header `Authorization: Bearer <token>`. (Catatan Render Free:
+> service "tidur" setelah idle, request pertama bisa lambat ~30 dtk.)
+>
+> **Knob env opsional:** `RATE_LIMIT_MAX` (global/menit, default 120),
+> `CHAT_RATE_MAX` (chat/menit/IP, default 8), `SCAN_RATE_MAX` (scan/menit/IP,
+> default 6), `CHAT_DAILY_MAX` (chat/hari total, default 200).
 
 ---
 
