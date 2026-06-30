@@ -19,8 +19,10 @@ Repo ini berkembang dari "MCP server Solscan + UI explorer sederhana" menjadi
 | 4 | **Telegram Alert + Trojan link** | ✅ Jalan | Push notif token bagus + link beli 1-tap |
 | 5 | **MCP Servers (Rust + Node)** | ✅ Jalan | Sambungkan screener ke Claude Desktop |
 
-Plus: **Settings panel** (kelola API key dari UI, key tetap di server) dan
-**proxy Express** sebagai jembatan aman browser ↔ API.
+Plus: **Kalkulator Screening Manual + Checklist** (hitung skor risiko dari angka
+yang kamu baca sendiri di DexScreener/RugCheck), **Settings panel** (kelola API key
+dari UI, key tetap di server), dan **proxy Express** sebagai jembatan aman
+browser ↔ API yang sekaligus **menyajikan frontend build** (mode satu port :8787).
 
 ---
 
@@ -89,7 +91,21 @@ Alur: **Discover → Screen → Filter → Alert**
   (`screen_token`, `screen_and_alert`, `batch_screen`, `get_holder_analysis`,
   `check_bonding_curve`), memakai core screening yang sama dengan web proxy.
 
-### 2.6 Settings & keamanan key
+### 2.6 Kalkulator Screening Manual + Checklist
+**File:** `web/frontend/src/components/ManualScoringPanel.vue`, `ChecklistPanel.vue`
+
+- **Kalkulator manual**: kamu ketik angka yang kamu lihat langsung di
+  DexScreener/RugCheck (likuiditas, market cap, volume, umur, buy/sell, makers,
+  konsentrasi top-10, status mint/freeze/LP, red flag) → skor risiko **0–100**
+  dihitung otomatis dengan breakdown +/- yang transparan. Heuristik, bukan
+  prediksi harga. Pelengkap GEM Score otomatis untuk saat menilai pair dengan mata.
+- **Checklist**: daftar cek cepat kriteria screening dasar.
+- **Layout halaman**: 🚀 10x Radar & Screener (data live) di **atas**, lalu
+  Kalkulator manual & Checklist di **bawah**.
+- **Tema**: palet dark blue-grey + aksen mint dengan angka monospace, seragam di
+  seluruh app lewat design token (`styles/tokens.css`) — tanpa hex mentah di komponen.
+
+### 2.7 Settings & keamanan key
 **File:** `web/server/ai/settings.js`
 - Semua secret (Solscan / Anthropic / Telegram) hidup di store memori server,
   di-seed dari `.env` saat boot.
@@ -103,12 +119,13 @@ Alur: **Discover → Screen → Filter → Alert**
 ```mermaid
 flowchart TD
     subgraph Clients["PENGGUNA"]
-        Browser["Browser (Vue Frontend :5173)"]
+        Browser["Browser (Vue Frontend)"]
         ClaudeDesktop["Claude Desktop (MCP client)"]
         TG["Telegram"]
     end
 
-    subgraph Proxy["EXPRESS PROXY :8787 — pegang semua secret"]
+    subgraph Proxy["EXPRESS :8787 — pegang semua secret + serve frontend"]
+        Static["express.static (frontend build) + SPA fallback"]
         Settings["Settings Store (API keys di memori)"]
         ScreenAPI["/api/screen, /api/batch-screen"]
         RadarAPI["/api/auto-screen (10x Radar)"]
@@ -130,6 +147,7 @@ flowchart TD
         Anthropic["Anthropic API (Claude)"]
     end
 
+    Browser -->|HTML/JS/CSS| Static
     Browser -->|/api/*| ScreenAPI
     Browser --> RadarAPI
     Browser --> ChatAPI
@@ -243,7 +261,7 @@ Tampil di RadarPanel (diurutkan skor tertinggi)
 ```
 web/
 ├── server/
-│   ├── index.js                 # Express proxy: semua route /api/*
+│   ├── index.js                 # Express proxy: route /api/* + serve frontend build (1 port)
 │   ├── solscan.js               # Allowlist + fetch ke Solscan
 │   ├── ai/
 │   │   ├── anthropic.js         # Tool-loop + streaming SSE (Claude API)
@@ -260,8 +278,11 @@ web/
 ├── mcp/server.js                # MCP Node (5 tool screener) untuk Claude Desktop
 └── frontend/src/
     ├── App.vue                  # Layout + ChatWidget mengambang
-    ├── pages/ExplorerPage.vue   # Halaman utama
+    ├── styles/tokens.css        # Design token (tema dark blue-grey + aksen mint)
+    ├── pages/ExplorerPage.vue   # Halaman utama (Radar di atas, kalkulator manual di bawah)
     └── components/
+        ├── ManualScoringPanel.vue # Kalkulator skor risiko manual (input tangan)
+        ├── ChecklistPanel.vue   # Checklist kriteria screening cepat
         ├── ScreenerPanel.vue    # UI screening 1 token
         ├── RadarPanel.vue       # UI 10x Radar
         ├── SettingsPanel.vue    # UI kelola API key
