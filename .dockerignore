@@ -1,0 +1,9 @@
+# Keep the image small and never ship secrets / local state into it.
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+web/server/.settings.json
+web/server/.radar-state.json
+web/frontend/dist
+.git

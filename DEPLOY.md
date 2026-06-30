@@ -18,14 +18,31 @@ Yang di bawah ini perlu **kamu klik sekali** di dashboard.
 
 ---
 
-## 1. Backend di Render (dulu — karena URL-nya dibutuhkan frontend)
+## 1. Backend (pilih satu host — semua punya free tier)
 
-1. Buka <https://dashboard.render.com> → **New** → **Blueprint**.
-2. Pilih repo `Memecoin-Screener`. Render membaca `render.yaml` → service
-   `memecoin-screener-api` (plan **Free**, root `web/server`).
-3. Klik **Apply**. Tunggu deploy selesai.
-4. Catat URL-nya, mis. `https://memecoin-screener-api.onrender.com`.
-5. Tes: buka `…onrender.com/api/health` → harus `{"ok":true,...}`.
+Repo punya **dua** cara deploy: `render.yaml` (Render) **dan** `Dockerfile`
+(host container apa pun). Tujuannya sama: dapat satu URL backend publik.
+
+### Opsi A — Back4app Containers (TANPA kartu kredit) ⭐ untuk yang tak mau isi kartu
+1. Daftar di <https://www.back4app.com/> (cukup email/GitHub, tidak minta kartu).
+2. **Containers** → **Deploy your app** → connect repo `Memecoin-Screener`.
+3. Build pakai **Dockerfile** di root (otomatis terdeteksi). Port: `8787`
+   (atau biarkan Back4app set `PORT`).
+4. Tambah Environment Variables (lihat tabel knob di bawah; minimal `ADMIN_TOKEN`).
+5. Deploy → catat URL publiknya (mis. `https://<app>.back4app.io`).
+
+### Opsi B — Koyeb (juga tanpa kartu untuk free tier)
+1. Daftar di <https://www.koyeb.com/> dengan GitHub.
+2. **Create Web Service** → repo `Memecoin-Screener` → builder **Dockerfile**.
+3. Instance **Free**, set env vars, Deploy → catat URL (`https://<app>.koyeb.app`).
+
+### Opsi C — Render (Blueprint) — catatan: free tier Render umumnya tak butuh
+kartu, tapi kalau diminta, pakai Opsi A/B.
+1. <https://dashboard.render.com> → **New** → **Blueprint** → repo `Memecoin-Screener`.
+2. Render membaca `render.yaml` → service `memecoin-screener-api` (Free, root `web/server`).
+3. **Apply** → catat URL (`https://memecoin-screener-api.onrender.com`).
+
+**Apa pun hostnya, verifikasi:** buka `…/api/health` → harus `{"ok":true,...}`.
 
 > **Keamanan (sudah ada proteksi):** backend kini aman dipublikasikan —
 > - Endpoint tulis (`/api/settings`, `/api/screen-and-alert`, `/api/batch-screen`)
