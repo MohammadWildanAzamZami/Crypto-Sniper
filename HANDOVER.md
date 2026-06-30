@@ -29,7 +29,7 @@ The repo grew from "Solscan MCP server + a sample explorer page" into a full
 | Solscan connectivity | ✅ Verified | `chain_info` public; Pro endpoints need a Pro key |
 | Pro endpoints | ⚠️ Plan-gated | Free key → `401 upgrade your api key level` (handled gracefully) |
 | Web UI (`web/frontend`) | ✅ Builds & runs | Vite + Vue 3, token-driven design system |
-| API proxy (`web/server`) | ✅ Runs | Express, keeps all secrets server-side; deployable on Vercel |
+| API proxy (`web/server`) | ✅ Runs | Express, keeps all secrets server-side; serves the frontend build on one port |
 | Tests / CI | ❌ None | See roadmap §6 |
 | Docker | ❌ WIP | README says "available soon" |
 
@@ -107,8 +107,9 @@ and every enrichment **degrades to null on failure** so the score still computes
 `screener/autoScreen.js` discovers trending Solana mints (DexScreener boost/profile
 feeds), screens them with bounded concurrency (`skipLock` keeps the bulk scan fast),
 filters against a preset (aggressive / balanced / conservative), and de-dupes new
-matches before pushing to Telegram. Runs on a local `setInterval` (default 15 min)
-or a Vercel Cron in production.
+matches before pushing to Telegram. Runs on a `setInterval` (default 15 min); set
+`RADAR_INTERVAL_MIN=0` to disable, or trigger `GET /api/auto-screen` from an
+external scheduler/cron if you prefer to drive it on demand.
 
 ### 3.4 AI analyst — server-side tool-loop
 `ai/anthropic.js` runs Claude's agentic tool-use loop server-side and streams the
@@ -207,12 +208,12 @@ Wire into `claude_desktop_config.json` like the Rust server, pointing `command` 
    backends and picks one automatically: **Upstash Redis** (when
    `UPSTASH_REDIS_REST_URL` + `_TOKEN` are set) for correct dedupe across serverless
    instances (atomic `SADD`), else a gitignored `web/server/.radar-state.json` file,
-   else in-memory. Set `UPSTASH_*` in Vercel env to make multi-instance dedupe correct;
-   without it, single-instance/local use still works via the file/memory fallback.
+   else in-memory. Set `UPSTASH_*` only if you run multiple instances behind a load
+   balancer; for single-instance/local use the file/memory fallback is correct.
 10. ~~**Settings store is in-memory**~~ — FIXED: settings now persist to a gitignored
     `web/server/.settings.json` and reload on boot (overlaid on `.env` defaults). On
-    read-only/ephemeral filesystems (Vercel) the save no-ops and it falls back to the
-    old in-memory behaviour. A shared store is still needed for true multi-instance.
+    read-only/ephemeral filesystems the save no-ops and it falls back to the old
+    in-memory behaviour. A shared store is still needed for true multi-instance.
 
 ---
 

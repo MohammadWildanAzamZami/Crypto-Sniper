@@ -64,7 +64,8 @@ Alur: **Discover → Screen → Filter → Alert**
 
 - Hitung estimasi upside sebagai kelipatan ke $10M (mis. "~14x").
 - Token baru yang lolos → push ke Telegram (dedup via `alertedMints`, maks 5/scan).
-- Auto-jalan tiap `RADAR_INTERVAL_MIN` menit (default 15) di lokal; di Vercel via Cron.
+- Auto-jalan tiap `RADAR_INTERVAL_MIN` menit (default 15); set `=0` untuk mematikan,
+  atau panggil `GET /api/auto-screen` dari scheduler eksternal bila ingin on-demand.
 
 ### 2.3 AI Analyst Chat
 **File:** `web/server/ai/anthropic.js`, `local.js`, `tools.js`, `settings.js`

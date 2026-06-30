@@ -182,20 +182,16 @@ const distDir = path.resolve(__dirname, "../frontend/dist");
 app.use(express.static(distDir));
 app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(distDir, "index.html")));
 
-// Local dev / self-hosting: run a normal HTTP listener. On Vercel the app is
-// imported and invoked as a serverless function instead (see /api/index.js), so
-// we must NOT call listen() there.
-if (!process.env.VERCEL) {
-  // Local auto-scan interval (0 disables). Vercel uses a Cron job instead.
-  const radarMins = Number(process.env.RADAR_INTERVAL_MIN || 15);
-  if (radarMins > 0) {
-    setInterval(() => runRadarOnce().catch(() => {}), radarMins * 60_000);
-    console.log(`[radar] auto-scan tiap ${radarMins} menit`);
-  }
-  app.listen(PORT, () => {
-    console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
-    console.log(`[radar] state backend: ${radarBackend()}`);
-  });
+// Run a normal long-lived HTTP listener (single-port: serves API + frontend).
+// Background auto-scan interval (0 disables it).
+const radarMins = Number(process.env.RADAR_INTERVAL_MIN || 15);
+if (radarMins > 0) {
+  setInterval(() => runRadarOnce().catch(() => {}), radarMins * 60_000);
+  console.log(`[radar] auto-scan tiap ${radarMins} menit`);
 }
+app.listen(PORT, () => {
+  console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
+  console.log(`[radar] state backend: ${radarBackend()}`);
+});
 
 export default app;
