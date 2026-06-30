@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { apiUrl } from "../lib/api.js";
 
 /**
  * Thin client for the Express proxy (/api/*). The proxy holds the Solscan key,
@@ -17,7 +18,7 @@ export function useResource(resource) {
       const qs = new URLSearchParams(
         Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
       ).toString();
-      const res = await fetch(`/api/${resource}${qs ? `?${qs}` : ""}`);
+      const res = await fetch(apiUrl(`/api/${resource}${qs ? `?${qs}` : ""}`));
       const body = await res.json();
       if (!res.ok) {
         // Surface Solscan's real message (e.g. "upgrade your api key level").

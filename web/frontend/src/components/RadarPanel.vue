@@ -6,6 +6,7 @@
  * Heuristic only — memecoins are extremely risky. Not financial advice.
  */
 import { ref } from "vue";
+import { apiUrl } from "../lib/api.js";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [] });
 const loading = ref(false);
@@ -33,7 +34,7 @@ async function runScan() {
   loading.value = true;
   error.value = "";
   try {
-    const r = await fetch("/api/auto-screen");
+    const r = await fetch(apiUrl("/api/auto-screen"));
     const body = await r.json();
     if (!r.ok) error.value = body?.error || `Scan gagal (${r.status})`;
     else scan.value = body;

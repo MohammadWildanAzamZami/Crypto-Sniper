@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { screenToken, screenAndAlert, batchScreen, isValidMint } from "./screener/screen.js";
 import { runAutoScan } from "./screener/autoScreen.js";
 import { sendAlert } from "./screener/telegram.js";
@@ -176,11 +177,18 @@ app.get("/api/:resource", async (req, res) => {
 
 // ---- Serve the built frontend (single-port mode) ----
 // Run `npm run build` in web/frontend first. Static assets are served from the
-// Vite dist/, and any non-/api route falls back to index.html (SPA).
+// Vite dist/, and any non-/api route falls back to index.html (SPA). When dist/
+// is absent (e.g. backend hosted separately as a pure API, with the frontend on
+// GitHub Pages) this is skipped and the server is API-only.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(__dirname, "../frontend/dist");
-app.use(express.static(distDir));
-app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(distDir, "index.html")));
+if (existsSync(path.join(distDir, "index.html"))) {
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(distDir, "index.html")));
+  console.log("[web] serving frontend build from dist/");
+} else {
+  console.log("[web] no frontend build found — running API-only");
+}
 
 // Run a normal long-lived HTTP listener (single-port: serves API + frontend).
 // Background auto-scan interval (0 disables it).

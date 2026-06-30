@@ -6,6 +6,7 @@
  */
 import { ref, reactive, onMounted } from "vue";
 import AppButton from "./AppButton.vue";
+import { apiUrl } from "../lib/api.js";
 
 const emit = defineEmits(["close", "updated"]);
 
@@ -30,7 +31,7 @@ const showAi = ref(false);
 const MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
 async function load() {
-  const r = await fetch("/api/settings");
+  const r = await fetch(apiUrl("/api/settings"));
   const s = await r.json();
   Object.assign(status, s);
   form.aiMode = s.aiMode;
@@ -41,7 +42,7 @@ async function load() {
 async function save() {
   saving.value = true;
   try {
-    const r = await fetch("/api/settings", {
+    const r = await fetch(apiUrl("/api/settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -59,7 +60,7 @@ async function test(target) {
   testMsg[target] = "Testing…";
   // Save first so the server has the latest values to test against.
   await save();
-  const r = await fetch("/api/settings/test", {
+  const r = await fetch(apiUrl("/api/settings/test"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ target }),

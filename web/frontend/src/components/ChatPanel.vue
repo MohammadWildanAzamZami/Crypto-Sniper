@@ -9,6 +9,7 @@ import { ref, reactive, nextTick, onMounted } from "vue";
 import ChatMessage from "./ChatMessage.vue";
 import ChatComposer from "./ChatComposer.vue";
 import SettingsPanel from "./SettingsPanel.vue";
+import { apiUrl } from "../lib/api.js";
 
 // items: { kind:'msg', role, text, time } | { kind:'tool', name, status, isError } | { kind:'error', text }
 const items = ref([]);
@@ -30,7 +31,7 @@ function nowHM() {
 
 async function loadStatus() {
   try {
-    const s = await (await fetch("/api/settings")).json();
+    const s = await (await fetch(apiUrl("/api/settings"))).json();
     Object.assign(status, s);
   } catch { /* offline; composer still usable, errors surface on send */ }
 }
@@ -56,7 +57,7 @@ async function send(text) {
   let assistant = null; // current streaming assistant msg item
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch(apiUrl("/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

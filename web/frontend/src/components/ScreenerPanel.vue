@@ -9,6 +9,7 @@
 import { ref, computed } from "vue";
 import AppButton from "./AppButton.vue";
 import AppInput from "./AppInput.vue";
+import { apiUrl } from "../lib/api.js";
 
 // USDC mint as a safe, always-listed default so the panel demos out-of-the-box.
 const address = ref("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -95,7 +96,7 @@ async function screen() {
   error.value = "";
   report.value = null;
   try {
-    const res = await fetch(`/api/screen?token_address=${encodeURIComponent(v)}`);
+    const res = await fetch(apiUrl(`/api/screen?token_address=${encodeURIComponent(v)}`));
     const body = await res.json();
     if (!res.ok) {
       error.value = body?.error || `Request failed (${res.status})`;

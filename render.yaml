@@ -1,0 +1,18 @@
+# Render blueprint for the backend API (web/server). One free web service.
+# Render injects PORT; the server reads process.env.PORT. Deploy via
+# https://dashboard.render.com → New → Blueprint → pick this repo.
+#
+# Leave secret keys UNSET for a safe public deploy: Radar/Screener still work via
+# DexScreener's free API. Only add SOLSCAN_API_KEY / ANTHROPIC / TELEGRAM if you
+# also add request auth — these endpoints are otherwise open to anyone.
+services:
+  - type: web
+    name: memecoin-screener-api
+    runtime: node
+    rootDir: web/server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: RADAR_INTERVAL_MIN
+        value: "15"
