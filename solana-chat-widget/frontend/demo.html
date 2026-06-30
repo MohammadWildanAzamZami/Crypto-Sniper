@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo · Solana Chat Widget</title>
+<style>
+  body{margin:0;background:#0b0d10;color:#e7e9ec;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:48px 20px;}
+  h1{font-size:24px;margin:0 0 8px;}
+  p{color:#8b93a1;line-height:1.6;}
+  code{background:#191d24;border:1px solid #262b33;border-radius:6px;padding:2px 6px;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#7cf2b0;}
+  .card{background:#13161b;border:1px solid #262b33;border-radius:14px;padding:20px;margin-top:20px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Demo Solana Chat Widget</h1>
+    <p>Bubble chat muncul di pojok kanan bawah. Klik untuk mengobrol dengan AI.
+       Widget ini memanggil backend di <code id="be"></code>.</p>
+
+    <div class="card">
+      <h2 style="margin-top:0;font-size:16px;">Cara pasang di web aslimu</h2>
+      <p>Cukup tambahkan satu baris ini sebelum <code>&lt;/body&gt;</code>:</p>
+      <p><code>&lt;script src="solana-chat-widget.js" data-backend="https://backend-kamu.com"&gt;&lt;/script&gt;</code></p>
+    </div>
+  </div>
+
+  <!-- Konfigurasi backend untuk demo lokal. Ganti ke URL backend produksimu. -->
+  <script>
+    window.SOLANA_CHAT_WIDGET = {
+      backend: "http://localhost:8788",
+      title: "Asisten Memecoin",
+      greeting: "Halo! Tanya apa saja soal screening memecoin Solana. (Bukan saran finansial.)"
+    };
+    document.getElementById("be").textContent = window.SOLANA_CHAT_WIDGET.backend;
+  </script>
+  <script src="solana-chat-widget.js"></script>
+</body>
+</html>
