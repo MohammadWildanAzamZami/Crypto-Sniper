@@ -10,7 +10,7 @@ import { SYSTEM_PROMPT } from "./systemPrompt.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 8788;
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-fable-5";
 const ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const RATE_MAX = Number(process.env.RATE_MAX || 15);
 

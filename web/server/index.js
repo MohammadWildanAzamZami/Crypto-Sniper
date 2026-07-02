@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { screenToken, screenAndAlert, batchScreen, isValidMint } from "./screener/screen.js";
 import { runAutoScan } from "./screener/autoScreen.js";
+import { runProRadar } from "./screener/proRadar.js";
 import { sendAlert } from "./screener/telegram.js";
 import { ALLOWED, solscanFetch } from "./solscan.js";
 import { publicStatus, getState, applySettings, testTarget } from "./ai/settings.js";
@@ -173,6 +174,25 @@ app.get("/api/auto-screen", scanLimit, async (req, res) => {
 app.get("/api/auto-screen/latest", async (_req, res) => {
   try {
     res.json(await getLatestScan());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// ---- Pro Radar (AI-boosted, Fable 5) -------------------------------------
+// Same discovery funnel as the 10x Radar, but enriches the finalists with the
+// liquidity-lock data and runs a Fable 5 ranking pass (conviction + thesis +
+// red flags). Uses whatever AI mode is configured (local CLI or API key); if
+// the AI is unavailable it degrades to pure-heuristic ordering (aiUsed:false).
+app.get("/api/pro-radar", scanLimit, async (req, res) => {
+  const st = getState();
+  try {
+    res.json(await runProRadar({
+      solscanKey: solscanKey(),
+      nowMs: Date.now(),
+      preset: req.query.preset,
+      ai: { aiMode: st.aiMode, aiKey: st.aiKey, model: st.model, claudePath: st.claudePath },
+    }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

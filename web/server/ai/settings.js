@@ -26,7 +26,7 @@ const state = {
   aiMode: process.env.AI_MODE || "local", // "api" | "local"
   aiProvider: "claude", // "claude" | "openai" | "gemini"
   aiKey: process.env.ANTHROPIC_API_KEY || "",
-  model: process.env.ANTHROPIC_MODEL || "claude-opus-4-8",
+  model: process.env.ANTHROPIC_MODEL || "claude-fable-5",
   claudePath: process.env.CLAUDE_CLI_PATH || "claude",
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",

@@ -4,6 +4,7 @@ import AppButton from "../components/AppButton.vue";
 import StatList from "../components/StatList.vue";
 import ScreenerPanel from "../components/ScreenerPanel.vue";
 import RadarPanel from "../components/RadarPanel.vue";
+import ProRadarPanel from "../components/ProRadarPanel.vue";
 import ManualScoringPanel from "../components/ManualScoringPanel.vue";
 // import ChecklistPanel from "../components/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
@@ -48,6 +49,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     </header>
 
     <RadarPanel />
+
+    <ProRadarPanel />
 
     <ScreenerPanel />
 

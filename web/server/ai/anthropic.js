@@ -20,7 +20,7 @@ Rules:
 - Be concise and lead with the answer. Render addresses in backticks. Not financial advice — note risk for memecoins.
 - Stay on Solana on-chain topics; politely decline unrelated requests.`;
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-fable-5";
 const MAX_TOOL_ROUNDS = 6;
 
 // Write one SSE event. Each event is a JSON line under the default "message".

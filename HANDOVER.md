@@ -16,13 +16,14 @@
 ## 1. TL;DR — current state
 
 The repo grew from "Solscan MCP server + a sample explorer page" into a full
-**Solana memecoin screening platform**. Five systems now live here:
+**Solana memecoin screening platform**. Six systems now live here:
 
 | Area | Status | Notes |
 |------|--------|-------|
 | **GEM Score™ screener** | ✅ Works | 0–100 score, 3 weighted pillars; DexScreener-only works key-less |
 | **10x Radar** (auto-screener) | ✅ Works | discover → screen → filter → Telegram, runs on an interval/Cron |
-| **AI Analyst chat** | ✅ Works | Claude tool-loop over SSE; API key or local Claude-CLI mode |
+| **Pro Radar** (AI-boosted radar) | ✅ Works | 10x funnel + RugCheck enrich + **Fable 5** rank (conviction/thesis/red flags); `GET /api/pro-radar`, degrades to heuristic if AI is off |
+| **AI Analyst chat** | ✅ Works | Claude tool-loop over SSE; API key or local Claude-CLI mode; default model now `claude-fable-5` |
 | **Telegram alerts + Trojan link** | ✅ Works | HTML alert + 1-tap buy deep-link (no wallet held) |
 | **Node MCP server** (`web/mcp`) | ✅ Works | 5 screener tools for Claude Desktop, shares the screening core |
 | Rust MCP server (`solscan-mcp`) | ✅ Builds & runs | 37 Solscan tools over stdio (original server) |
@@ -45,6 +46,7 @@ Memecoin-Screener/
 ├── CLAUDE.md              # Auto-loaded context for Claude Code
 ├── HANDOVER.md            # This file
 ├── LAPORAN.md             # Indonesian overview + flowcharts of everything built
+├── web/PRO-RADAR.md       # Pro Radar (Fable 5) data-flow + Mermaid/ASCII flowcharts
 ├── README.md              # Original project README (install + usage)
 ├── TOOLS.md               # Reference for all Rust MCP tools
 ├── Cargo.toml / .lock     # Rust crate manifest
@@ -58,6 +60,7 @@ Memecoin-Screener/
     │   ├── index.js       # Routes: /api/screen, /api/auto-screen, /api/chat, /api/:resource
     │   ├── solscan.js     # Allowlist + fetch to Solscan
     │   ├── ai/            # AI analyst: anthropic.js (SSE tool-loop), local.js,
+    │   │                  #   analyze.js (Fable 5 Pro-Radar ranking),
     │   │                  #   tools.js (6 tools), settings.js (secret store + tests)
     │   └── screener/      # Framework-free screening core:
     │       ├── screen.js      #   orchestrator (single / batch)
@@ -65,6 +68,7 @@ Memecoin-Screener/
     │       ├── sources.js     #   DexScreener + Solscan holders + RugCheck lock
     │       ├── discover.js    #   trending-token feeds (Radar input)
     │       ├── autoScreen.js  #   10x Radar: discover → screen → filter
+    │       ├── proRadar.js    #   Pro Radar: funnel → enrich → Fable 5 rank
     │       └── telegram.js    #   alert formatting + Trojan deep-link
     ├── mcp/server.js      # Node MCP server (5 screener tools) for Claude Desktop
     └── frontend/          # Vite + Vue 3 app
@@ -111,20 +115,32 @@ matches before pushing to Telegram. Runs on a `setInterval` (default 15 min); se
 `RADAR_INTERVAL_MIN=0` to disable, or trigger `GET /api/auto-screen` from an
 external scheduler/cron if you prefer to drive it on demand.
 
-### 3.4 AI analyst — server-side tool-loop
+### 3.4 Pro Radar — AI-ranked variant of the funnel
+`screener/proRadar.js` reuses the 10x Radar discovery funnel (wider net, ~28 mints),
+fast-screens them for GEM Score, keeps the top-10 finalists, then **enriches** those
+finalists with RugCheck LP-lock data and runs an AI ranking pass via
+`ai/analyze.js` on **Fable 5** (`claude-fable-5`). The model returns, per token,
+`conviction` (0–100), `tier` (S/A/B/C), a `thesis`, `catalysts[]`, `redFlags[]`, and
+an `action` (APE/WATCH/AVOID). Results are sorted by conviction → action → GEM.
+The AI runs through whatever mode is configured (local Claude-CLI or Anthropic API);
+if the AI is unavailable it **degrades to pure-heuristic GEM ordering** and returns
+`aiUsed:false` (the UI shows a ⚠️ badge). Exposed at `GET /api/pro-radar`. Full
+data-flow + flowcharts live in `web/PRO-RADAR.md`.
+
+### 3.5 AI analyst — server-side tool-loop
 `ai/anthropic.js` runs Claude's agentic tool-use loop server-side and streams the
 reply over SSE. The 6 tools (`ai/tools.js`) map to the same allowlisted Solscan
 resources and the screener, so the model can only reach data we already expose.
 A **local mode** (`ai/local.js`) drives the Claude CLI instead of the API.
 
-### 3.5 Design system is token-driven
+### 3.6 Design system is token-driven
 - All raw values (color/space/type/radius/motion) live once in
   `web/frontend/src/styles/tokens.css` as **primitive** tokens, aliased to
   intent-based **semantic** tokens. Components reference semantic tokens only.
 - Rationale: single source of truth, theme-ability, and consistency — changing a
   brand color is a one-line edit.
 
-### 3.6 Errors are surfaced, never swallowed or crashed
+### 3.7 Errors are surfaced, never swallowed or crashed
 - Rust: failed requests return `McpError`; the server never panics on a bad call.
 - Web: the proxy forwards Solscan's real HTTP status and message; the UI renders a
   visible error state (e.g. the 401 upgrade message) instead of failing silently.
@@ -174,7 +190,8 @@ npm run dev                                              # http://localhost:8787
 cd web/frontend && npm install && npm run dev            # http://localhost:5173
 ```
 Relevant `.env` vars (all optional): `SOLSCAN_API_KEY`, `ANTHROPIC_API_KEY`,
-`ANTHROPIC_MODEL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `RADAR_INTERVAL_MIN`
+`ANTHROPIC_MODEL` (default `claude-fable-5`; used by the chat analyst and Pro Radar),
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `RADAR_INTERVAL_MIN`
 (0 disables the local auto-scan), `RADAR_PRESET`.
 Stop background servers: `lsof -ti:5173,8787 | xargs kill`.
 

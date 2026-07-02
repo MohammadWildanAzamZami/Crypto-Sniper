@@ -16,13 +16,13 @@ const status = reactive({
   aiMode: "api",
   aiProvider: "claude",
   aiConfigured: false,
-  model: "claude-opus-4-8",
+  model: "claude-fable-5",
   telegramConfigured: false,
 });
 
 // Local form state. Secret fields stay blank unless the user types a new value
 // (blank = "leave unchanged" on the server).
-const form = reactive({ solscanKey: "", aiMode: "api", aiProvider: "claude", aiKey: "", model: "claude-opus-4-8" });
+const form = reactive({ solscanKey: "", aiMode: "api", aiProvider: "claude", aiKey: "", model: "claude-fable-5" });
 const saving = ref(false);
 const testMsg = reactive({ solscan: "", ai: "" });
 const showSolscan = ref(false);
@@ -32,7 +32,7 @@ const adminToken = ref(getAdminToken());
 const showAdmin = ref(false);
 const saveMsg = ref("");
 
-const MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"];
+const MODELS = ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"];
 
 async function load() {
   const r = await fetch(apiUrl("/api/settings"));

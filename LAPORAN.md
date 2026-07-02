@@ -9,15 +9,16 @@
 ## 1. Ringkasan
 
 Repo ini berkembang dari "MCP server Solscan + UI explorer sederhana" menjadi
-**platform screening memecoin Solana** yang lengkap. Ada 5 sistem besar:
+**platform screening memecoin Solana** yang lengkap. Ada 6 sistem besar:
 
 | # | Sistem | Status | Fungsi inti |
 |---|--------|--------|-------------|
 | 1 | **GEM Score™ Screener** | ✅ Jalan | Skor 0–100 kualitas/risiko token dari data live |
 | 2 | **10x Radar (Auto-Screener)** | ✅ Jalan | Otomatis cari token "potensi 10x" tiap interval |
-| 3 | **AI Analyst Chat** | ✅ Jalan | Chat AI (Claude) yang bisa panggil tool on-chain |
-| 4 | **Telegram Alert + Trojan link** | ✅ Jalan | Push notif token bagus + link beli 1-tap |
-| 5 | **MCP Servers (Rust + Node)** | ✅ Jalan | Sambungkan screener ke Claude Desktop |
+| 3 | **🧠 Pro Radar (Fable 5)** | ✅ Jalan | 10x Radar + peringkat AI: conviction, tesis, red flag |
+| 4 | **AI Analyst Chat** | ✅ Jalan | Chat AI (Claude) yang bisa panggil tool on-chain |
+| 5 | **Telegram Alert + Trojan link** | ✅ Jalan | Push notif token bagus + link beli 1-tap |
+| 6 | **MCP Servers (Rust + Node)** | ✅ Jalan | Sambungkan screener ke Claude Desktop |
 
 Plus: **Kalkulator Screening Manual + Checklist** (hitung skor risiko dari angka
 yang kamu baca sendiri di DexScreener/RugCheck), **Settings panel** (kelola API key
@@ -67,7 +68,31 @@ Alur: **Discover → Screen → Filter → Alert**
 - Auto-jalan tiap `RADAR_INTERVAL_MIN` menit (default 15); set `=0` untuk mematikan,
   atau panggil `GET /api/auto-screen` dari scheduler eksternal bila ingin on-demand.
 
-### 2.3 AI Analyst Chat
+### 2.3 🧠 Pro Radar — 10x Radar bertenaga AI (Fable 5)
+**File:** `web/server/screener/proRadar.js`, `web/server/ai/analyze.js`,
+komponen frontend `web/frontend/src/components/ProRadarPanel.vue`
+**Endpoint:** `GET /api/pro-radar` · **Dokumen alur lengkap:** [web/PRO-RADAR.md](web/PRO-RADAR.md)
+
+Funnel penemuannya sama seperti 10x Radar, tapi finalisnya di-*enrich* dengan data
+liquidity-lock lalu diperingkat oleh model **Fable 5** (`claude-fable-5`).
+
+Alur: **Discover → Fast Screen → Pre-filter → Enrich → AI Rank → Merge**
+- **Discover** — sampai 28 mint trending dari feed DexScreener (jaring lebih lebar).
+- **Fast screen** semua mint (`skipLock`, konkuren ×10) → GEM Score 0–100.
+- **Pre-filter** preset `aggressive` → ambil **TOP 10 finalis** (GEM tertinggi).
+- **Enrich** finalis dengan RugCheck (LP locked %, locked USD, status, flag rugged).
+- **AI Rank** — kirim payload ringkas tiap finalis ke Fable 5, balas JSON:
+  `conviction 0–100`, `tier S/A/B/C`, `thesis`, `catalysts[]`, `redFlags[]`,
+  `action (APE/WATCH/AVOID)`.
+- **Merge + sort** — AI aktif → urut conviction ↓ lalu action lalu GEM. AI mati →
+  fallback urut GEM Score (`aiUsed:false`, badge ⚠️ di UI).
+- Dua jalur AI: **Local** (CLI `claude -p`, tanpa biaya) atau **API** (Anthropic key).
+  Bila AI tak tersedia, Pro Radar tetap jalan sebagai peringkat heuristik murni.
+
+Perbandingan singkat vs 10x Radar: Pro Radar menambah LP-lock enrichment untuk
+finalis + peringkat AI (conviction/tesis/red flag); trade-off-nya lebih lambat.
+
+### 2.4 AI Analyst Chat
 **File:** `web/server/ai/anthropic.js`, `local.js`, `tools.js`, `settings.js`
 + komponen frontend `ChatWidget/ChatPanel/ChatComposer/ChatMessage.vue`
 
@@ -77,22 +102,24 @@ Alur: **Discover → Screen → Filter → Alert**
   (`chain_info`, `token_meta`, `token_holders`, `account_detail`,
   `account_transactions`, `screen_token`), lalu menalar hasilnya.
 - Dua mode: **API** (pakai Anthropic key) atau **Local** (pakai Claude CLI).
+- **Model default kini `claude-fable-5`** (bisa diganti ke Opus 4.8 / Sonnet 5 /
+  Haiku 4.5 dari Settings). Sebelumnya default `claude-opus-4-8`.
 - Key AI tidak pernah sampai ke browser; loop berjalan server-side.
 
-### 2.4 Telegram + Trojan
+### 2.5 Telegram + Trojan
 **File:** `web/server/screener/telegram.js`
 - Format alert HTML rapi (skor, breakdown pilar, verdict, link DexScreener).
 - **Trojan deep-link** (`t.me/solana_trojanbot?start=<mint>`): tap = panel beli
   langsung terbuka. Server tidak pernah memegang wallet/seed/private key — beli
   tetap aksi manual user. Batas ini disengaja: screener memberi info, manusia memutuskan.
 
-### 2.5 MCP Servers
+### 2.6 MCP Servers
 - **Rust** (`src/`) — 37 tool Solscan Pro via stdio JSON-RPC (server asli repo).
 - **Node** (`web/mcp/server.js`) — 5 tool screener untuk Claude Desktop
   (`screen_token`, `screen_and_alert`, `batch_screen`, `get_holder_analysis`,
   `check_bonding_curve`), memakai core screening yang sama dengan web proxy.
 
-### 2.6 Kalkulator Screening Manual + Checklist
+### 2.7 Kalkulator Screening Manual + Checklist
 **File:** `web/frontend/src/components/ManualScoringPanel.vue`, `ChecklistPanel.vue`
 
 - **Kalkulator manual**: kamu ketik angka yang kamu lihat langsung di
@@ -106,7 +133,7 @@ Alur: **Discover → Screen → Filter → Alert**
 - **Tema**: palet dark blue-grey + aksen mint dengan angka monospace, seragam di
   seluruh app lewat design token (`styles/tokens.css`) — tanpa hex mentah di komponen.
 
-### 2.7 Settings & keamanan key
+### 2.8 Settings & keamanan key
 **File:** `web/server/ai/settings.js`
 - Semua secret (Solscan / Anthropic / Telegram) hidup di store memori server,
   di-seed dari `.env` saat boot.
@@ -130,6 +157,7 @@ flowchart TD
         Settings["Settings Store (API keys di memori)"]
         ScreenAPI["/api/screen, /api/batch-screen"]
         RadarAPI["/api/auto-screen (10x Radar)"]
+        ProRadarAPI["/api/pro-radar (Pro Radar + AI Fable 5)"]
         ChatAPI["/api/chat (SSE)"]
         SolscanProxy["/api/:resource (allowlist Solscan)"]
     end
@@ -138,6 +166,8 @@ flowchart TD
         Screen["screen.js (orchestrator)"]
         Gem["gemScore.js (skor 3 pilar)"]
         Auto["autoScreen.js (discover->filter)"]
+        Pro["proRadar.js (funnel + AI rank)"]
+        Analyze["ai/analyze.js (Fable 5 ranking)"]
         AI["ai/anthropic.js (tool-loop)"]
     end
 
@@ -158,6 +188,8 @@ flowchart TD
 
     ScreenAPI --> Screen
     RadarAPI --> Auto --> Screen
+    ProRadarAPI --> Pro --> Screen
+    Pro --> Analyze --> Anthropic
     ChatAPI --> AI
     Screen --> Gem
     AI -->|tool: screen_token| Screen
@@ -265,27 +297,30 @@ web/
 │   ├── index.js                 # Express proxy: route /api/* + serve frontend build (1 port)
 │   ├── solscan.js               # Allowlist + fetch ke Solscan
 │   ├── ai/
-│   │   ├── anthropic.js         # Tool-loop + streaming SSE (Claude API)
+│   │   ├── anthropic.js         # Tool-loop + streaming SSE (Claude API, default Fable 5)
 │   │   ├── local.js             # Mode lokal via Claude CLI
+│   │   ├── analyze.js           # Peringkat AI Pro Radar (Fable 5): conviction/tesis/red flag
 │   │   ├── tools.js             # 6 tool yang boleh dipanggil AI
-│   │   └── settings.js          # Store secret + status publik + test key
+│   │   └── settings.js          # Store secret + status publik + test key (default model Fable 5)
 │   └── screener/
 │       ├── screen.js            # Orchestrator screening 1 token / batch
 │       ├── gemScore.js          # Logika skor 3 pilar
 │       ├── sources.js           # DexScreener + Solscan + RugCheck
 │       ├── discover.js          # Feed token trending (untuk Radar)
 │       ├── autoScreen.js        # 10x Radar: discover->screen->filter
+│       ├── proRadar.js          # Pro Radar: funnel + enrich + AI rank (Fable 5)
 │       └── telegram.js          # Alert Telegram + Trojan deep-link
 ├── mcp/server.js                # MCP Node (5 tool screener) untuk Claude Desktop
 └── frontend/src/
     ├── App.vue                  # Layout + ChatWidget mengambang
     ├── styles/tokens.css        # Design token (tema dark blue-grey + aksen mint)
-    ├── pages/ExplorerPage.vue   # Halaman utama (Radar di atas, kalkulator manual di bawah)
+    ├── pages/ExplorerPage.vue   # Halaman utama (Radar & Pro Radar di atas, kalkulator manual di bawah)
     └── components/
         ├── ManualScoringPanel.vue # Kalkulator skor risiko manual (input tangan)
         ├── ChecklistPanel.vue   # Checklist kriteria screening cepat
         ├── ScreenerPanel.vue    # UI screening 1 token
         ├── RadarPanel.vue       # UI 10x Radar
-        ├── SettingsPanel.vue    # UI kelola API key
+        ├── ProRadarPanel.vue    # UI Pro Radar (kartu + meter conviction, tesis, red flag)
+        ├── SettingsPanel.vue    # UI kelola API key (pilih model, default Fable 5)
         └── Chat*.vue            # Widget chat AI
 ```
