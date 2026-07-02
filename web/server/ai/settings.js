@@ -19,7 +19,11 @@ const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "clau
 
 const state = {
   solscanKey: process.env.SOLSCAN_API_KEY || "",
-  aiMode: "api", // "api" | "local"
+  // Default ke mode lokal: pakai CLI `claude` (tanpa API key, tanpa biaya).
+  // Catatan: mode lokal butuh CLI `claude` di mesin yang menjalankan server.
+  // Di host publik (mis. Render) yang tak punya CLI itu, chat belum berfungsi
+  // sampai di-switch ke "api" + isi ANTHROPIC_API_KEY lewat Settings.
+  aiMode: process.env.AI_MODE || "local", // "api" | "local"
   aiProvider: "claude", // "claude" | "openai" | "gemini"
   aiKey: process.env.ANTHROPIC_API_KEY || "",
   model: process.env.ANTHROPIC_MODEL || "claude-opus-4-8",
