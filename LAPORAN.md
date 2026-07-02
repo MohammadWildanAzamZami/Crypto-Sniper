@@ -316,7 +316,104 @@ Tampil di RadarPanel (diurutkan skor tertinggi)
 
 ---
 
-## 6. Prinsip arsitektur yang dipegang
+## 6. Flowchart Alur: 🧠 Pro Radar (AI Fable 5)
+
+Alur end-to-end dari klik "Scan AI" sampai kartu token muncul di UI. Kolom kanan
+tiap tahap menunjukkan **dari mana datanya** dan **perlu key atau tidak**.
+
+### Versi Mermaid (render di GitHub)
+
+```mermaid
+flowchart TD
+    A["User klik 'Scan AI'<br/>GET /api/pro-radar"] --> B
+
+    subgraph S1["1 · DISCOVER — discover.js"]
+      B["discoverSolanaTokens(limit 28)"] --> B1["DexScreener feeds (PUBLIK, tanpa key):<br/>token-boosts/latest · token-boosts/top · token-profiles/latest"]
+      B1 --> B2["≤28 mint trending, dedup,<br/>buang USDC/USDT/wSOL"]
+    end
+
+    B2 --> C
+    subgraph S2["2 · FAST SCREEN semua mint — konkuren x10, skipLock:true"]
+      C["screenToken(mint)"] --> C1["DexScreener tokens API (PUBLIK):<br/>harga, likuiditas, MC/FDV, volume,<br/>priceChange, txns buy/sell, umur pair"]
+      C --> C2["Solscan Pro (opsional, butuh key Pro):<br/>jumlah holder + konsentrasi"]
+      C1 --> C3["computeGemScore() → GEM 0–100<br/>(Likuiditas 40 / Momentum 35 / Trust 25)"]
+      C2 --> C3
+    end
+
+    C3 --> D
+    subgraph S3["3 · PRE-FILTER — autoScreen.js"]
+      D["evaluateMoonshot(preset 'aggressive')<br/>MC≤500k · Liq≥5k · GEM≥55 · umur 0.5–14j · buy≥50%"] --> D1["yang LOLOS → urut GEM ↓<br/>→ ambil TOP 10 finalis + hitung upsideX"]
+    end
+
+    D1 --> E
+    subgraph S4["4 · ENRICH finalis — screenToken(skipLock:false)"]
+      E["RugCheck report (PUBLIK, tanpa key):<br/>LP locked %, locked USD, status, flag rugged"]
+    end
+
+    E --> F
+    subgraph S5["5 · AI RANK — ai/analyze.js → FABLE 5"]
+      F["kirim payload ringkas 10 finalis"] --> F1["Local: CLI 'claude -p' (tanpa biaya)<br/>API: Anthropic SDK (butuh key)"]
+      F1 --> F2["balas JSON per token:<br/>conviction 0–100, tier S/A/B/C,<br/>thesis, catalysts[], redFlags[], action"]
+    end
+
+    F2 --> G{"AI berhasil?"}
+    G -->|Ya| H["6 · MERGE + urut:<br/>conviction ↓ → action → GEM"]
+    G -->|Tidak / AI mati| I["Fallback: urut GEM Score ↓<br/>aiUsed:false (badge ⚠️)"]
+    H --> J["UI: kartu token + meter conviction,<br/>tesis, katalis ▲, red flag ▼, tombol Chart/Buy"]
+    I --> J
+```
+
+### Versi ASCII (kalau Mermaid tak render)
+
+```
+        ┌─────────────────────────────────────────────┐
+        │  User klik "Scan AI"  →  GET /api/pro-radar   │
+        └──────────────────────┬──────────────────────┘
+                               v
+ 1) DISCOVER  ── discover.js ───────────────────────────────────────────────
+    Sumber : DexScreener  token-boosts/latest · /top · token-profiles/latest
+             (PUBLIK, tanpa key)
+    Ambil  : ≤28 mint Solana trending → dedup → buang USDC/USDT/wSOL
+                               v
+ 2) FAST SCREEN semua mint  ── screen.js + sources.js (konkuren x10, skipLock)─
+    Sumber : DexScreener  latest/dex/tokens/<mint>   (PUBLIK)
+    Data   : harga, likuiditas USD, MC/FDV, volume 1h/6h/24h,
+             priceChange 1h/6h/24h, txns buy/sell 24j, umur pair, jumlah pair
+    Opsi   : Solscan Pro /token/holders → holder & konsentrasi (hanya jika key Pro)
+    Skor   : computeGemScore() → GEM 0–100 (Likuiditas 40 + Momentum 35 + Trust 25)
+                               v
+ 3) PRE-FILTER heuristik  ── autoScreen.js: evaluateMoonshot() ──────────────
+    Preset : "aggressive"  MC ≤ $500k · Liq ≥ $5k · GEM ≥ 55 ·
+             umur 0.5j–14h · buy ratio ≥ 50%
+             ┌──────────────┴──────────────┐
+          LOLOS                          GAGAL (dibuang)
+             v
+    urut GEM ↓ → ambil TOP 10 finalis  (+ hitung upsideX ke target $10M)
+                               v
+ 4) ENRICH finalis  ── screen.js (skipLock:false) + sources.js ──────────────
+    Sumber : RugCheck  v1/tokens/<mint>/report   (PUBLIK, tanpa key)
+    Data   : LP locked %, locked USD, total LP USD, status, flag "rugged"
+                               v
+ 5) AI RANK  ── ai/analyze.js  →  FABLE 5 (claude-fable-5) ───────────────────
+    Input  : payload RINGKAS per finalis (gemScore, MC, likuiditas, volume,
+             priceChange, buys/sells, buyRatio%, umur, lockedPct, status, rugged)
+    Jalur  : Local → CLI `claude -p` (tanpa biaya)  |  API → Anthropic SDK (key)
+    Output : conviction 0–100, tier S/A/B/C, thesis, catalysts[], redFlags[],
+             action (APE / WATCH / AVOID)      ← model hanya menalar angka
+                               v
+                     ┌── AI berhasil? ──┐
+                    YA                 TIDAK / AI mati
+                     v                   v
+ 6) MERGE + urut:                Fallback: urut GEM Score ↓
+    conviction ↓ → action → GEM   (aiUsed:false, badge ⚠️ di UI)
+                     └────────┬─────────┘
+                              v
+   UI: kartu token + meter conviction, tesis, katalis ▲, red flag ▼, tombol Chart/Buy
+```
+
+---
+
+## 7. Prinsip arsitektur yang dipegang
 
 1. **Key = secret server-side.** Solscan/Anthropic/Telegram key cuma ada di Express
    proxy (`settings.js`); browser hanya lihat status boolean.
@@ -329,7 +426,7 @@ Tampil di RadarPanel (diurutkan skor tertinggi)
 
 ---
 
-## 7. Peta file penting
+## 8. Peta file penting
 
 ```
 web/
