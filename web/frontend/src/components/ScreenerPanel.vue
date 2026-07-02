@@ -18,8 +18,27 @@ const loading = ref(false);
 const error = ref("");
 const report = ref(null);
 const buyHint = ref("");
+const logoBroken = ref(false);
+const caCopied = ref(false);
 
 const SOLANA_ADDR = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+// Lettered avatar fallback when a token has no logo (or the image fails to load).
+const tokenInitials = computed(() => {
+  const t = report.value?.token;
+  return ((t?.symbol || t?.name || "?").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase()) || "?";
+});
+
+// Click the contract address to copy it to the clipboard.
+async function copyCa() {
+  const ca = report.value?.token?.address;
+  if (!ca) return;
+  try {
+    await navigator.clipboard.writeText(ca);
+    caCopied.value = true;
+    setTimeout(() => { caCopied.value = false; }, 1800);
+  } catch { /* clipboard blocked */ }
+}
 
 const verdictColor = computed(() => {
   const l = report.value?.verdict?.label;
@@ -95,6 +114,8 @@ async function screen() {
   loading.value = true;
   error.value = "";
   report.value = null;
+  logoBroken.value = false;
+  caCopied.value = false;
   try {
     const res = await fetch(apiUrl(`/api/screen?token_address=${encodeURIComponent(v)}`));
     const body = await res.json();
@@ -146,8 +167,28 @@ async function screen() {
         </div>
         <div class="score__meta">
           <p class="score__name">
+            <span class="score__logo" aria-hidden="true">
+              <img
+                v-if="report.token.logoUrl && !logoBroken"
+                :src="report.token.logoUrl"
+                :alt="report.token.symbol"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="logoBroken = true"
+              />
+              <span v-else class="score__logo-fallback">{{ tokenInitials }}</span>
+            </span>
             {{ report.token.name }} <span class="score__sym">({{ report.token.symbol }})</span>
           </p>
+          <button
+            type="button"
+            class="score__addr"
+            :title="'Klik untuk salin alamat: ' + report.token.address"
+            @click="copyCa"
+          >
+            <span class="score__addr-text">{{ report.token.address }}</span>
+            <span class="score__addr-copy">{{ caCopied ? "✅ disalin" : "📋 salin" }}</span>
+          </button>
           <p class="score__verdict" :style="{ color: verdictColor }">
             {{ report.verdict.emoji }} {{ report.verdict.label }} — {{ report.verdict.action }}
           </p>
@@ -279,8 +320,20 @@ async function screen() {
 .score__num { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--text-heading); }
 .score__den { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: -4px; }
 .score__meta { display: grid; gap: var(--space-2); }
-.score__name { margin: 0; font-size: var(--font-size-lg); color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.score__name { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--font-size-lg); color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.score__logo { flex: none; width: 32px; height: 32px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg-raised); border: 1px solid var(--border-default); }
+.score__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.score__logo-fallback { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: var(--text-link); letter-spacing: 0.3px; }
 .score__sym { color: var(--text-muted); }
+.score__addr { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; justify-self: start;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: var(--font-size-xs); color: var(--text-muted);
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.score__addr-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score__addr-copy { flex: none; color: var(--text-link); }
+.score__addr:hover .score__addr-text { color: var(--text-body); }
+.score__addr:hover .score__addr-copy { color: var(--text-link-hover); }
+.score__addr:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-xs); }
 .score__verdict { margin: 0; font-weight: var(--font-weight-medium); }
 .score__price, .score__src { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 

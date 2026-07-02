@@ -126,6 +126,7 @@ export function computeGemScore(metrics, holders, nowMs, lock) {
       address: metrics.address,
       name: metrics.name,
       symbol: metrics.symbol,
+      logoUrl: metrics.logoUrl || null,
       priceUsd: metrics.priceUsd,
       url: metrics.url,
       pairAddress: metrics.pairAddress,

@@ -115,6 +115,7 @@ export async function runAutoScan({ solscanKey, nowMs, preset = "balanced", limi
       address: r.report.token.address,
       name: r.report.token.name,
       symbol: r.report.token.symbol,
+      logoUrl: r.report.token.logoUrl || null,
       gemScore: r.report.gemScore,
       verdict: r.report.verdict,
       marketCap: r.report.metrics.marketCap || 0,

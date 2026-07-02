@@ -26,6 +26,9 @@ export async function fetchDexScreener(tokenAddress) {
     address: tokenAddress,
     name: best.baseToken?.name || "Unknown",
     symbol: best.baseToken?.symbol || "?",
+    // Token logo — DexScreener serves it on the pair's `info.imageUrl`. Null when
+    // the token has no metadata image; the UI falls back to a lettered avatar.
+    logoUrl: best.info?.imageUrl || null,
     priceUsd: Number(best.priceUsd) || 0,
     liquidityUsd: best.liquidity?.usd || 0,
     fdv: best.fdv || 0,
