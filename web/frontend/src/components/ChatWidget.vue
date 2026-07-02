@@ -192,7 +192,7 @@ function onResizeKey(e) {
     :aria-label="open ? 'Close chat assistant' : 'Open chat assistant'"
     @click="toggleOpen"
   >
-    <svg v-if="!open" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+    <svg v-if="!open" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
       <path fill="currentColor"
         d="M12 2C6.5 2 2 6.03 2 11c0 2.7 1.34 5.13 3.47 6.78L4.5 22l4.6-2.1c.92.23 1.9.35 2.9.35 5.5 0 10-4.03 10-9S17.5 2 12 2zm-3.2 7.2h6.4a.8.8 0 0 1 0 1.6H8.8a.8.8 0 0 1 0-1.6zm0 3.2h4.8a.8.8 0 0 1 0 1.6H8.8a.8.8 0 0 1 0-1.6z" />
     </svg>
@@ -207,8 +207,8 @@ function onResizeKey(e) {
   right: 24px;
   bottom: 24px;
   z-index: 1000;
-  width: 60px;
-  height: 60px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -224,7 +224,7 @@ function onResizeKey(e) {
 .cw__fab:active { transform: scale(0.96); }
 .cw__fab:focus-visible { outline: 3px solid var(--border-focus, #6ea8fe); outline-offset: 3px; }
 .cw__fab--open { background: var(--bg-raised, #2a2a2a); color: var(--text-body, #eee); animation: none; }
-.cw__fab-x { font-size: 22px; line-height: 1; }
+.cw__fab-x { font-size: 18px; line-height: 1; }
 
 @keyframes cw-pulse {
   0% { box-shadow: 0 6px 20px rgba(0, 87, 183, 0.45), 0 0 0 0 rgba(0, 87, 183, 0.5); }

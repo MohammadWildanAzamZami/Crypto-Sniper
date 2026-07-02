@@ -1,11 +1,11 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import AppButton from "../components/AppButton.vue";
 import StatList from "../components/StatList.vue";
 import ScreenerPanel from "../components/ScreenerPanel.vue";
 import RadarPanel from "../components/RadarPanel.vue";
 import ManualScoringPanel from "../components/ManualScoringPanel.vue";
-import ChecklistPanel from "../components/ChecklistPanel.vue";
+// import ChecklistPanel from "../components/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
 
 const chain = useResource("chain-info");
@@ -23,6 +23,17 @@ const chainStats = computed(() => {
 
 // Network status disembunyikan sementara — tidak perlu memuat chain-info.
 // onMounted(() => chain.load());
+
+// Kalkulator manual melayang: tampil saat tombol "Kalkulator manual" ditekan.
+const showCalc = ref(false);
+function openCalc() { showCalc.value = true; }
+function closeCalc() { showCalc.value = false; }
+
+function onKeydown(e) {
+  if (e.key === "Escape" && showCalc.value) closeCalc();
+}
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 </script>
 
 <template>
@@ -40,17 +51,35 @@ const chainStats = computed(() => {
 
     <ScreenerPanel />
 
-    <div class="page__divider" role="separator" aria-hidden="true"></div>
-    <header class="page__head">
-      <h2>Kalkulator manual</h2>
-      <p class="page__sub">
-        Masukkan data yang kamu lihat langsung di DexScreener &amp; RugCheck untuk menghitung skor risiko.
-      </p>
-    </header>
-
-    <ManualScoringPanel />
-
+    <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
     <ChecklistPanel />
+    -->
+
+    <!-- Tombol melayang: tekan untuk membuka Kalkulator manual -->
+    <button
+      type="button"
+      class="calc-fab"
+      :aria-expanded="showCalc"
+      aria-haspopup="dialog"
+      @click="openCalc"
+    >
+      🧮 Kalkulator manual
+    </button>
+
+    <!-- Panel Kalkulator manual melayang (drawer) -->
+    <Teleport to="body">
+      <div v-if="showCalc" class="calc-overlay" @click.self="closeCalc">
+        <div class="calc-drawer" role="dialog" aria-modal="true" aria-labelledby="calc-drawer-h">
+          <div class="calc-drawer__head">
+            <h2 id="calc-drawer-h">🧮 Kalkulator manual</h2>
+            <button type="button" class="calc-drawer__close" aria-label="Tutup" @click="closeCalc">✕</button>
+          </div>
+          <div class="calc-drawer__body">
+            <ManualScoringPanel />
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
@@ -90,4 +119,82 @@ const chainStats = computed(() => {
 .panel { display: grid; gap: var(--space-6); }
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
 .panel__error { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
+
+/* Tombol melayang pembuka Kalkulator manual */
+.calc-fab {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: var(--space-6);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full, 999px);
+  color: var(--text-body);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--motion-duration-instant) var(--motion-ease),
+    transform var(--motion-duration-instant) var(--motion-ease);
+}
+.calc-fab:hover { border-color: var(--text-success); transform: translateX(-50%) translateY(-1px); }
+.calc-fab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* Overlay + drawer melayang */
+.calc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+.calc-drawer {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base, var(--bg-card));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.calc-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border-default);
+}
+.calc-drawer__head h2 { margin: 0; font-size: var(--font-size-lg); }
+.calc-drawer__close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--control-radius);
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.calc-drawer__close:hover { border-color: var(--text-error); color: var(--text-error); }
+.calc-drawer__close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.calc-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-6); }
+
+@media (max-width: 560px) {
+  .calc-overlay { padding: var(--space-4); }
+  .calc-drawer { width: 100%; max-height: 92vh; }
+}
 </style>
