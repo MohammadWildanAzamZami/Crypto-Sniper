@@ -74,23 +74,63 @@ komponen frontend `web/frontend/src/components/ProRadarPanel.vue`
 **Endpoint:** `GET /api/pro-radar` · **Dokumen alur lengkap:** [web/PRO-RADAR.md](web/PRO-RADAR.md)
 
 Funnel penemuannya sama seperti 10x Radar, tapi finalisnya di-*enrich* dengan data
-liquidity-lock lalu diperingkat oleh model **Fable 5** (`claude-fable-5`).
+liquidity-lock lalu diperingkat oleh model **Fable 5** (`claude-fable-5`) yang menilai
+*conviction*, tesis, katalis, dan red flag tiap token.
 
-Alur: **Discover → Fast Screen → Pre-filter → Enrich → AI Rank → Merge**
-- **Discover** — sampai 28 mint trending dari feed DexScreener (jaring lebih lebar).
-- **Fast screen** semua mint (`skipLock`, konkuren ×10) → GEM Score 0–100.
-- **Pre-filter** preset `aggressive` → ambil **TOP 10 finalis** (GEM tertinggi).
-- **Enrich** finalis dengan RugCheck (LP locked %, locked USD, status, flag rugged).
-- **AI Rank** — kirim payload ringkas tiap finalis ke Fable 5, balas JSON:
-  `conviction 0–100`, `tier S/A/B/C`, `thesis`, `catalysts[]`, `redFlags[]`,
-  `action (APE/WATCH/AVOID)`.
-- **Merge + sort** — AI aktif → urut conviction ↓ lalu action lalu GEM. AI mati →
-  fallback urut GEM Score (`aiUsed:false`, badge ⚠️ di UI).
-- Dua jalur AI: **Local** (CLI `claude -p`, tanpa biaya) atau **API** (Anthropic key).
-  Bila AI tak tersedia, Pro Radar tetap jalan sebagai peringkat heuristik murni.
+#### 📥 Sumber data — data apa diambil dari mana
 
-Perbandingan singkat vs 10x Radar: Pro Radar menambah LP-lock enrichment untuk
-finalis + peringkat AI (conviction/tesis/red flag); trade-off-nya lebih lambat.
+Semua data pasar berasal dari **API publik gratis** (DexScreener + RugCheck).
+Solscan Pro & AI bersifat **opsional** — kalau tak ada, Pro Radar tetap jalan.
+
+| Tahap | Fungsi (file) | Sumber & endpoint | Perlu key? | Data yang diambil |
+|-------|---------------|-------------------|:----------:|-------------------|
+| 1. Discover | `discoverSolanaTokens` (`discover.js`) | **DexScreener** `token-boosts/latest`, `token-boosts/top`, `token-profiles/latest` | ❌ | Daftar sampai **28 mint** Solana yang lagi trending (dedup, buang USDC/USDT/wSOL) |
+| 2. Fast screen | `fetchDexScreener` (`sources.js`) | **DexScreener** `latest/dex/tokens/<mint>` | ❌ | Harga USD, likuiditas USD, marketCap/FDV, volume 1h/6h/24h, priceChange 1h/6h/24h, txns buy/sell 24j, umur pair (`pairCreatedAt`), jumlah pair, logo/URL |
+| 2b. (opsional) | `fetchSolscanHolders` (`sources.js`) | **Solscan Pro** `pro-api.solscan.io/v2.0/token/holders` | ✅ Pro | Jumlah holder + konsentrasi top holder — **dilewati kalau tanpa key Pro** |
+| 2c. Skor | `computeGemScore` (`gemScore.js`) | (hitung lokal, tanpa jaringan) | ❌ | **GEM Score 0–100** (Likuiditas 40 + Momentum 35 + Trust/Age 25) |
+| 4. Enrich | `fetchRugcheckLock` (`sources.js`) | **RugCheck** `api.rugcheck.xyz/v1/tokens/<mint>/report` | ❌ | **LP locked %**, locked USD, total LP USD, status (Locked/Partially/Unlocked), flag `rugged` |
+| 5. AI rank | `analyzeCandidates` (`ai/analyze.js`) | **Fable 5** — CLI `claude -p` (Local) atau Anthropic SDK (API) | Local ❌ · API ✅ | conviction 0–100, tier S/A/B/C, thesis, catalysts[], redFlags[], action APE/WATCH/AVOID |
+
+> ⚠️ LP-lock (RugCheck) **sengaja dilewati saat fast-screen** (`skipLock:true`) biar
+> pemindaian massal cepat, lalu **hanya di-ambil untuk 10 finalis** di tahap enrich.
+
+#### 🔄 Alur screening — langkah demi langkah
+
+**Discover → Fast Screen (semua) → Pre-filter → Enrich (finalis) → AI Rank → Merge & Sort**
+
+1. **Discover** (`discoverSolanaTokens`, limit 28) — tarik mint trending dari 3 feed
+   DexScreener publik, gabung, buang duplikat + stablecoin/wSOL.
+2. **Fast screen semua mint** — `screenToken(..., skipLock:true)` paralel **konkurensi
+   ×10**. Tiap token: ambil data DexScreener (+ Solscan holders bila ada key) →
+   hitung **GEM Score** → jalankan `evaluateMoonshot` (lolos/tidak + alasan).
+3. **Pre-filter → finalis** — ambil yang **lolos preset `aggressive`**
+   (MC ≤ $500k, Liq ≥ $5k, GEM ≥ 55, umur 0.5j–14h, buy ratio ≥ 50%), urut
+   **GEM tertinggi**, ambil **TOP 10** (`maxAi`) sebagai finalis. Hitung estimasi
+   `upsideX` = kelipatan ke target $10M market cap.
+4. **Enrich finalis** — untuk 10 finalis saja, panggil ulang `screenToken(...,
+   skipLock:false)` supaya **data LP-lock RugCheck ikut terisi** (locked %, status,
+   rugged). Kalau enrich gagal, laporan cepat sebelumnya tetap dipakai.
+5. **AI Rank (Fable 5)** — susun payload **ringkas per finalis** (address, symbol,
+   gemScore, marketCap, liquidityUsd, volume24h, priceChange 1h/6h/24h, buys/sells,
+   buyRatio%, ageHours, pairCount, lockedPct, lockStatus, rugged) → kirim ke Fable 5.
+   Model **hanya menalar angka yang diberikan** (dilarang mengarang data), lalu balas
+   JSON: `conviction`, `tier`, `thesis`, `catalysts[]`, `redFlags[]`, `action`.
+   - **Mode Local** (default, tanpa biaya): CLI `claude -p --model claude-fable-5`
+     (headless, timeout 90 detik). **Mode API**: Anthropic SDK (butuh Anthropic key).
+6. **Merge & Sort** — gabungkan verdict AI ke tiap finalis, lalu:
+   - **AI aktif** → urut **conviction ↓**, lalu action (APE > WATCH > AVOID), lalu GEM.
+   - **AI mati/gagal** → fallback urut **GEM Score ↓**, tandai `aiUsed:false`
+     (UI menampilkan badge **⚠️ AI tak aktif**). AI tidak pernah bikin request gagal —
+     kegagalan apa pun degrade mulus ke urutan heuristik.
+
+Respons akhir ke UI: `{ scannedAt, preset, discovered, candidatesScanned, aiUsed,
+aiMode, model, matches[] }`. Tiap `match` berisi data token + `ai` (conviction, tier,
+tesis, katalis, red flag, action) untuk digambar sebagai kartu + meter conviction.
+
+Perbandingan singkat vs 10x Radar: Pro Radar menjaring lebih lebar (28 vs 18),
+menambah **LP-lock enrichment** untuk finalis + **peringkat AI** (conviction/tesis/
+red flag); trade-off-nya lebih lambat (ada langkah enrich + panggilan AI). Alur &
+flowchart Mermaid/ASCII lengkap ada di [web/PRO-RADAR.md](web/PRO-RADAR.md).
 
 ### 2.4 AI Analyst Chat
 **File:** `web/server/ai/anthropic.js`, `local.js`, `tools.js`, `settings.js`
