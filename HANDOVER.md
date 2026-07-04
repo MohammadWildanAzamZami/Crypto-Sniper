@@ -22,7 +22,7 @@ The repo grew from "Solscan MCP server + a sample explorer page" into a full
 |------|--------|-------|
 | **GEM Score™ screener** | ✅ Works | 0–100 score, 3 weighted pillars; DexScreener-only works key-less |
 | **10x Radar** (auto-screener) | ✅ Works | discover → screen → filter → Telegram, runs on an interval/Cron |
-| **Pro Radar** (AI-boosted radar) | ✅ Works | 10x funnel + RugCheck enrich + **Fable 5** rank (conviction/thesis/red flags); `GET /api/pro-radar`, degrades to heuristic if AI is off |
+| **Pro Radar** (AI-boosted radar) | ✅ Works | 10x funnel + RugCheck/Pump.fun enrich + hard quality gate + **Fable 5** rank + **win-rate self-tuning** + **smart money** (Birdeye+Helius) + inline chart; `GET /api/pro-radar`, degrades gracefully. See §3.4 |
 | **AI Analyst chat** | ✅ Works | Claude tool-loop over SSE; API key or local Claude-CLI mode; default model now `claude-fable-5` |
 | **Telegram alerts + Trojan link** | ✅ Works | HTML alert + 1-tap buy deep-link (no wallet held) |
 | **Node MCP server** (`web/mcp`) | ✅ Works | 5 screener tools for Claude Desktop, shares the screening core |

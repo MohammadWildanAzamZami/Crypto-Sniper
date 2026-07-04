@@ -27,6 +27,24 @@ browser ↔ API yang sekaligus **menyajikan frontend build** (mode satu port :87
 
 ---
 
+## 🆕 Pembaruan terbaru (ringkas, biar gampang dibaca)
+
+Fitur-fitur paling baru di **Pro Radar** (urut dari yang terbaru). Detail teknis
+ada di [bagian 2.3](#23--pro-radar--10x-radar-bertenaga-ai-fable-5).
+
+| Fitur | Apa gunanya buat kamu |
+|-------|-----------------------|
+| 🧠 **Smart money tracking** | Menandai token yang sedang **diakumulasi trader top / whale** yang profitnya bagus. Datanya dari **Birdeye** (siapa yang beli) + **Helius** (wallet-nya asli/mapan, bukan bot). Muncul sebagai badge **🧠 Smart N · 🐋** di kartu token. Perlu API key (Birdeye wajib, Helius opsional) — diisi di Settings. |
+| 🎯 **Self-tuning target win rate 90%** | Sistem mencatat tiap pick, menilai hasilnya beberapa jam kemudian (naik/turun/rug), lalu **memperketat filter sendiri** kalau win rate turun. Ada **pengaman** biar radar tak pernah kosong permanen. ⚠️ 90% itu *target yang dikejar*, bukan jaminan — efeknya token yang tampil lebih sedikit tapi lebih aman. |
+| 🛡️ **Gerbang kualitas + buang AVOID** | Token rug, likuiditas tipis, honeypot, sudah dump jauh dari ATH, atau di-ban Pump.fun **dibuang otomatis**. Yang tampil hanya yang lolos + di-ranking AI. |
+| 🎓 **Sinyal Pump.fun** | Badge **🎓 grad** untuk token yang sudah lulus bonding curve (lebih matang), dan deteksi token yang sudah pump-and-dump. |
+| 📊 **Chart DexScreener inline** | Klik token → chart harga langsung muncul. Di **HP chart melayang** (overlay), logo token di header, tanpa tulisan atribusi. |
+
+> **Ingat selalu:** semua ini **alat bantu heuristik, bukan nasihat keuangan atau
+> jaminan cuan.** Memecoin sangat berisiko — DYOR, pakai uang yang siap hilang.
+
+---
+
 ## 2. Komponen yang sudah dibangun (detail)
 
 ### 2.1 GEM Score™ — Mesin penilaian token
