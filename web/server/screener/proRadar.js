@@ -67,6 +67,9 @@ function toAiCandidate(report, nowMs) {
     lockedPct: report.liquidityLock?.lockedPct ?? null,
     lockStatus: report.liquidityLock?.status ?? "unknown",
     rugged: report.liquidityLock?.rugged ?? null,
+    // Pump.fun signals (null for non-pump tokens): graduation + drawdown from ATH.
+    pumpGraduated: report.pumpfun?.complete ?? null,
+    pumpDrawdownFromAthPct: report.pumpfun?.drawdownFromAthPct ?? null,
   };
 }
 
@@ -163,6 +166,9 @@ export async function runProRadar({
       trojanLink: rep.trojanLink,
       lockedPct: rep.liquidityLock?.lockedPct ?? null,
       lockStatus: rep.liquidityLock?.status ?? null,
+      pump: rep.pumpfun
+        ? { graduated: rep.pumpfun.complete, drawdownFromAthPct: rep.pumpfun.drawdownFromAthPct }
+        : null,
       upsideX: r.upsideX,
       reasons: r.reasons,
       ai: a

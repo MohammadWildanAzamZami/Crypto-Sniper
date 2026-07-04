@@ -89,6 +89,7 @@ Solscan Pro & AI bersifat **opsional** — kalau tak ada, Pro Radar tetap jalan.
 | 2b. (opsional) | `fetchSolscanHolders` (`sources.js`) | **Solscan Pro** `pro-api.solscan.io/v2.0/token/holders` | ✅ Pro | Jumlah holder + konsentrasi top holder — **dilewati kalau tanpa key Pro** |
 | 2c. Skor | `computeGemScore` (`gemScore.js`) | (hitung lokal, tanpa jaringan) | ❌ | **GEM Score 0–100** (Likuiditas 40 + Momentum 35 + Trust/Age 25) |
 | 4. Enrich | `fetchRugcheckLock` (`sources.js`) | **RugCheck** `api.rugcheck.xyz/v1/tokens/<mint>/report` | ❌ | **LP locked %**, locked USD, total LP USD, status (Locked/Partially/Unlocked), flag `rugged` |
+| 4b. Enrich (Pump.fun) | `fetchPumpfun` (`sources.js`) | **Pump.fun** `frontend-api-v3.pump.fun/coins/<mint>` (hanya token pump) | ❌ | **graduated** (`complete`), drawdown dari **ATH**, flag banned/nsfw/hidden, reply count, creator |
 | 5. AI rank | `analyzeCandidates` (`ai/analyze.js`) | **Fable 5** — CLI `claude -p` (Local) atau Anthropic SDK (API) | Local ❌ · API ✅ | conviction 0–100, tier S/A/B/C, thesis, catalysts[], redFlags[], action APE/WATCH/AVOID |
 
 > ⚠️ LP-lock (RugCheck) **sengaja dilewati saat fast-screen** (`skipLock:true`) biar
@@ -134,7 +135,8 @@ flowchart Mermaid/ASCII lengkap ada di [web/PRO-RADAR.md](web/PRO-RADAR.md).
 
 #### 🆕 Peningkatan v2 — Gerbang kualitas + Self-tuning + Chart inline
 **File baru:** `web/server/screener/quality.js`, `web/server/screener/learn.js`
-**Endpoint baru:** `GET /api/pro-radar/track` (track record + ambang auto-tuned)
+(+ `fetchPumpfun` di `sources.js`) **Endpoint baru:** `GET /api/pro-radar/track`
+(track record + ambang auto-tuned + target win rate)
 
 Menjawab keluhan "hasil radar masih jelek", pipeline Pro Radar ditingkatkan agar
 **membuang sampah** dan **belajar dari hasilnya sendiri**. Angka default juga
@@ -142,10 +144,12 @@ diperketat: `discoverLimit` 28 → **40**, `maxAi` 10 → **14**, preset default
 `aggressive` → **`balanced`**.
 
 1. **Gerbang kualitas keras** (`quality.js`, `qualityGate`) — dijalankan **setelah
-   enrich** (data LP-lock lengkap), sebelum AI/UI. Token **dibuang otomatis** kalau:
-   ditandai `rugged` (RugCheck), market cap 0, likuiditas/volume/transaksi di bawah
-   ambang, buy-sell timpang (~semua beli = indikasi honeypot; ~semua jual = sedang
-   didump), atau LP-lock di bawah ambang saat datanya diketahui. Ambang **bukan
+   enrich** (data LP-lock + Pump.fun lengkap), sebelum AI/UI. Token **dibuang
+   otomatis** kalau: ditandai `rugged` (RugCheck), market cap 0, GEM di bawah ambang,
+   likuiditas/volume/transaksi di bawah ambang, buy-sell timpang (~semua beli =
+   indikasi honeypot; ~semua jual = sedang didump), LP-lock di bawah ambang saat
+   diketahui, atau — untuk token **Pump.fun** — di-ban/nsfw/hidden, **sudah dump jauh
+   dari ATH**, atau (mode ketat) belum graduate dari bonding curve. Ambang **bukan
    angka mati** — diambil dari store self-tuning.
 2. **Filter buang AVOID** — dulu AI cuma *mengurutkan*, token `AVOID`/conviction
    rendah tetap tampil. Sekarang token ber-action `AVOID` atau conviction di bawah
@@ -161,17 +165,22 @@ diperketat: `discoverLimit` 28 → **40**, `maxAi` 10 → **14**, preset default
      `RADAR_GRADE_AFTER_MIN`) dinilai: harga sekarang vs entry → klasifikasi
      **win** (≥+50%) / **loss** (≤−25%) / **rug** (≤10% harga entry atau delisting)
      / **flat** (`gradeAndRetune`).
-   - **Setel ulang** — dari agregat hasil, ambang gerbang **otomatis diketatkan**:
-     banyak rug → naikkan `minLockedPct`, `minLiquidity`, `minTx`; banyak rugi →
-     naikkan `minVolume`; AI terlalu pede pada yang gagal → naikkan `minConviction`.
-     Kalau track record bersih & produktif → longgarkan sedikit. Semua **di-clamp**
-     dalam batas aman supaya tidak lari ke nilai absurd.
-   - **Tampilkan** — UI punya strip **🧬 Self-tuning**: win rate, jumlah pick dinilai
-     (W/L/rug), avg return, dan ambang auto-tuned yang sedang berlaku.
+   - **Setel ulang (pengontrol target win rate)** — ada **setpoint target win rate**
+     (default **90%**, `RADAR_TARGET_WINRATE`). Tiap siklus: hitung selisih `gap =
+     target − winRate`. Kalau **di bawah target**, SEMUA ambang **diketatkan
+     proporsional** dengan `gap` (makin jauh makin agresif): `minGem`, `minLiquidity`,
+     `minVolume`, `minTx`, `minLockedPct` (RugCheck), `minConviction` (AI) naik,
+     `maxDrawdownFromAth` (Pump.fun) turun; kalau `gap` besar/masih ada rug →
+     eskalasi **graduated-only** (hanya token Pump.fun yang lulus bonding curve).
+     Kalau **di atas target** → longgarkan sedikit agar funnel tak kering. Semua
+     **di-clamp** dalam batas aman.
+   - **Tampilkan** — UI punya strip **🧬 Self-tuning**: 🎯 target, win rate (W/L/rug),
+     status **⚙️ di bawah target — mengetatkan otomatis**, dan ambang auto-tuned aktif.
 
-> ⚠️ **Bukan jaminan cuan.** Memecoin itu acak dan penuh manipulasi — tak ada sistem
-> yang bisa "sempurna" memprediksinya. Sistem ini **mengurangi sampah secara nyata
-> dan belajar dari kesalahannya**, tapi tetap alat bantu, bukan mesin profit. DYOR.
+> ⚠️ **Bukan jaminan cuan — 90% itu target yang dikejar, bukan janji.** Memecoin acak
+> dan penuh manipulasi; tak ada sistem yang bisa menang 90% konsisten. Efek nyata
+> mengejar target tinggi = **pick jauh lebih sedikit** (kadang 0–2 atau kosong saat
+> mode ketat) karena hanya yang paling aman diloloskan. Alat bantu, bukan mesin profit.
 
 Selain itu, di UI **klik token → chart DexScreener tampil inline** (embed iframe,
 toggle buka/tutup) — dulu tombol Chart hanya membuka tab baru. Backend kini ikut

@@ -2,7 +2,7 @@
 // Kept framework-free so it can be reused by the Express proxy AND by an MCP
 // server / CLI without dragging Express in.
 
-import { fetchDexScreener, fetchSolscanHolders, fetchRugcheckLock } from "./sources.js";
+import { fetchDexScreener, fetchSolscanHolders, fetchRugcheckLock, fetchPumpfun } from "./sources.js";
 import { computeGemScore } from "./gemScore.js";
 import { sendAlert, trojanBuyLink } from "./telegram.js";
 
@@ -25,17 +25,22 @@ export async function screenToken(tokenAddress, { solscanKey, nowMs, skipLock = 
   if (!metrics) {
     throw new Error("Token not listed on any Solana DEX (no DexScreener data). Too new or invalid.");
   }
-  // Holder + lock enrichment run in parallel; both degrade to null on failure.
-  // skipLock skips the (slow) RugCheck call — used by the bulk 10x Radar scan so
-  // it stays fast; the single-token screener still fetches the lock.
-  const [holders, lock] = await Promise.all([
+  // Holder + lock + pump.fun enrichment run in parallel; all degrade to null on
+  // failure. skipLock skips the (slow) RugCheck + pump.fun calls — used by the bulk
+  // scan so it stays fast; enrichment/single-token screening fetches everything.
+  // pump.fun is only queried for pump-origin mints (curve/graduation lives there).
+  const looksPump = addr.toLowerCase().endsWith("pump") || String(metrics.dexId || "").includes("pump");
+  const [holders, lock, pumpfun] = await Promise.all([
     fetchSolscanHolders(addr, solscanKey),
     skipLock ? Promise.resolve(null) : fetchRugcheckLock(addr),
+    skipLock || !looksPump ? Promise.resolve(null) : fetchPumpfun(addr),
   ]);
   const report = computeGemScore(metrics, holders, nowMs ?? null, lock);
+  report.pumpfun = pumpfun;
   report.trojanLink = trojanBuyLink(addr);
   report.holdersEnriched = Boolean(holders);
   report.lockEnriched = Boolean(lock);
+  report.pumpEnriched = Boolean(pumpfun);
   return report;
 }
 

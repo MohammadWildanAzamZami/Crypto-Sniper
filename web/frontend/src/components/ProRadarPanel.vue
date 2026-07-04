@@ -106,15 +106,15 @@ async function buy(m) {
   <section class="panel" aria-labelledby="proradar-h">
     <div class="panel__head">
       <div>
-        <h2 id="proradar-h">🧠 Pro Radar <span class="tag">Fable 5</span></h2>
+        <h2 id="proradar-h">🧠 Pro Radar <span class="tag">AI</span></h2>
         <p class="panel__sub">
-          Radar bertenaga AI: memindai token trending, cek likuiditas &amp; lock, lalu <b>Fable 5</b>
+          Radar bertenaga AI: memindai token trending, cek likuiditas &amp; lock, lalu <b>AI</b>
           menilai conviction, tesis, katalis, dan red flag tiap token. Heuristik + opini AI — bukan nasihat keuangan.
         </p>
       </div>
       <div class="head-actions">
         <button class="scanbtn" :disabled="loading" @click="runScan">
-          {{ loading ? "🧠 Fable 5 menganalisis…" : "Scan AI" }}
+          {{ loading ? "🧠 AI menganalisis…" : "Scan AI" }}
         </button>
         <button v-if="scan.scannedAt" class="closebtn" :disabled="loading" @click="closeScan">
           Tutup
@@ -126,8 +126,11 @@ async function buy(m) {
     <div v-if="track" class="learn">
       <div class="learn__row">
         <span class="learn__tag">🧬 Self-tuning</span>
+        <span v-if="track.targetWinRate != null" class="learn__stat learn__sub">
+          🎯 Target {{ Math.round(track.targetWinRate * 100) }}%
+        </span>
         <span v-if="track.graded" class="learn__stat">
-          Win rate <b :class="track.winRate >= 0.4 ? 'ok' : track.winRate <= 0.2 ? 'bad' : ''">
+          Win rate <b :class="!track.belowTarget ? 'ok' : track.winRate <= 0.2 ? 'bad' : ''">
             {{ Math.round((track.winRate || 0) * 100) }}%
           </b>
           <span class="learn__sub">({{ track.wins }}W · {{ track.losses }}L · {{ track.rugs }} rug dari {{ track.graded }} dinilai)</span>
@@ -135,23 +138,28 @@ async function buy(m) {
         <span v-else class="learn__stat learn__sub">
           Belum ada pick yang matang untuk dinilai ({{ track.open }} dilacak) — sistem belajar setelah beberapa jam.
         </span>
+        <span v-if="track.belowTarget" class="learn__fix">⚙️ di bawah target — mengetatkan filter otomatis</span>
+        <span v-else-if="track.graded" class="learn__stat learn__sub ok">✅ target tercapai</span>
         <span v-if="track.avgReturnPct != null" class="learn__stat learn__sub">
-          Avg return {{ track.avgReturnPct > 0 ? "+" : "" }}{{ track.avgReturnPct }}%
+          Avg {{ track.avgReturnPct > 0 ? "+" : "" }}{{ track.avgReturnPct }}%
         </span>
       </div>
       <div class="learn__row learn__thresholds">
         <span class="learn__sub">Ambang auto-tuned:</span>
+        <span class="pill">GEM ≥ {{ track.tuning.minGem }}</span>
         <span class="pill">Liq ≥ {{ money(track.tuning.minLiquidity) }}</span>
         <span class="pill">Vol ≥ {{ money(track.tuning.minVolume) }}</span>
         <span class="pill">Tx ≥ {{ track.tuning.minTx }}</span>
         <span class="pill">Lock ≥ {{ track.tuning.minLockedPct }}%</span>
         <span class="pill">Conv ≥ {{ track.tuning.minConviction }}</span>
+        <span class="pill">Dump &lt; {{ track.tuning.maxDrawdownFromAth }}%</span>
+        <span v-if="track.tuning.requirePumpComplete" class="pill pill--strict">🎓 graduated only</span>
         <span v-if="track.retunes" class="learn__sub">· disetel {{ track.retunes }}×</span>
       </div>
     </div>
 
     <p v-if="!scan.scannedAt && !loading && !error" class="hint">
-      Klik <b>Scan AI</b> — analisis Fable 5 butuh beberapa detik lebih lama dari 10x Radar biasa.
+      Klik <b>Scan AI</b> — analisis AI butuh beberapa detik lebih lama dari 10x Radar biasa.
     </p>
 
     <p v-if="scan.scannedAt" class="meta">
@@ -159,7 +167,7 @@ async function buy(m) {
       · {{ scan.candidatesScanned }} dicek
       <span v-if="scan.rejected">· <b>{{ scan.rejected }}</b> dibuang gerbang kualitas</span>
       · <b>{{ scan.matches.length }}</b> lolos
-      <span v-if="scan.aiUsed" class="meta-ai ok">· ✅ diperingkat {{ scan.model || 'Fable 5' }}</span>
+      <span v-if="scan.aiUsed" class="meta-ai ok">· ✅ diperingkat AI</span>
       <span v-else class="meta-ai warn">· ⚠️ AI tak aktif — urutan heuristik (aktifkan mode AI di Settings)</span>
     </p>
 
@@ -218,6 +226,7 @@ async function buy(m) {
           </div>
           <div class="card__badges">
             <span v-if="m.ai" :class="actionClass(m.ai.action)">{{ actionLabel(m.ai.action) }}</span>
+            <span v-if="m.pump?.graduated" class="badge badge--grad" title="Lulus bonding curve Pump.fun (graduated)">🎓 grad</span>
             <span v-if="m.quality != null" class="badge badge--q" :title="'Skor kualitas gabungan (GEM + conviction)'">Q {{ m.quality }}</span>
             <span class="badge badge--gem">GEM {{ m.gemScore }}</span>
             <span class="badge badge--x" v-if="m.upsideX">~{{ m.upsideX }}x</span>
@@ -249,22 +258,43 @@ async function buy(m) {
           <li v-for="(r, i) in m.reasons" :key="i">{{ r }}</li>
         </ul>
 
-        <!-- Inline DexScreener chart (toggled by clicking the token) -->
+        <!-- DexScreener chart: inline on desktop, floating overlay on mobile -->
         <div v-if="openChart === m.address && m.chartUrl" class="chart">
-          <div class="chart__head">
-            <span class="chart__title">📊 {{ m.symbol }} chart</span>
-            <a class="chart__open" :href="m.url" target="_blank" rel="noopener">
-              Buka di DexScreener ↗
-            </a>
-          </div>
-          <div class="chart__frame">
-            <iframe
-              :src="m.chartUrl"
-              :title="`Chart harga ${m.symbol} di DexScreener`"
-              loading="lazy"
-              allow="clipboard-write"
-              referrerpolicy="no-referrer"
-            />
+          <div class="chart__backdrop" aria-hidden="true" @click="toggleChart(m)"></div>
+          <div class="chart__panel">
+            <div class="chart__head">
+              <span class="chart__title">
+                <span class="chart__logo" aria-hidden="true">
+                  <img
+                    v-if="m.logoUrl && !failedLogos.has(m.address)"
+                    :src="m.logoUrl"
+                    :alt="m.symbol"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    @error="logoFailed(m.address)"
+                  />
+                  <span v-else class="chart__logo-fallback">{{ initials(m) }}</span>
+                </span>
+                {{ m.symbol }} chart
+              </span>
+              <div class="chart__head-actions">
+                <a class="chart__open" :href="m.url" target="_blank" rel="noopener">
+                  Buka di DexScreener ↗
+                </a>
+                <button type="button" class="chart__close" aria-label="Tutup chart" @click="toggleChart(m)">✕</button>
+              </div>
+            </div>
+            <div class="chart__frame">
+              <iframe
+                :src="m.chartUrl"
+                :title="`Chart harga ${m.symbol} di DexScreener`"
+                loading="lazy"
+                allow="clipboard-write"
+                referrerpolicy="no-referrer"
+              />
+              <!-- Cover the DexScreener attribution footer inside the (cross-origin) embed. -->
+              <div class="chart__mask" aria-hidden="true"></div>
+            </div>
           </div>
         </div>
         <p v-else-if="openChart === m.address" class="chart__na">
@@ -331,10 +361,13 @@ async function buy(m) {
 .learn__stat b.ok { color: #16a34a; }
 .learn__stat b.bad { color: var(--text-error); }
 .learn__sub { color: var(--text-muted); font-size: var(--font-size-xs); }
+.learn__sub.ok { color: #16a34a; }
+.learn__fix { font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); color: #f59e0b; }
 .learn__thresholds { gap: var(--space-2); }
 .pill { font-size: 11px; padding: 1px var(--space-3); border-radius: 999px;
   background: var(--bg-card); border: 1px solid var(--border-default); color: var(--text-body);
   font-variant-numeric: tabular-nums; }
+.pill--strict { background: rgba(245, 158, 11, 0.16); color: #f59e0b; border-color: rgba(245, 158, 11, 0.5); }
 .hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 .empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
@@ -390,6 +423,7 @@ async function buy(m) {
 .badge--x { background: #16a34a; color: #fff; }
 .badge--gem { background: rgba(124, 58, 237, 0.18); color: #c4b5fd; border: 1px solid rgba(124, 58, 237, 0.5); }
 .badge--q { background: rgba(16, 163, 74, 0.16); color: #4ade80; border: 1px solid rgba(16, 163, 74, 0.5); }
+.badge--grad { background: rgba(59, 130, 246, 0.18); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); }
 
 /* Conviction meter */
 .conv { display: flex; align-items: center; gap: var(--space-3); }
@@ -410,19 +444,40 @@ async function buy(m) {
 .reasons li { font-size: var(--font-size-xs); color: var(--text-muted); }
 .reasons li::before { content: "• "; color: #a855f7; }
 
-/* Inline DexScreener chart embed */
+/* DexScreener chart embed (inline on desktop) */
 .chart { display: grid; gap: var(--space-3); }
-.chart__head { display: flex; justify-content: space-between; align-items: baseline; }
-.chart__title { color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.chart__backdrop { display: none; } /* only used as a full-screen overlay on mobile */
+.chart__panel { display: grid; gap: var(--space-3); }
+.chart__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.chart__title { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.chart__logo { flex: none; width: 22px; height: 22px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border-default); }
+.chart__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chart__logo-fallback { font-size: 9px; font-weight: var(--font-weight-bold); color: var(--text-muted); letter-spacing: 0.2px; }
+.chart__head-actions { display: flex; align-items: center; gap: var(--space-4); }
 .chart__open { color: #c4b5fd; text-decoration: none; font-size: var(--font-size-sm); }
 .chart__open:hover { color: #a855f7; }
+.chart__close {
+  display: none; /* shown on mobile overlay */
+  width: 30px; height: 30px; flex: none; padding: 0;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--bg-card); color: var(--text-body); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.chart__close:hover { border-color: #a855f7; color: #a855f7; }
+.chart__close:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; }
 .chart__frame {
   position: relative; width: 100%;
   aspect-ratio: 16 / 10; max-height: 460px;
-  border: 1px solid rgba(124, 58, 237, 0.4); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   overflow: hidden; background: var(--bg-card);
 }
 .chart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* Masks the "tracked by DexScreener" attribution bar at the bottom of the
+   (cross-origin) embed — we can't touch its DOM, so we cover it. */
+.chart__mask {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
+  background: #0b0e13; pointer-events: none;
+}
 .chart__na { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 
 .card__actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
@@ -441,5 +496,23 @@ async function buy(m) {
   .panel__head { flex-direction: column; }
   .head-actions { width: 100%; }
   .scanbtn { flex: 1; }
+
+  /* Chart floats on top of the page as an overlay on mobile. */
+  .chart__backdrop {
+    display: block; position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.65); z-index: 200;
+  }
+  .chart__panel {
+    position: fixed; z-index: 201;
+    top: 12px; left: 10px; right: 10px;
+    padding: var(--space-4);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    max-height: 86vh; overflow: auto;
+  }
+  .chart__close { display: grid; place-items: center; }
+  .chart__frame { aspect-ratio: auto; height: 62vh; max-height: none; }
 }
 </style>

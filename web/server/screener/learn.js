@@ -30,16 +30,32 @@ const RUG_PRICE_FLOOR = 0.1;    // <=10% of entry (or delisted) counts as a rug
 const LOSS_THRESHOLD = -0.25;   // <=-25% is a loss
 const WIN_THRESHOLD = 0.5;      // >=+50% is a win
 
-// Tuning starts here and is clamped to these bounds so learning can nudge but
-// never run away to absurd values.
-const DEFAULT_TUNING = { minLiquidity: 12_000, minVolume: 15_000, minTx: 60, minLockedPct: 20, minConviction: 45 };
-const BOUNDS = {
-  minLiquidity: [8_000, 120_000],
-  minVolume: [8_000, 250_000],
-  minTx: [40, 500],
-  minLockedPct: [0, 90],
-  minConviction: [35, 78],
+// Target win rate the controller chases (setpoint). Default 0.9 — aspirational;
+// the controller pushes toward it by tightening, which mainly means FEWER, safer
+// picks (memecoins can't actually be won 90% of the time — see README/HANDOVER).
+const DEFAULT_TARGET = clampWinRate(process.env.RADAR_TARGET_WINRATE);
+
+// Tuning starts here and is clamped to these bounds. Bounds are wide so the
+// controller can get genuinely strict when it's below target, but never absurd.
+const DEFAULT_TUNING = {
+  minLiquidity: 12_000, minVolume: 15_000, minTx: 60, minLockedPct: 20,
+  minConviction: 45, minGem: 60, maxDrawdownFromAth: 80,
 };
+const BOUNDS = {
+  minLiquidity: [8_000, 400_000],
+  minVolume: [8_000, 800_000],
+  minTx: [40, 1200],
+  minLockedPct: [0, 100],
+  minConviction: [35, 92],
+  minGem: [55, 88],
+  maxDrawdownFromAth: [45, 95], // lower = stricter (reject bigger dumps from ATH)
+};
+
+function clampWinRate(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 0.9;
+  return Math.min(0.95, Math.max(0.3, n));
+}
 
 function clamp(key, v) {
   const [lo, hi] = BOUNDS[key];
@@ -48,11 +64,16 @@ function clamp(key, v) {
 }
 
 // ---- Persistence ----------------------------------------------------------
-let mem = { tuning: { ...DEFAULT_TUNING }, picks: [], lastRetuneAt: 0, retunes: 0 };
+let mem = {
+  tuning: { ...DEFAULT_TUNING, requirePumpComplete: false },
+  targetWinRate: DEFAULT_TARGET,
+  picks: [], lastRetuneAt: 0, retunes: 0,
+};
 try {
   const saved = JSON.parse(readFileSync(FILE_PATH, "utf8"));
   if (saved && typeof saved === "object") {
-    mem.tuning = { ...DEFAULT_TUNING, ...(saved.tuning || {}) };
+    mem.tuning = { ...DEFAULT_TUNING, requirePumpComplete: false, ...(saved.tuning || {}) };
+    mem.targetWinRate = clampWinRate(saved.targetWinRate ?? DEFAULT_TARGET);
     mem.picks = Array.isArray(saved.picks) ? saved.picks : [];
     mem.lastRetuneAt = saved.lastRetuneAt || 0;
     mem.retunes = saved.retunes || 0;
@@ -60,8 +81,11 @@ try {
 } catch {
   /* no memory file yet — start fresh */
 }
-// Normalise tuning to bounds on load (in case DEFAULT/BOUNDS changed).
+// Env target always wins on boot (lets the operator re-point the setpoint).
+if (process.env.RADAR_TARGET_WINRATE) mem.targetWinRate = DEFAULT_TARGET;
+// Normalise numeric tuning to bounds on load (in case DEFAULT/BOUNDS changed).
 for (const k of Object.keys(DEFAULT_TUNING)) mem.tuning[k] = clamp(k, mem.tuning[k]);
+mem.tuning.requirePumpComplete = Boolean(mem.tuning.requirePumpComplete);
 
 function save() {
   try {
@@ -159,45 +183,47 @@ export async function gradeAndRetune(nowMs) {
   return getTrackRecord();
 }
 
-// Adjust the gate thresholds from aggregate outcomes. Conservative, clamped.
+// Closed-loop controller: drive the gate thresholds toward the target win rate.
+// Below target → tighten EVERY lever proportionally to the gap (bigger miss =
+// bigger step). Above target → relax slightly so the funnel isn't bone-dry. All
+// clamped. The honest effect of chasing a high target is FEWER, safer picks.
 function retune(now) {
   const graded = mem.picks.filter((p) => p.outcome);
   if (graded.length < MIN_GRADED_TO_TUNE) return;
 
   const n = graded.length;
-  const rugs = graded.filter((p) => p.outcome.status === "rug");
-  const losses = graded.filter((p) => p.outcome.status === "loss");
-  const wins = graded.filter((p) => p.outcome.status === "win");
-  const rugRate = rugs.length / n;
-  const lossRate = losses.length / n;
-  const winRate = wins.length / n;
+  const wins = graded.filter((p) => p.outcome.status === "win").length;
+  const rugs = graded.filter((p) => p.outcome.status === "rug").length;
+  const winRate = wins / n;
+  const rugRate = rugs / n;
+  const target = mem.targetWinRate;
+  const gap = target - winRate; // >0 → below target (tighten), <0 → above (relax)
 
   const t = { ...mem.tuning };
 
-  if (rugRate > 0.25) {
-    // Too many rugs → demand more locked LP and deeper liquidity/activity.
-    t.minLockedPct = clamp("minLockedPct", t.minLockedPct + 10);
-    t.minLiquidity = clamp("minLiquidity", t.minLiquidity * 1.15);
-    t.minTx = clamp("minTx", t.minTx + 20);
-  } else if (rugRate < 0.08 && winRate > 0.33) {
-    // Clean, productive track record → relax slightly to widen the funnel.
-    t.minLiquidity = clamp("minLiquidity", t.minLiquidity * 0.94);
-    t.minLockedPct = clamp("minLockedPct", t.minLockedPct - 5);
+  if (gap > 0.02) {
+    // Proportional tightening. g is the capped gap used as the step scale.
+    const g = Math.min(0.6, gap);
+    t.minConviction = clamp("minConviction", t.minConviction + Math.ceil(g * 50));
+    t.minLockedPct = clamp("minLockedPct", t.minLockedPct + Math.ceil(g * 70));
+    t.minLiquidity = clamp("minLiquidity", t.minLiquidity * (1 + g));
+    t.minVolume = clamp("minVolume", t.minVolume * (1 + g));
+    t.minTx = clamp("minTx", t.minTx + Math.ceil(g * 120));
+    t.minGem = clamp("minGem", t.minGem + Math.ceil(g * 25));
+    t.maxDrawdownFromAth = clamp("maxDrawdownFromAth", t.maxDrawdownFromAth - Math.ceil(g * 45));
+    // Deep miss or rugging → escalate to graduated-only pump.fun tokens.
+    if (gap > 0.25 || rugRate > 0.2) t.requirePumpComplete = true;
+  } else if (gap < -0.05) {
+    // Comfortably above target → widen the funnel a little.
+    t.minConviction = clamp("minConviction", t.minConviction - 2);
+    t.minLiquidity = clamp("minLiquidity", t.minLiquidity * 0.96);
+    t.minLockedPct = clamp("minLockedPct", t.minLockedPct - 3);
+    t.minGem = clamp("minGem", t.minGem - 1);
+    t.maxDrawdownFromAth = clamp("maxDrawdownFromAth", t.maxDrawdownFromAth + 3);
+    if (rugRate === 0) t.requirePumpComplete = false;
   }
 
-  if (lossRate + rugRate > 0.5) {
-    // More than half the graded picks lost money → require thicker volume.
-    t.minVolume = clamp("minVolume", t.minVolume * 1.15);
-  }
-
-  // If the AI was confident on the losers, raise the conviction floor.
-  const badPicks = [...rugs, ...losses].filter((p) => typeof p.conviction === "number");
-  if (badPicks.length >= 4) {
-    const avgBadConv = badPicks.reduce((s, p) => s + p.conviction, 0) / badPicks.length;
-    if (avgBadConv >= t.minConviction) t.minConviction = clamp("minConviction", t.minConviction + 5);
-  }
-
-  const changed = Object.keys(DEFAULT_TUNING).some((k) => t[k] !== mem.tuning[k]);
+  const changed = JSON.stringify(t) !== JSON.stringify(mem.tuning);
   mem.tuning = t;
   if (changed) {
     mem.lastRetuneAt = now;
@@ -221,8 +247,11 @@ export function getTrackRecord() {
     best = { symbol: p.symbol, returnPct: p.outcome.returnPct };
   }
 
+  const winRate = n ? wins / n : null;
   return {
     tuning: { ...mem.tuning },
+    targetWinRate: mem.targetWinRate,
+    belowTarget: winRate != null ? winRate < mem.targetWinRate : null,
     retunes: mem.retunes,
     lastRetuneAt: mem.lastRetuneAt,
     graded: n,
@@ -231,7 +260,7 @@ export function getTrackRecord() {
     losses,
     rugs,
     flats: n - wins - losses - rugs,
-    winRate: n ? Number((wins / n).toFixed(2)) : null,
+    winRate: winRate != null ? Number(winRate.toFixed(2)) : null,
     avgReturnPct: n ? Number((avgReturn * 100).toFixed(1)) : null,
     best,
   };

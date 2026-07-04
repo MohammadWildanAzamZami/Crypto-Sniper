@@ -6,6 +6,7 @@
 const DEXSCREENER_TOKEN = "https://api.dexscreener.com/latest/dex/tokens";
 const SOLSCAN_PRO = "https://pro-api.solscan.io/v2.0";
 const RUGCHECK_REPORT = "https://api.rugcheck.xyz/v1/tokens";
+const PUMPFUN_COIN = "https://frontend-api-v3.pump.fun/coins";
 
 /**
  * Fetch all DEX pairs for a token mint and return the most relevant Solana pair
@@ -78,6 +79,43 @@ export async function fetchSolscanHolders(tokenAddress, apiKey) {
     const topAmount = items.reduce((s, h) => s + (Number(h.amount) || 0), 0);
     const decimals = items[0]?.decimals ?? 0;
     return { holderCount: total, top: items.length, topAmount, decimals };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pump.fun enrichment (free, key-less, v3 frontend API). Only pump.fun-origin
+ * mints return data — everything else 404s → null. Gives us signals DexScreener
+ * can't: whether the bonding curve has `complete`d (graduated = survived the
+ * rug-prone launch phase), moderation flags (banned / nsfw / hidden), community
+ * `reply_count`, and — crucially — the drawdown from all-time-high market cap,
+ * which flags tokens that already pumped and dumped. Degrades to null on failure.
+ */
+export async function fetchPumpfun(tokenAddress) {
+  try {
+    const res = await fetch(`${PUMPFUN_COIN}/${tokenAddress}`, {
+      headers: { accept: "application/json", "user-agent": "Mozilla/5.0" },
+    });
+    if (!res.ok) return null; // non-pump mint or API hiccup
+    const j = await res.json();
+    if (!j || j.mint !== tokenAddress) return null;
+
+    const usdMc = Number(j.usd_market_cap) || 0;
+    const athMc = Number(j.ath_market_cap) || 0;
+    return {
+      isPump: true,
+      complete: Boolean(j.complete),        // graduated off the bonding curve
+      banned: Boolean(j.is_banned),
+      hidden: Boolean(j.hidden),
+      nsfw: Boolean(j.nsfw),
+      replyCount: Number(j.reply_count) || 0,
+      usdMarketCap: Math.round(usdMc),
+      athMarketCap: Math.round(athMc),
+      // % below ATH (0 = at ATH, 90 = down 90% from the top). null if unknown.
+      drawdownFromAthPct: athMc > 0 ? Math.round((1 - usdMc / athMc) * 100) : null,
+      creator: typeof j.creator === "string" ? j.creator : null,
+    };
   } catch {
     return null;
   }

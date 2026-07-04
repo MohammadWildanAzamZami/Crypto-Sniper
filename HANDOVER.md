@@ -138,21 +138,34 @@ conviction floor are **removed** from the results (a small top-3 floor keeps the
 non-empty when the AI is harsh). Each surviving token also gets a blended
 `quality = 0.5·gem + 0.5·conviction` (the **Q** badge), which is the primary sort key.
 
-**Self-tuning loop (`screener/learn.js`).** Evidence-based, not prediction. Every
-displayed pick is snapshotted with its entry price (`recordPicks`) into a gitignored
-`web/server/screener/.radar-memory.json` (file-backed, in-memory fallback). On a later
-scan, matured picks (default ≥3h, `RADAR_GRADE_AFTER_MIN`) are graded live — current
-price vs entry → **win** (≥+50%) / **loss** (≤−25%) / **rug** (≤10% of entry or
-delisted) / **flat** (`gradeAndRetune`). From the aggregate, the gate thresholds
-**auto-tighten** (more rugs → raise `minLockedPct`/`minLiquidity`/`minTx`; more losses
-→ raise `minVolume`; AI over-confident on losers → raise `minConviction`), all clamped
-to safe bounds; a clean, productive record relaxes them slightly. The track record +
-current tuned thresholds are exposed at `GET /api/pro-radar/track` and shown in the UI
-(🧬 Self-tuning strip). **Not a profit guarantee** — it reduces junk and learns from
-its own misses; memecoins remain random and adversarial.
+**Self-tuning loop (`screener/learn.js`) — win-rate-target controller.** Evidence-based,
+not prediction. Every displayed pick is snapshotted with its entry price (`recordPicks`)
+into a gitignored `web/server/screener/.radar-memory.json` (file-backed, in-memory
+fallback). On a later scan, matured picks (default ≥3h, `RADAR_GRADE_AFTER_MIN`) are
+graded live — current price vs entry → **win** (≥+50%) / **loss** (≤−25%) / **rug**
+(≤10% of entry or delisted) / **flat** (`gradeAndRetune`). A closed-loop controller then
+drives the gate thresholds toward a **target win rate** (`RADAR_TARGET_WINRATE`, default
+**0.9**): when below target it tightens EVERY lever proportionally to the gap — `minGem`,
+`minLiquidity`, `minVolume`, `minTx`, `minLockedPct`, `minConviction` up and
+`maxDrawdownFromAth` down — and, on a big miss or ongoing rugs, escalates to
+`requirePumpComplete` (graduated-pump-only); above target it relaxes slightly. All values
+clamped to wide-but-sane bounds. Exposed at `GET /api/pro-radar/track` and shown in the
+UI (🧬 Self-tuning strip: 🎯 target, win rate, ⚙️ auto-tightening status, live thresholds).
+**Not a profit guarantee — 0.9 is a setpoint it *chases*, not a promise.** Chasing a high
+target mostly means FEWER, safer picks (often 0–2, or empty in strict mode); memecoins
+can't actually be won 90% of the time.
 
-**Inline chart.** Clicking a token in the Pro Radar list now embeds its DexScreener
-chart inline (toggle); the backend sends a `chartUrl` per match.
+**Pump.fun signals (`fetchPumpfun` in `sources.js`).** For pump-origin mints, enrichment
+also pulls the pump.fun v3 API (`frontend-api-v3.pump.fun/coins/<mint>`, key-less): bonding
+-curve `complete` (graduated), drawdown from ATH market cap, and banned/nsfw/hidden flags.
+The gate rejects banned/nsfw/hidden, big ATH drawdowns, and (strict mode) non-graduated
+tokens; the AI payload and UI (🎓 grad badge) surface graduation too. Degrades to null for
+non-pump tokens or API failure. **Note:** Solscan holder-concentration would add another
+signal but needs a Pro key (absent on the free tier).
+
+**Inline chart.** Clicking a token in the Pro Radar list embeds its DexScreener chart
+(inline on desktop, floating overlay on mobile with the attribution footer masked and the
+token logo in the header); the backend sends a `chartUrl` per match.
 
 ### 3.5 AI analyst — server-side tool-loop
 `ai/anthropic.js` runs Claude's agentic tool-use loop server-side and streams the
@@ -327,3 +340,10 @@ Ordered by leverage. Each item is independently shippable.
   them, computed returns, and aggregated the track record without error.
   `GET /api/pro-radar/track` returns tuned thresholds. Inline DexScreener chart
   toggles per token in the UI (Vite HMR clean).
+- Pro Radar v3 (win-rate controller + pump.fun), verified live: `/api/pro-radar/track`
+  reports `targetWinRate: 0.9`, `belowTarget: true`. Controller test (isolated,
+  `RADAR_GRADE_AFTER_MIN=0`): at winRate 0.12 it tightened every lever in one cycle
+  (liq 12k→19.2k, vol 15k→24k, tx 60→132, lock 20→62, conv 45→75, gem→75,
+  maxDrawdownFromAth→53, requirePumpComplete→true). `fetchPumpfun` on a pump mint
+  returned `complete:true`, drawdown 32% from ATH, no ban/nsfw. Frontend rebuilt and
+  served via ngrok (single-port :8787).

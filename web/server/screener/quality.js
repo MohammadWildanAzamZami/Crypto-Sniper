@@ -18,6 +18,8 @@ const money = (n) => "$" + Math.round(n || 0).toLocaleString();
 export function qualityGate(report, tuning) {
   const m = report?.metrics || {};
   const lock = report?.liquidityLock || null;
+  const pump = report?.pumpfun || null;
+  const gem = report?.gemScore || 0;
   const rejects = [];
 
   const mc = m.marketCap || 0;
@@ -29,6 +31,22 @@ export function qualityGate(report, tuning) {
 
   // Hard rug flag from RugCheck — never surface these.
   if (lock?.rugged) rejects.push("ditandai rugged (RugCheck)");
+
+  // GEM Score floor (self-tuned) — the overall heuristic quality bar.
+  if (tuning.minGem && gem < tuning.minGem) rejects.push(`GEM ${gem} < ${tuning.minGem}`);
+
+  // Pump.fun signals (only when the mint is a pump.fun token and data loaded).
+  if (pump) {
+    if (pump.banned) rejects.push("di-ban Pump.fun");
+    if (pump.nsfw) rejects.push("ditandai NSFW (Pump.fun)");
+    if (pump.hidden) rejects.push("disembunyikan Pump.fun");
+    // Already pumped-and-dumped: far below its ATH market cap.
+    if (typeof pump.drawdownFromAthPct === "number" && pump.drawdownFromAthPct >= tuning.maxDrawdownFromAth) {
+      rejects.push(`sudah −${pump.drawdownFromAthPct}% dari ATH (dump)`);
+    }
+    // When strict, only trust graduated tokens (survived the bonding curve).
+    if (tuning.requirePumpComplete && !pump.complete) rejects.push("belum graduate dari bonding curve");
+  }
 
   // A token with no real market cap can't be valued or exited safely.
   if (mc <= 0) rejects.push("market cap tak diketahui");
