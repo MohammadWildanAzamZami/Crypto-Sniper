@@ -15,7 +15,7 @@ Repo ini berkembang dari "MCP server Solscan + UI explorer sederhana" menjadi
 |---|--------|--------|-------------|
 | 1 | **GEM Score™ Screener** | ✅ Jalan | Skor 0–100 kualitas/risiko token dari data live |
 | 2 | **10x Radar (Auto-Screener)** | ✅ Jalan | Otomatis cari token "potensi 10x" tiap interval |
-| 3 | **🧠 Pro Radar (Fable 5)** | ✅ Jalan | 10x Radar + peringkat AI: conviction, tesis, red flag |
+| 3 | **🧠 Pro Radar (Fable 5)** | ✅ Jalan | 10x Radar + gerbang kualitas + peringkat AI + **self-tuning** (belajar dari hasil) |
 | 4 | **AI Analyst Chat** | ✅ Jalan | Chat AI (Claude) yang bisa panggil tool on-chain |
 | 5 | **Telegram Alert + Trojan link** | ✅ Jalan | Push notif token bagus + link beli 1-tap |
 | 6 | **MCP Servers (Rust + Node)** | ✅ Jalan | Sambungkan screener ke Claude Desktop |
@@ -131,6 +131,51 @@ Perbandingan singkat vs 10x Radar: Pro Radar menjaring lebih lebar (28 vs 18),
 menambah **LP-lock enrichment** untuk finalis + **peringkat AI** (conviction/tesis/
 red flag); trade-off-nya lebih lambat (ada langkah enrich + panggilan AI). Alur &
 flowchart Mermaid/ASCII lengkap ada di [web/PRO-RADAR.md](web/PRO-RADAR.md).
+
+#### 🆕 Peningkatan v2 — Gerbang kualitas + Self-tuning + Chart inline
+**File baru:** `web/server/screener/quality.js`, `web/server/screener/learn.js`
+**Endpoint baru:** `GET /api/pro-radar/track` (track record + ambang auto-tuned)
+
+Menjawab keluhan "hasil radar masih jelek", pipeline Pro Radar ditingkatkan agar
+**membuang sampah** dan **belajar dari hasilnya sendiri**. Angka default juga
+diperketat: `discoverLimit` 28 → **40**, `maxAi` 10 → **14**, preset default
+`aggressive` → **`balanced`**.
+
+1. **Gerbang kualitas keras** (`quality.js`, `qualityGate`) — dijalankan **setelah
+   enrich** (data LP-lock lengkap), sebelum AI/UI. Token **dibuang otomatis** kalau:
+   ditandai `rugged` (RugCheck), market cap 0, likuiditas/volume/transaksi di bawah
+   ambang, buy-sell timpang (~semua beli = indikasi honeypot; ~semua jual = sedang
+   didump), atau LP-lock di bawah ambang saat datanya diketahui. Ambang **bukan
+   angka mati** — diambil dari store self-tuning.
+2. **Filter buang AVOID** — dulu AI cuma *mengurutkan*, token `AVOID`/conviction
+   rendah tetap tampil. Sekarang token ber-action `AVOID` atau conviction di bawah
+   ambang **dibuang dari daftar**. Ada floor kecil (top-3) supaya panel tak kosong
+   saat AI galak tapi masih ada gem layak.
+3. **Skor Quality gabungan** — tiap token dapat `quality = 0.5·GEM + 0.5·conviction`
+   (badge **Q** di kartu), dipakai sebagai kunci urut utama.
+4. **Sistem self-improving** (`learn.js`) — *feedback loop berbasis bukti*, bukan
+   ramalan:
+   - **Catat** — tiap token yang ditampilkan disimpan dengan harga entry
+     (`recordPicks`) ke `.radar-memory.json` (file-backed, fallback in-memory).
+   - **Nilai** — pada scan berikutnya, pick yang sudah "matang" (default ≥3 jam,
+     `RADAR_GRADE_AFTER_MIN`) dinilai: harga sekarang vs entry → klasifikasi
+     **win** (≥+50%) / **loss** (≤−25%) / **rug** (≤10% harga entry atau delisting)
+     / **flat** (`gradeAndRetune`).
+   - **Setel ulang** — dari agregat hasil, ambang gerbang **otomatis diketatkan**:
+     banyak rug → naikkan `minLockedPct`, `minLiquidity`, `minTx`; banyak rugi →
+     naikkan `minVolume`; AI terlalu pede pada yang gagal → naikkan `minConviction`.
+     Kalau track record bersih & produktif → longgarkan sedikit. Semua **di-clamp**
+     dalam batas aman supaya tidak lari ke nilai absurd.
+   - **Tampilkan** — UI punya strip **🧬 Self-tuning**: win rate, jumlah pick dinilai
+     (W/L/rug), avg return, dan ambang auto-tuned yang sedang berlaku.
+
+> ⚠️ **Bukan jaminan cuan.** Memecoin itu acak dan penuh manipulasi — tak ada sistem
+> yang bisa "sempurna" memprediksinya. Sistem ini **mengurangi sampah secara nyata
+> dan belajar dari kesalahannya**, tapi tetap alat bantu, bukan mesin profit. DYOR.
+
+Selain itu, di UI **klik token → chart DexScreener tampil inline** (embed iframe,
+toggle buka/tutup) — dulu tombol Chart hanya membuka tab baru. Backend kini ikut
+mengirim `chartUrl` per token.
 
 ### 2.4 AI Analyst Chat
 **File:** `web/server/ai/anthropic.js`, `local.js`, `tools.js`, `settings.js`
@@ -445,7 +490,9 @@ web/
 │       ├── sources.js           # DexScreener + Solscan + RugCheck
 │       ├── discover.js          # Feed token trending (untuk Radar)
 │       ├── autoScreen.js        # 10x Radar: discover->screen->filter
-│       ├── proRadar.js          # Pro Radar: funnel + enrich + AI rank (Fable 5)
+│       ├── proRadar.js          # Pro Radar: funnel + enrich + gerbang kualitas + AI rank + self-tuning
+│       ├── quality.js           # Gerbang anti-junk (buang rug/likuiditas tipis/honeypot/dump)
+│       ├── learn.js             # Self-tuning: catat pick -> nilai hasil -> auto-setel ambang
 │       └── telegram.js          # Alert Telegram + Trojan deep-link
 ├── mcp/server.js                # MCP Node (5 tool screener) untuk Claude Desktop
 └── frontend/src/

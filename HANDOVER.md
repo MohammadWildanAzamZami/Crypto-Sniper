@@ -57,7 +57,7 @@ Memecoin-Screener/
 │       └── requests/      # Request param structs, grouped by namespace
 └── web/
     ├── server/            # Express proxy — ALL secrets live here (seeded from .env)
-    │   ├── index.js       # Routes: /api/screen, /api/auto-screen, /api/chat, /api/:resource
+    │   ├── index.js       # Routes: /api/screen, /api/auto-screen, /api/pro-radar(/track), /api/chat, /api/:resource
     │   ├── solscan.js     # Allowlist + fetch to Solscan
     │   ├── ai/            # AI analyst: anthropic.js (SSE tool-loop), local.js,
     │   │                  #   analyze.js (Fable 5 Pro-Radar ranking),
@@ -68,7 +68,9 @@ Memecoin-Screener/
     │       ├── sources.js     #   DexScreener + Solscan holders + RugCheck lock
     │       ├── discover.js    #   trending-token feeds (Radar input)
     │       ├── autoScreen.js  #   10x Radar: discover → screen → filter
-    │       ├── proRadar.js    #   Pro Radar: funnel → enrich → Fable 5 rank
+    │       ├── proRadar.js    #   Pro Radar: funnel → enrich → quality gate → Fable 5 → self-tune
+    │       ├── quality.js     #   hard anti-junk gate (rug/thin-liq/honeypot/dump)
+    │       ├── learn.js       #   self-tuning: record picks → grade outcomes → auto-tune thresholds
     │       └── telegram.js    #   alert formatting + Trojan deep-link
     ├── mcp/server.js      # Node MCP server (5 screener tools) for Claude Desktop
     └── frontend/          # Vite + Vue 3 app
@@ -115,17 +117,42 @@ matches before pushing to Telegram. Runs on a `setInterval` (default 15 min); se
 `RADAR_INTERVAL_MIN=0` to disable, or trigger `GET /api/auto-screen` from an
 external scheduler/cron if you prefer to drive it on demand.
 
-### 3.4 Pro Radar — AI-ranked variant of the funnel
-`screener/proRadar.js` reuses the 10x Radar discovery funnel (wider net, ~28 mints),
-fast-screens them for GEM Score, keeps the top-10 finalists, then **enriches** those
+### 3.4 Pro Radar — AI-ranked variant of the funnel (+ quality gate + self-tuning)
+`screener/proRadar.js` reuses the 10x Radar discovery funnel (wider net, ~40 mints),
+fast-screens them for GEM Score, keeps the top-14 finalists, then **enriches** those
 finalists with RugCheck LP-lock data and runs an AI ranking pass via
 `ai/analyze.js` on **Fable 5** (`claude-fable-5`). The model returns, per token,
 `conviction` (0–100), `tier` (S/A/B/C), a `thesis`, `catalysts[]`, `redFlags[]`, and
-an `action` (APE/WATCH/AVOID). Results are sorted by conviction → action → GEM.
-The AI runs through whatever mode is configured (local Claude-CLI or Anthropic API);
-if the AI is unavailable it **degrades to pure-heuristic GEM ordering** and returns
-`aiUsed:false` (the UI shows a ⚠️ badge). Exposed at `GET /api/pro-radar`. Full
-data-flow + flowcharts live in `web/PRO-RADAR.md`.
+an `action` (APE/WATCH/AVOID). The AI runs through whatever mode is configured (local
+Claude-CLI or Anthropic API); if it's unavailable it **degrades to pure-heuristic GEM
+ordering** and returns `aiUsed:false` (the UI shows a ⚠️ badge). Exposed at
+`GET /api/pro-radar`. Full data-flow + flowcharts live in `web/PRO-RADAR.md`.
+
+**Quality gate (`screener/quality.js`).** After enrichment, a hard gate runs
+*before* the AI: it drops `rugged` tokens, zero-market-cap, thin liquidity/volume,
+dead trade counts, one-sided books (near-all-buys ≈ honeypot, near-all-sells ≈ dump),
+and known-but-low LP lock. This is what removed the junk that used to pad the list.
+
+**AI-drop, not just sort.** Post-AI, tokens judged `AVOID` or below the (tuned)
+conviction floor are **removed** from the results (a small top-3 floor keeps the panel
+non-empty when the AI is harsh). Each surviving token also gets a blended
+`quality = 0.5·gem + 0.5·conviction` (the **Q** badge), which is the primary sort key.
+
+**Self-tuning loop (`screener/learn.js`).** Evidence-based, not prediction. Every
+displayed pick is snapshotted with its entry price (`recordPicks`) into a gitignored
+`web/server/screener/.radar-memory.json` (file-backed, in-memory fallback). On a later
+scan, matured picks (default ≥3h, `RADAR_GRADE_AFTER_MIN`) are graded live — current
+price vs entry → **win** (≥+50%) / **loss** (≤−25%) / **rug** (≤10% of entry or
+delisted) / **flat** (`gradeAndRetune`). From the aggregate, the gate thresholds
+**auto-tighten** (more rugs → raise `minLockedPct`/`minLiquidity`/`minTx`; more losses
+→ raise `minVolume`; AI over-confident on losers → raise `minConviction`), all clamped
+to safe bounds; a clean, productive record relaxes them slightly. The track record +
+current tuned thresholds are exposed at `GET /api/pro-radar/track` and shown in the UI
+(🧬 Self-tuning strip). **Not a profit guarantee** — it reduces junk and learns from
+its own misses; memecoins remain random and adversarial.
+
+**Inline chart.** Clicking a token in the Pro Radar list now embeds its DexScreener
+chart inline (toggle); the backend sends a `chartUrl` per match.
 
 ### 3.5 AI analyst — server-side tool-loop
 `ai/anthropic.js` runs Claude's agentic tool-use loop server-side and streams the
@@ -293,3 +320,10 @@ Ordered by leverage. Each item is independently shippable.
 - `web/frontend` production build → success (`vite build`).
 - Web app rendered (Playwright) in 4 states: live data, 401 error, input
   validation error, mobile (390px) — all correct.
+- Pro Radar v2 (quality gate + AI-drop + self-tuning), `GET /api/pro-radar` live:
+  40 discovered/scanned → **3 shown** (down from 10 of mixed junk); survivors all
+  LP-locked 99–100%, liquidity $26k–50k, no rugs. `recordPicks` persisted 3 picks
+  with entry prices; `gradeAndRetune` (tested with `RADAR_GRADE_AFTER_MIN=0`) graded
+  them, computed returns, and aggregated the track record without error.
+  `GET /api/pro-radar/track` returns tuned thresholds. Inline DexScreener chart
+  toggles per token in the UI (Vite HMR clean).

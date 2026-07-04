@@ -16,6 +16,9 @@ node_modules/
 # Persisted 10x Radar runtime state (latest scan + alerted mints)
 .radar-state.json
 **/.radar-state.json
+# Pro Radar self-learning memory (tracked picks + graded outcomes + tuned thresholds)
+.radar-memory.json
+**/.radar-memory.json
 
 # Build output
 dist/

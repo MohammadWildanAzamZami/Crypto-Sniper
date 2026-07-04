@@ -5,15 +5,35 @@
  * explains each (thesis, catalysts, red flags). Falls back to heuristic ordering
  * if the AI is unavailable. Heuristic + AI opinion — NOT financial advice. DYOR.
  */
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { apiUrl } from "../lib/api.js";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null });
+// Self-learning track record (win rate, graded count, auto-tuned thresholds).
+const track = ref(null);
+
+async function loadTrack() {
+  try {
+    const r = await fetch(apiUrl("/api/pro-radar/track"));
+    if (r.ok) track.value = await r.json();
+  } catch { /* non-fatal — the strip just stays hidden */ }
+}
+onMounted(loadTrack);
+
+const money = (n) => (typeof n === "number" ? "$" + Math.round(n).toLocaleString() : "—");
 const loading = ref(false);
 const error = ref("");
 const copied = ref("");
 const copiedAddr = ref("");
 const failedLogos = ref(new Set());
+// Address of the token whose DexScreener chart is currently expanded (one at a
+// time). Click a token (logo/name) to embed its live chart inline; click again
+// to collapse it.
+const openChart = ref("");
+
+function toggleChart(m) {
+  openChart.value = openChart.value === m.address ? "" : m.address;
+}
 
 const usd = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
 
@@ -52,6 +72,7 @@ function closeScan() {
   scan.value = { scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null };
   error.value = "";
   copied.value = "";
+  openChart.value = "";
 }
 
 async function runScan() {
@@ -63,7 +84,7 @@ async function runScan() {
     const r = await fetch(apiUrl("/api/pro-radar"));
     const body = await r.json();
     if (!r.ok) error.value = body?.error || `Scan gagal (${r.status})`;
-    else scan.value = body;
+    else { scan.value = body; openChart.value = ""; if (body.track) track.value = body.track; }
   } catch {
     error.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
   } finally {
@@ -101,13 +122,43 @@ async function buy(m) {
       </div>
     </div>
 
+    <!-- Self-learning strip: track record + current auto-tuned thresholds -->
+    <div v-if="track" class="learn">
+      <div class="learn__row">
+        <span class="learn__tag">🧬 Self-tuning</span>
+        <span v-if="track.graded" class="learn__stat">
+          Win rate <b :class="track.winRate >= 0.4 ? 'ok' : track.winRate <= 0.2 ? 'bad' : ''">
+            {{ Math.round((track.winRate || 0) * 100) }}%
+          </b>
+          <span class="learn__sub">({{ track.wins }}W · {{ track.losses }}L · {{ track.rugs }} rug dari {{ track.graded }} dinilai)</span>
+        </span>
+        <span v-else class="learn__stat learn__sub">
+          Belum ada pick yang matang untuk dinilai ({{ track.open }} dilacak) — sistem belajar setelah beberapa jam.
+        </span>
+        <span v-if="track.avgReturnPct != null" class="learn__stat learn__sub">
+          Avg return {{ track.avgReturnPct > 0 ? "+" : "" }}{{ track.avgReturnPct }}%
+        </span>
+      </div>
+      <div class="learn__row learn__thresholds">
+        <span class="learn__sub">Ambang auto-tuned:</span>
+        <span class="pill">Liq ≥ {{ money(track.tuning.minLiquidity) }}</span>
+        <span class="pill">Vol ≥ {{ money(track.tuning.minVolume) }}</span>
+        <span class="pill">Tx ≥ {{ track.tuning.minTx }}</span>
+        <span class="pill">Lock ≥ {{ track.tuning.minLockedPct }}%</span>
+        <span class="pill">Conv ≥ {{ track.tuning.minConviction }}</span>
+        <span v-if="track.retunes" class="learn__sub">· disetel {{ track.retunes }}×</span>
+      </div>
+    </div>
+
     <p v-if="!scan.scannedAt && !loading && !error" class="hint">
       Klik <b>Scan AI</b> — analisis Fable 5 butuh beberapa detik lebih lama dari 10x Radar biasa.
     </p>
 
     <p v-if="scan.scannedAt" class="meta">
       Pindai terakhir: <b>{{ ago(scan.scannedAt) }}</b>
-      · {{ scan.candidatesScanned }} dicek · <b>{{ scan.matches.length }}</b> finalis
+      · {{ scan.candidatesScanned }} dicek
+      <span v-if="scan.rejected">· <b>{{ scan.rejected }}</b> dibuang gerbang kualitas</span>
+      · <b>{{ scan.matches.length }}</b> lolos
       <span v-if="scan.aiUsed" class="meta-ai ok">· ✅ diperingkat {{ scan.model || 'Fable 5' }}</span>
       <span v-else class="meta-ai warn">· ⚠️ AI tak aktif — urutan heuristik (aktifkan mode AI di Settings)</span>
     </p>
@@ -115,14 +166,22 @@ async function buy(m) {
     <p v-if="error" class="err" role="alert">⚠️ {{ error }}</p>
 
     <p v-if="!loading && scan.scannedAt && !scan.matches.length" class="empty">
-      Belum ada finalis yang lolos saat ini. Coba lagi nanti — pasar bergerak cepat.
+      Tidak ada token yang lolos gerbang kualitas saat ini
+      <span v-if="scan.rejected">({{ scan.rejected }} dibuang karena rug/likuiditas tipis/dump)</span>.
+      Ini normal — radar lebih memilih kosong daripada menampilkan sampah. Coba lagi nanti.
     </p>
 
     <ul v-if="scan.matches.length" class="list">
       <li v-for="m in scan.matches" :key="m.address" class="card">
         <div class="card__top">
           <div class="card__idwrap">
-            <span class="card__logo" aria-hidden="true">
+            <button
+              type="button"
+              class="card__logo card__logo--btn"
+              :title="'Klik untuk lihat chart ' + m.symbol"
+              :aria-expanded="openChart === m.address"
+              @click="toggleChart(m)"
+            >
               <img
                 v-if="m.logoUrl && !failedLogos.has(m.address)"
                 :src="m.logoUrl"
@@ -132,13 +191,20 @@ async function buy(m) {
                 @error="logoFailed(m.address)"
               />
               <span v-else class="card__logo-fallback">{{ initials(m) }}</span>
-            </span>
+            </button>
             <div class="card__id">
-              <div class="card__line1">
+              <button
+                type="button"
+                class="card__line1 card__line1--btn"
+                :title="'Klik untuk lihat chart ' + m.symbol"
+                :aria-expanded="openChart === m.address"
+                @click="toggleChart(m)"
+              >
                 <span v-if="m.ai" :class="tierClass(m.ai.tier)">{{ m.ai.tier }}</span>
                 <span class="card__sym">{{ m.symbol }}</span>
                 <span class="card__name">{{ m.name }}</span>
-              </div>
+                <span class="card__caret" aria-hidden="true">{{ openChart === m.address ? "▾" : "▸" }}</span>
+              </button>
               <button
                 type="button"
                 class="card__addr"
@@ -152,6 +218,7 @@ async function buy(m) {
           </div>
           <div class="card__badges">
             <span v-if="m.ai" :class="actionClass(m.ai.action)">{{ actionLabel(m.ai.action) }}</span>
+            <span v-if="m.quality != null" class="badge badge--q" :title="'Skor kualitas gabungan (GEM + conviction)'">Q {{ m.quality }}</span>
             <span class="badge badge--gem">GEM {{ m.gemScore }}</span>
             <span class="badge badge--x" v-if="m.upsideX">~{{ m.upsideX }}x</span>
           </div>
@@ -182,8 +249,32 @@ async function buy(m) {
           <li v-for="(r, i) in m.reasons" :key="i">{{ r }}</li>
         </ul>
 
+        <!-- Inline DexScreener chart (toggled by clicking the token) -->
+        <div v-if="openChart === m.address && m.chartUrl" class="chart">
+          <div class="chart__head">
+            <span class="chart__title">📊 {{ m.symbol }} chart</span>
+            <a class="chart__open" :href="m.url" target="_blank" rel="noopener">
+              Buka di DexScreener ↗
+            </a>
+          </div>
+          <div class="chart__frame">
+            <iframe
+              :src="m.chartUrl"
+              :title="`Chart harga ${m.symbol} di DexScreener`"
+              loading="lazy"
+              allow="clipboard-write"
+              referrerpolicy="no-referrer"
+            />
+          </div>
+        </div>
+        <p v-else-if="openChart === m.address" class="chart__na">
+          📊 Chart tak tersedia — tidak ada pair DexScreener untuk token ini.
+        </p>
+
         <div class="card__actions">
-          <a class="lnk" :href="m.url" target="_blank" rel="noopener">📈 Chart</a>
+          <button type="button" class="lnk lnkbtn" @click="toggleChart(m)">
+            {{ openChart === m.address ? "📊 Sembunyikan chart" : "📈 Lihat chart" }}
+          </button>
           <button class="buy" @click="buy(m)">
             {{ copied === m.address ? "✅ Alamat disalin — paste di Trojan" : "🤖 Buy via Trojan" }}
           </button>
@@ -224,6 +315,26 @@ async function buy(m) {
 .meta { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .meta-ai.ok { color: var(--text-success, #16a34a); }
 .meta-ai.warn { color: #f59e0b; }
+
+/* Self-learning strip */
+.learn {
+  display: grid; gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(124, 58, 237, 0.06);
+}
+.learn__row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--font-size-sm); }
+.learn__tag { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); padding: 2px var(--space-3);
+  border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #a855f7); color: #fff; }
+.learn__stat { color: var(--text-body); }
+.learn__stat b.ok { color: #16a34a; }
+.learn__stat b.bad { color: var(--text-error); }
+.learn__sub { color: var(--text-muted); font-size: var(--font-size-xs); }
+.learn__thresholds { gap: var(--space-2); }
+.pill { font-size: 11px; padding: 1px var(--space-3); border-radius: 999px;
+  background: var(--bg-card); border: 1px solid var(--border-default); color: var(--text-body);
+  font-variant-numeric: tabular-nums; }
 .hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 .empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
@@ -240,8 +351,15 @@ async function buy(m) {
   display: grid; place-items: center; background: var(--bg-card); border: 1px solid rgba(124, 58, 237, 0.5); }
 .card__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card__logo-fallback { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: #c4b5fd; letter-spacing: 0.3px; }
+.card__logo--btn { padding: 0; cursor: pointer; transition: border-color 120ms, transform 120ms; }
+.card__logo--btn:hover { border-color: #a855f7; transform: scale(1.05); }
+.card__logo--btn:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; }
 .card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .card__line1 { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.card__line1--btn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-align: left; }
+.card__line1--btn:hover .card__sym { color: #a855f7; }
+.card__line1--btn:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; border-radius: var(--radius-xs); }
+.card__caret { flex: none; align-self: center; font-size: 11px; color: #c4b5fd; }
 .card__sym { font-weight: var(--font-weight-bold); color: var(--text-heading); font-size: var(--font-size-lg); }
 .card__name { color: var(--text-muted); font-size: var(--font-size-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card__addr { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
@@ -271,6 +389,7 @@ async function buy(m) {
 .badge { font-size: var(--font-size-xs); padding: 2px var(--space-3); border-radius: 999px; font-weight: var(--font-weight-medium); }
 .badge--x { background: #16a34a; color: #fff; }
 .badge--gem { background: rgba(124, 58, 237, 0.18); color: #c4b5fd; border: 1px solid rgba(124, 58, 237, 0.5); }
+.badge--q { background: rgba(16, 163, 74, 0.16); color: #4ade80; border: 1px solid rgba(16, 163, 74, 0.5); }
 
 /* Conviction meter */
 .conv { display: flex; align-items: center; gap: var(--space-3); }
@@ -291,9 +410,26 @@ async function buy(m) {
 .reasons li { font-size: var(--font-size-xs); color: var(--text-muted); }
 .reasons li::before { content: "• "; color: #a855f7; }
 
+/* Inline DexScreener chart embed */
+.chart { display: grid; gap: var(--space-3); }
+.chart__head { display: flex; justify-content: space-between; align-items: baseline; }
+.chart__title { color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.chart__open { color: #c4b5fd; text-decoration: none; font-size: var(--font-size-sm); }
+.chart__open:hover { color: #a855f7; }
+.chart__frame {
+  position: relative; width: 100%;
+  aspect-ratio: 16 / 10; max-height: 460px;
+  border: 1px solid rgba(124, 58, 237, 0.4); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--bg-card);
+}
+.chart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.chart__na { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
+
 .card__actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .lnk { color: var(--text-link); text-decoration: none; font-size: var(--font-size-sm); }
 .lnk:hover { color: var(--text-link-hover); }
+.lnkbtn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.lnkbtn:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; border-radius: var(--radius-xs); }
 .buy {
   padding: var(--space-2) var(--space-5); border: 1px solid #16a34a; border-radius: var(--radius-sm);
   background: #16a34a; color: #fff; font: inherit; font-weight: var(--font-weight-medium); cursor: pointer;

@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { screenToken, screenAndAlert, batchScreen, isValidMint } from "./screener/screen.js";
 import { runAutoScan } from "./screener/autoScreen.js";
 import { runProRadar } from "./screener/proRadar.js";
+import { getTrackRecord } from "./screener/learn.js";
 import { sendAlert } from "./screener/telegram.js";
 import { ALLOWED, solscanFetch } from "./solscan.js";
 import { publicStatus, getState, applySettings, testTarget } from "./ai/settings.js";
@@ -184,6 +185,12 @@ app.get("/api/auto-screen/latest", async (_req, res) => {
 // liquidity-lock data and runs a Fable 5 ranking pass (conviction + thesis +
 // red flags). Uses whatever AI mode is configured (local CLI or API key); if
 // the AI is unavailable it degrades to pure-heuristic ordering (aiUsed:false).
+// Self-learning track record (win rate + current auto-tuned thresholds). Cheap:
+// reads the learn store, no scan. Defined before /api/:resource so it isn't shadowed.
+app.get("/api/pro-radar/track", (_req, res) => {
+  res.json(getTrackRecord());
+});
+
 app.get("/api/pro-radar", scanLimit, async (req, res) => {
   const st = getState();
   try {

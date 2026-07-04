@@ -11,6 +11,8 @@ import { screenToken } from "./screen.js";
 import { discoverSolanaTokens } from "./discover.js";
 import { evaluateMoonshot, PRESETS } from "./autoScreen.js";
 import { analyzeCandidates } from "../ai/analyze.js";
+import { qualityGate } from "./quality.js";
+import { getTuning, recordPicks, gradeAndRetune, getTrackRecord } from "./learn.js";
 
 const UPSIDE_TARGET_CAP = 10_000_000;
 
@@ -79,14 +81,19 @@ const ACTION_RANK = { APE: 3, WATCH: 2, AVOID: 1 };
 export async function runProRadar({
   solscanKey,
   nowMs,
-  preset = "aggressive",
+  preset = "balanced",
   ai = {},
-  discoverLimit = 28,
+  discoverLimit = 40,
   concurrency = 10,
-  maxAi = 10,
+  maxAi = 14,
 } = {}) {
   const now = nowMs ?? Date.now();
-  const criteria = PRESETS[preset] || PRESETS.aggressive;
+  const criteria = PRESETS[preset] || PRESETS.balanced;
+
+  // Self-tuning: grade any matured past picks and pull the current (learned)
+  // quality-gate thresholds. Grading is time-bounded so it won't stall the scan.
+  const track = await gradeAndRetune(now).catch(() => getTrackRecord());
+  const tuning = getTuning();
 
   // 1) Discover trending mints (DexScreener boosts/profiles — public, key-less).
   const mints = (await discoverSolanaTokens({ limit: discoverLimit })).filter((m) => !SKIP.has(m));
@@ -123,13 +130,22 @@ export async function runProRadar({
     return r;
   });
 
-  // 5) Fable 5 ranking pass over the finalists (null if AI unavailable).
-  const aiPayload = finalists.map((r) => toAiCandidate(r.report, now));
+  // 4b) HARD QUALITY GATE — drop rugs, dead pairs, honeypot-shaped and unlocked
+  // tokens before they ever reach the AI or the UI. Thresholds are self-tuned.
+  const rejected = [];
+  const gated = finalists.filter((r) => {
+    const g = qualityGate(r.report, tuning);
+    if (!g.ok) rejected.push({ address: r.report.token.address, symbol: r.report.token.symbol, rejects: g.rejects });
+    return g.ok;
+  });
+
+  // 5) Fable 5 ranking pass over the survivors (null if AI unavailable).
+  const aiPayload = gated.map((r) => toAiCandidate(r.report, now));
   const aiMap = await analyzeCandidates(aiPayload, ai);
   const aiUsed = Boolean(aiMap);
 
-  // 6) Merge AI verdicts onto the finalists and shape the client payload.
-  const matches = finalists.map((r) => {
+  // 6) Merge AI verdicts onto the survivors and shape the client payload.
+  const matches = gated.map((r) => {
     const rep = r.report;
     const a = aiMap?.get(rep.token.address) || null;
     return {
@@ -143,6 +159,7 @@ export async function runProRadar({
       liquidityUsd: rep.metrics.liquidityUsd || 0,
       priceUsd: rep.token.priceUsd,
       url: rep.token.url,
+      chartUrl: rep.token.chartUrl || null,
       trojanLink: rep.trojanLink,
       lockedPct: rep.liquidityLock?.lockedPct ?? null,
       lockStatus: rep.liquidityLock?.status ?? null,
@@ -161,30 +178,52 @@ export async function runProRadar({
     };
   });
 
-  // 7) Sort: AI conviction first when we have it, else GEM Score.
-  if (aiUsed) {
-    matches.sort((x, y) => {
-      const cx = x.ai?.conviction ?? -1;
-      const cy = y.ai?.conviction ?? -1;
-      if (cy !== cx) return cy - cx;
-      const ax = ACTION_RANK[x.ai?.action] ?? 0;
-      const ay = ACTION_RANK[y.ai?.action] ?? 0;
-      if (ay !== ax) return ay - ax;
-      return y.gemScore - x.gemScore;
-    });
-  } else {
-    matches.sort((x, y) => y.gemScore - x.gemScore);
+  // 6b) Blended quality score (0-100): AI conviction and GEM Score together when
+  // we have the AI, else GEM alone. Used for the badge + as the final sort key.
+  for (const mt of matches) {
+    mt.quality = mt.ai ? Math.round(0.5 * mt.gemScore + 0.5 * mt.ai.conviction) : mt.gemScore;
   }
+
+  // 7) Post-AI filter: the AI already saw only gate-survivors, so now DROP the
+  // ones it judged AVOID or below the (self-tuned) conviction floor. This is what
+  // stops junk from padding the list. Keep a small floor so the panel isn't empty
+  // when the AI is harsh but we still have decent gems.
+  let shown = matches;
+  if (aiUsed) {
+    shown = matches.filter((m) => m.ai && m.ai.action !== "AVOID" && m.ai.conviction >= tuning.minConviction);
+    if (shown.length === 0 && matches.length) {
+      shown = matches
+        .slice()
+        .sort((a, b) => (b.ai?.conviction ?? -1) - (a.ai?.conviction ?? -1))
+        .slice(0, 3);
+    }
+  }
+
+  // 8) Sort: quality first, then AI action, then GEM Score.
+  shown.sort((x, y) => {
+    if (y.quality !== x.quality) return y.quality - x.quality;
+    const ax = ACTION_RANK[x.ai?.action] ?? 0;
+    const ay = ACTION_RANK[y.ai?.action] ?? 0;
+    if (ay !== ax) return ay - ax;
+    return y.gemScore - x.gemScore;
+  });
+
+  // 9) Record what we surfaced so it can be graded on a future scan (self-learning).
+  recordPicks(shown, now);
 
   return {
     scannedAt: now,
     preset,
     discovered: mints.length,
     candidatesScanned: valid.length,
+    rejected: rejected.length,
+    rejectedSample: rejected.slice(0, 6),
     aiUsed,
     aiMode: ai.aiMode || "none",
     model: ai.model || null,
-    matches,
+    tuning,
+    track,
+    matches: shown,
   };
 }
 
