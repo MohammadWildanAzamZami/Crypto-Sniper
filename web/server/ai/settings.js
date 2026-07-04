@@ -15,10 +15,15 @@ import { fileURLToPath } from "node:url";
 const STORE_PATH = fileURLToPath(new URL("../.settings.json", import.meta.url));
 
 // Fields we persist. solscanTier is a runtime probe result, deliberately not saved.
-const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "claudePath", "telegram"];
+const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "claudePath", "telegram", "birdeyeKey", "heliusKey"];
 
 const state = {
   solscanKey: process.env.SOLSCAN_API_KEY || "",
+  // Smart-money tracking keys. Birdeye = who's trading (top traders); Helius =
+  // are those wallets real/established. Both server-side; both optional (the
+  // radar degrades to no-smart-money when absent).
+  birdeyeKey: process.env.BIRDEYE_API_KEY || "",
+  heliusKey: process.env.HELIUS_API_KEY || "",
   // Default ke mode lokal: pakai CLI `claude` (tanpa API key, tanpa biaya).
   // Catatan: mode lokal butuh CLI `claude` di mesin yang menjalankan server.
   // Di host publik (mis. Render) yang tak punya CLI itu, chat belum berfungsi
@@ -76,6 +81,10 @@ export function publicStatus() {
     aiConfigured: state.aiMode === "local" ? true : Boolean(state.aiKey),
     model: state.model,
     telegramConfigured: Boolean(state.telegram.botToken && state.telegram.chatId),
+    birdeyeConfigured: Boolean(state.birdeyeKey),
+    heliusConfigured: Boolean(state.heliusKey),
+    // Smart money needs Birdeye at minimum; Helius only enriches it.
+    smartMoneyEnabled: Boolean(state.birdeyeKey),
   };
 }
 
@@ -93,6 +102,8 @@ export function applySettings(patch = {}) {
   if (typeof patch.aiKey === "string" && patch.aiKey !== "") state.aiKey = patch.aiKey;
   if (typeof patch.model === "string" && patch.model !== "") state.model = patch.model;
   if (typeof patch.claudePath === "string" && patch.claudePath !== "") state.claudePath = patch.claudePath;
+  if (typeof patch.birdeyeKey === "string" && patch.birdeyeKey !== "") state.birdeyeKey = patch.birdeyeKey;
+  if (typeof patch.heliusKey === "string" && patch.heliusKey !== "") state.heliusKey = patch.heliusKey;
   if (patch.telegram && typeof patch.telegram === "object") {
     if (typeof patch.telegram.botToken === "string" && patch.telegram.botToken !== "")
       state.telegram.botToken = patch.telegram.botToken;
@@ -133,6 +144,23 @@ export async function testTarget(target) {
       return { ok: true, detail: `Anthropic key valid (${state.model}).` };
     } catch (err) {
       return { ok: false, detail: `Anthropic key test failed: ${err?.message || err}` };
+    }
+  }
+
+  if (target === "smart") {
+    if (!state.birdeyeKey) return { ok: false, detail: "Belum ada Birdeye key (wajib untuk smart money)." };
+    try {
+      // Ping a stable mint (USDC) — just checks the key is accepted.
+      const res = await fetch(
+        "https://public-api.birdeye.so/defi/price?address=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        { headers: { "X-API-KEY": state.birdeyeKey, "x-chain": "solana", accept: "application/json" } }
+      );
+      if (res.status === 401 || res.status === 403) return { ok: false, detail: "Birdeye key ditolak (401/403)." };
+      if (!res.ok) return { ok: false, detail: `Birdeye merespons ${res.status}.` };
+      const helius = state.heliusKey ? " + Helius aktif (verifikasi wallet)." : " (Helius belum diisi — verifikasi wallet nonaktif).";
+      return { ok: true, detail: `Birdeye key valid.${helius}` };
+    } catch (err) {
+      return { ok: false, detail: `Uji Birdeye gagal: ${err?.message || err}` };
     }
   }
 

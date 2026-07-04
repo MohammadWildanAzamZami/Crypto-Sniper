@@ -12,7 +12,7 @@ import { discoverSolanaTokens } from "./discover.js";
 import { evaluateMoonshot, PRESETS } from "./autoScreen.js";
 import { analyzeCandidates } from "../ai/analyze.js";
 import { qualityGate } from "./quality.js";
-import { getTuning, recordPicks, gradeAndRetune, getTrackRecord } from "./learn.js";
+import { getTuning, recordPicks, gradeAndRetune, getTrackRecord, getFirstSeen, noteScanYield } from "./learn.js";
 
 const UPSIDE_TARGET_CAP = 10_000_000;
 
@@ -70,6 +70,13 @@ function toAiCandidate(report, nowMs) {
     // Pump.fun signals (null for non-pump tokens): graduation + drawdown from ATH.
     pumpGraduated: report.pumpfun?.complete ?? null,
     pumpDrawdownFromAthPct: report.pumpfun?.drawdownFromAthPct ?? null,
+    // Smart-money signals (null when Birdeye key absent): top-trader accumulation.
+    smartScore: report.smartMoney?.score ?? null,
+    smartAccumulating: report.smartMoney?.accumulating ?? null,
+    smartWhales: report.smartMoney?.whales ?? null,
+    smartProfitableTraders: report.smartMoney?.profitable ?? null,
+    smartNetBuyUsd: report.smartMoney?.netBuyUsd ?? null,
+    smartEstablishedWallets: report.smartMoney?.established ?? null,
   };
 }
 
@@ -86,6 +93,7 @@ export async function runProRadar({
   nowMs,
   preset = "balanced",
   ai = {},
+  smart = {},
   discoverLimit = 40,
   concurrency = 10,
   maxAi = 14,
@@ -122,7 +130,10 @@ export async function runProRadar({
   // 4) Enrich finalists with the (slower) RugCheck liquidity-lock data.
   await mapPool(finalists, concurrency, async (r) => {
     try {
-      const full = await screenToken(r.report.token.address, { solscanKey, nowMs: now, skipLock: false });
+      const full = await screenToken(r.report.token.address, {
+        solscanKey, nowMs: now, skipLock: false,
+        birdeyeKey: smart.birdeyeKey, heliusKey: smart.heliusKey,
+      });
       r.report = full;
       r.upsideX = full.metrics?.marketCap > 0
         ? Math.min(999, Math.max(1, Math.round(UPSIDE_TARGET_CAP / full.metrics.marketCap)))
@@ -169,6 +180,16 @@ export async function runProRadar({
       pump: rep.pumpfun
         ? { graduated: rep.pumpfun.complete, drawdownFromAthPct: rep.pumpfun.drawdownFromAthPct }
         : null,
+      smart: rep.smartMoney
+        ? {
+            score: rep.smartMoney.score,
+            accumulating: rep.smartMoney.accumulating,
+            whales: rep.smartMoney.whales,
+            profitable: rep.smartMoney.profitable,
+            netBuyUsd: rep.smartMoney.netBuyUsd,
+            established: rep.smartMoney.established,
+          }
+        : null,
       upsideX: r.upsideX,
       reasons: r.reasons,
       ai: a
@@ -188,6 +209,10 @@ export async function runProRadar({
   // we have the AI, else GEM alone. Used for the badge + as the final sort key.
   for (const mt of matches) {
     mt.quality = mt.ai ? Math.round(0.5 * mt.gemScore + 0.5 * mt.ai.conviction) : mt.gemScore;
+    // Smart-money accumulation is a strong tailwind — nudge quality up to +12.
+    if (mt.smart && mt.smart.score > 0) {
+      mt.quality = Math.min(100, mt.quality + Math.round(mt.smart.score * 0.12));
+    }
   }
 
   // 7) Post-AI filter: the AI already saw only gate-survivors, so now DROP the
@@ -214,8 +239,29 @@ export async function runProRadar({
     return y.gemScore - x.gemScore;
   });
 
-  // 9) Record what we surfaced so it can be graded on a future scan (self-learning).
+  // 9) Record what we surfaced so it can be graded on a future scan (self-learning),
+  // and feed the yield to the starvation guard so an over-tight gate reopens.
   recordPicks(shown, now);
+  noteScanYield(shown.length, now);
+
+  // 9b) Attach the entry price at FIRST detection (recordPicks has already
+  // snapshotted brand-new tokens, so every shown pick has a first-seen row).
+  // This lets the UI show "screened at $X → now $Y (+Z%, Nx)" as live evidence of
+  // whether the radar's picks actually run toward a 10x.
+  for (const m of shown) {
+    const fs = getFirstSeen(m.address);
+    if (!fs) continue;
+    const cur = m.priceUsd;
+    const hasBoth = fs.priceUsd > 0 && typeof cur === "number" && cur > 0;
+    m.firstSeen = {
+      priceUsd: fs.priceUsd,
+      marketCap: fs.marketCap,
+      at: fs.at,
+      isNew: now - fs.at < 60_000, // detected on THIS scan
+      changePct: hasBoth ? Number((((cur - fs.priceUsd) / fs.priceUsd) * 100).toFixed(1)) : null,
+      multiple: hasBoth ? Number((cur / fs.priceUsd).toFixed(2)) : null,
+    };
+  }
 
   return {
     scannedAt: now,
@@ -227,6 +273,7 @@ export async function runProRadar({
     aiUsed,
     aiMode: ai.aiMode || "none",
     model: ai.model || null,
+    smartMoneyEnabled: Boolean(smart.birdeyeKey),
     tuning,
     track,
     matches: shown,

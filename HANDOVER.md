@@ -70,7 +70,8 @@ Memecoin-Screener/
     │       ├── autoScreen.js  #   10x Radar: discover → screen → filter
     │       ├── proRadar.js    #   Pro Radar: funnel → enrich → quality gate → Fable 5 → self-tune
     │       ├── quality.js     #   hard anti-junk gate (rug/thin-liq/honeypot/dump)
-    │       ├── learn.js       #   self-tuning: record picks → grade outcomes → auto-tune thresholds
+    │       ├── learn.js       #   self-tuning: win-rate controller + starvation guard
+    │       ├── smartMoney.js  #   smart money: Birdeye top traders + Helius wallet verify
     │       └── telegram.js    #   alert formatting + Trojan deep-link
     ├── mcp/server.js      # Node MCP server (5 screener tools) for Claude Desktop
     └── frontend/          # Vite + Vue 3 app
@@ -162,6 +163,33 @@ The gate rejects banned/nsfw/hidden, big ATH drawdowns, and (strict mode) non-gr
 tokens; the AI payload and UI (🎓 grad badge) surface graduation too. Degrades to null for
 non-pump tokens or API failure. **Note:** Solscan holder-concentration would add another
 signal but needs a Pro key (absent on the free tier).
+
+**Smart money tracking (`screener/smartMoney.js`) — Birdeye + Helius, interlocking.**
+For each enriched finalist (when a Birdeye key is set): **Birdeye** `/defi/v2/tokens/top_traders`
+gives the token's 24h top traders with USD buy/sell volume, wallet `tags` (whale/bundler),
+and per-trader PnL; **Helius** `/v0/addresses/<owner>/transactions` verifies the top few are
+established wallets (real history) rather than fresh sniper/bundle wallets. Combined into a
+0–100 `smartScore` (net buy pressure + whales accumulating + profitable traders + breadth +
+Helius verification) surfaced in the AI payload, the blended quality score (+up to 12), and a
+UI badge (🧠 Smart N · 🐋). Both keys live server-side in the settings store (seeded from
+`BIRDEYE_API_KEY` / `HELIUS_API_KEY`), editable in the Settings panel (🧠 Smart money section,
+with a Test button → `testTarget("smart")`); `publicStatus()` exposes `smartMoneyEnabled`.
+Birdeye is required; Helius optional; both degrade to null (feature off) with no key.
+`smartMoney.js` retries on 429/5xx so a free-tier burst during the enrich fan-out doesn't
+null everything. **Note:** the free Birdeye tier is CU/rate-limited — a public deployment
+that scans often will consume the operator's quota.
+
+**Starvation guard (`learn.js` `noteScanYield`).** The win-rate controller chasing 0.9 against
+a real ~15% win rate will tighten the gate to the point of an empty radar — which then can
+never gather outcomes to improve. If a scan surfaces 0 picks `STARVE_LIMIT` (2) times in a
+row, the thresholds relax a step (and `requirePumpComplete` clears) so the funnel reopens.
+Tuning bounds were also capped below "impossible" (e.g. `minLockedPct` max 92, not 100).
+
+**.env load order fix (`loadenv.js`).** `ai/settings.js` reads `process.env` at import time to
+seed secrets; ESM evaluates imports before the entrypoint body, so the old `dotenv.config()`
+in `index.js` ran *after* settings had already read a still-empty env — `.env`-seeded keys
+never took effect. `index.js` now imports `./loadenv.js` first (it calls `dotenv.config()`),
+so `.env` is loaded before any module initialises.
 
 **Inline chart.** Clicking a token in the Pro Radar list embeds its DexScreener chart
 (inline on desktop, floating overlay on mobile with the attribution footer masked and the
@@ -340,6 +368,13 @@ Ordered by leverage. Each item is independently shippable.
   them, computed returns, and aggregated the track record without error.
   `GET /api/pro-radar/track` returns tuned thresholds. Inline DexScreener chart
   toggles per token in the UI (Vite HMR clean).
+- Smart money (Birdeye + Helius) calibrated LIVE with real keys: Birdeye
+  `top_traders` → 200 with USD volume + whale tags + PnL; Helius
+  `/addresses/../transactions` → parsed swap array. `fetchSmartMoney(BONK)` →
+  score 97 (3 whales, net +$203k, 4 Helius-verified). Full `/api/pro-radar`
+  scan surfaced picks with `smart` populated (e.g. trumplet score 46, 5
+  profitable traders, 3 established wallets); `/api/health` → `smartMoneyEnabled:true`.
+  429-retry added after observing burst rate-limits null the enrich fan-out.
 - Pro Radar v3 (win-rate controller + pump.fun), verified live: `/api/pro-radar/track`
   reports `targetWinRate: 0.9`, `belowTarget: true`. Controller test (isolated,
   `RADAR_GRADE_AFTER_MIN=0`): at winRate 0.12 it tightened every lever in one cycle

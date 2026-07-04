@@ -90,6 +90,7 @@ Solscan Pro & AI bersifat **opsional** — kalau tak ada, Pro Radar tetap jalan.
 | 2c. Skor | `computeGemScore` (`gemScore.js`) | (hitung lokal, tanpa jaringan) | ❌ | **GEM Score 0–100** (Likuiditas 40 + Momentum 35 + Trust/Age 25) |
 | 4. Enrich | `fetchRugcheckLock` (`sources.js`) | **RugCheck** `api.rugcheck.xyz/v1/tokens/<mint>/report` | ❌ | **LP locked %**, locked USD, total LP USD, status (Locked/Partially/Unlocked), flag `rugged` |
 | 4b. Enrich (Pump.fun) | `fetchPumpfun` (`sources.js`) | **Pump.fun** `frontend-api-v3.pump.fun/coins/<mint>` (hanya token pump) | ❌ | **graduated** (`complete`), drawdown dari **ATH**, flag banned/nsfw/hidden, reply count, creator |
+| 4c. Smart money | `fetchSmartMoney` (`smartMoney.js`) | **Birdeye** `top_traders` + **Helius** `addresses/../transactions` | ✅ Birdeye (Helius opsional) | Top trader 24j (USD buy/sell, tag **whale**, PnL) + verifikasi wallet mapan → **smartScore 0–100** |
 | 5. AI rank | `analyzeCandidates` (`ai/analyze.js`) | **Fable 5** — CLI `claude -p` (Local) atau Anthropic SDK (API) | Local ❌ · API ✅ | conviction 0–100, tier S/A/B/C, thesis, catalysts[], redFlags[], action APE/WATCH/AVOID |
 
 > ⚠️ LP-lock (RugCheck) **sengaja dilewati saat fast-screen** (`skipLock:true`) biar
@@ -185,6 +186,26 @@ diperketat: `discoverLimit` 28 → **40**, `maxAi` 10 → **14**, preset default
 Selain itu, di UI **klik token → chart DexScreener tampil inline** (embed iframe,
 toggle buka/tutup) — dulu tombol Chart hanya membuka tab baru. Backend kini ikut
 mengirim `chartUrl` per token.
+
+#### 🧠 Smart money tracking (Birdeye + Helius)
+**File baru:** `web/server/screener/smartMoney.js` · key di Settings (server-side)
+
+Dua sumber **saling bertaut**:
+- **Birdeye** (`top_traders`) — *siapa* yang menradingkan token: top trader 24 jam
+  dengan **USD buy/sell**, tag **whale**, dan **PnL** tiap trader.
+- **Helius** (`addresses/../transactions`) — *apakah wallet-nya nyata*: verifikasi
+  top trader punya riwayat transaksi (wallet mapan) vs sniper/bundle sekali pakai.
+
+Digabung jadi **smartScore 0–100** (net buy USD + whale akumulasi + trader profit +
+sebaran + verifikasi Helius) → masuk payload AI, **boost skor Quality** (hingga +12),
+dan badge **🧠 Smart N · 🐋** di kartu. Birdeye **wajib**, Helius opsional; keduanya
+degrade ke null (fitur off) tanpa key. Ada **retry saat 429** agar burst free-tier
+tidak membuat semua null. Key diisi di **Settings → 🧠 Smart money** (server-side, gitignored).
+
+Plus dua perbaikan pendukung: **starvation guard** (`learn.js`) supaya pengontrol
+target 90% tak mencekik radar sampai kosong permanen (kalau kosong 2× beruntun,
+ambang otomatis dilonggarkan), dan **`loadenv.js`** (memuat `.env` sebelum modul lain
+membaca `process.env` — memperbaiki seeding key dari `.env`).
 
 ### 2.4 AI Analyst Chat
 **File:** `web/server/ai/anthropic.js`, `local.js`, `tools.js`, `settings.js`
@@ -501,7 +522,8 @@ web/
 │       ├── autoScreen.js        # 10x Radar: discover->screen->filter
 │       ├── proRadar.js          # Pro Radar: funnel + enrich + gerbang kualitas + AI rank + self-tuning
 │       ├── quality.js           # Gerbang anti-junk (buang rug/likuiditas tipis/honeypot/dump)
-│       ├── learn.js             # Self-tuning: catat pick -> nilai hasil -> auto-setel ambang
+│       ├── learn.js             # Self-tuning: pengontrol target win rate + starvation guard
+│       ├── smartMoney.js        # Smart money: Birdeye top trader + verifikasi wallet Helius
 │       └── telegram.js          # Alert Telegram + Trojan deep-link
 ├── mcp/server.js                # MCP Node (5 tool screener) untuk Claude Desktop
 └── frontend/src/

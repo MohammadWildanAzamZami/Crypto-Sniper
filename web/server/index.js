@@ -1,6 +1,6 @@
+import "./loadenv.js"; // MUST be first — loads .env before settings.js reads process.env
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -15,8 +15,6 @@ import { streamChat } from "./ai/anthropic.js";
 import { localChat } from "./ai/local.js";
 import { getLatestScan, setLatestScan, markAlerted, radarBackend } from "./radarStore.js";
 import { rateLimit, chatBudget, requireAdmin } from "./middleware/guard.js";
-
-dotenv.config();
 
 const PORT = process.env.PORT || 8787;
 
@@ -199,6 +197,7 @@ app.get("/api/pro-radar", scanLimit, async (req, res) => {
       nowMs: Date.now(),
       preset: req.query.preset,
       ai: { aiMode: st.aiMode, aiKey: st.aiKey, model: st.model, claudePath: st.claudePath },
+      smart: { birdeyeKey: st.birdeyeKey, heliusKey: st.heliusKey },
     }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });

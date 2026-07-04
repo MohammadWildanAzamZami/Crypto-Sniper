@@ -36,6 +36,13 @@ function toggleChart(m) {
 }
 
 const usd = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
+// Token prices are often tiny fractions ($0.0000023) — keep significant digits.
+const price = (n) => {
+  if (typeof n !== "number" || !(n > 0)) return "—";
+  if (n >= 1) return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 0.01) return "$" + n.toFixed(4);
+  return "$" + n.toPrecision(3);
+};
 
 // Lettered avatar fallback when a token has no logo (or the image fails to load).
 function initials(m) {
@@ -169,6 +176,8 @@ async function buy(m) {
       · <b>{{ scan.matches.length }}</b> lolos
       <span v-if="scan.aiUsed" class="meta-ai ok">· ✅ diperingkat AI</span>
       <span v-else class="meta-ai warn">· ⚠️ AI tak aktif — urutan heuristik (aktifkan mode AI di Settings)</span>
+      <span v-if="scan.smartMoneyEnabled" class="meta-ai ok">· 🧠 smart money aktif</span>
+      <span v-else class="meta-ai warn">· 🧠 smart money off (tambah Birdeye key di Settings)</span>
     </p>
 
     <p v-if="error" class="err" role="alert">⚠️ {{ error }}</p>
@@ -226,6 +235,15 @@ async function buy(m) {
           </div>
           <div class="card__badges">
             <span v-if="m.ai" :class="actionClass(m.ai.action)">{{ actionLabel(m.ai.action) }}</span>
+            <span
+              v-if="m.smart && m.smart.accumulating > 0"
+              class="badge badge--smart"
+              :title="`Smart money score ${m.smart.score}/100 — ${m.smart.accumulating} top trader akumulasi`
+                + (m.smart.whales ? `, ${m.smart.whales} whale` : '')
+                + (m.smart.profitable ? `, ${m.smart.profitable} trader profit` : '')
+                + (m.smart.netBuyUsd ? `, net ${m.smart.netBuyUsd >= 0 ? 'beli' : 'jual'} $${Math.abs(Math.round(m.smart.netBuyUsd)).toLocaleString()}` : '')
+                + (m.smart.established != null ? `, ${m.smart.established} wallet mapan (Helius)` : '')"
+            >🧠 Smart {{ m.smart.score }}<span v-if="m.smart.whales">· 🐋{{ m.smart.whales }}</span></span>
             <span v-if="m.pump?.graduated" class="badge badge--grad" title="Lulus bonding curve Pump.fun (graduated)">🎓 grad</span>
             <span v-if="m.quality != null" class="badge badge--q" :title="'Skor kualitas gabungan (GEM + conviction)'">Q {{ m.quality }}</span>
             <span class="badge badge--gem">GEM {{ m.gemScore }}</span>
@@ -247,6 +265,27 @@ async function buy(m) {
           <span>MC {{ usd(m.marketCap) }}</span>
           <span>Liq {{ usd(m.liquidityUsd) }}</span>
           <span v-if="m.lockedPct != null">🔒 {{ m.lockedPct }}%</span>
+        </div>
+
+        <!-- Entry price at first detection: evidence the radar's picks run toward 10x -->
+        <div
+          v-if="m.firstSeen"
+          class="firstseen"
+          :class="m.firstSeen.multiple >= 2 ? 'firstseen--up'
+            : (m.firstSeen.changePct != null && m.firstSeen.changePct < 0 ? 'firstseen--down' : '')"
+        >
+          <span class="firstseen__label">🎯 Harga terdeteksi pertama</span>
+          <span class="firstseen__price">{{ price(m.firstSeen.priceUsd) }}</span>
+          <template v-if="m.firstSeen.isNew">
+            <span class="firstseen__new">✨ baru terdeteksi</span>
+          </template>
+          <template v-else>
+            <span class="firstseen__arrow">→ kini {{ price(m.priceUsd) }}</span>
+            <span v-if="m.firstSeen.changePct != null" class="firstseen__chg">
+              {{ m.firstSeen.changePct > 0 ? "+" : "" }}{{ m.firstSeen.changePct }}% · {{ m.firstSeen.multiple }}x
+            </span>
+            <span class="firstseen__since">({{ ago(m.firstSeen.at) }})</span>
+          </template>
         </div>
 
         <div v-if="m.ai && (m.ai.catalysts.length || m.ai.redFlags.length)" class="tags">
@@ -414,7 +453,7 @@ async function buy(m) {
 .tier--c { background: #6b7280; }
 
 /* Action badge */
-.act { font-size: var(--font-size-xs); padding: 2px var(--space-3); border-radius: 999px; font-weight: var(--font-weight-medium); }
+.act { font-size: 8.6px; padding: 1px var(--space-2); border-radius: 999px; font-weight: var(--font-weight-medium); }
 .act--ape { background: #16a34a; color: #fff; }
 .act--watch { background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); }
 .act--avoid { background: rgba(239, 68, 68, 0.15); color: var(--text-error); border: 1px solid rgba(239, 68, 68, 0.5); }
@@ -424,6 +463,9 @@ async function buy(m) {
 .badge--gem { background: rgba(124, 58, 237, 0.18); color: #c4b5fd; border: 1px solid rgba(124, 58, 237, 0.5); }
 .badge--q { background: rgba(16, 163, 74, 0.16); color: #4ade80; border: 1px solid rgba(16, 163, 74, 0.5); }
 .badge--grad { background: rgba(59, 130, 246, 0.18); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); }
+.badge--smart { background: rgba(234, 179, 8, 0.18); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.55); }
+/* Shrink the WATCH / grad / Q / GEM badges ~28% */
+.badge--gem, .badge--q, .badge--grad { font-size: 8.6px; padding: 1px var(--space-2); }
 
 /* Conviction meter */
 .conv { display: flex; align-items: center; gap: var(--space-3); }
@@ -435,8 +477,23 @@ async function buy(m) {
 
 .card__stats { display: flex; gap: var(--space-5); flex-wrap: wrap; font-size: var(--font-size-sm); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
+/* Entry price at first detection */
+.firstseen { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs); font-variant-numeric: tabular-nums;
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  background: rgba(124, 58, 237, 0.10); border: 1px solid rgba(124, 58, 237, 0.28); }
+.firstseen__label { color: var(--text-muted); }
+.firstseen__price { font-weight: var(--font-weight-bold); color: #c4b5fd; }
+.firstseen__arrow { color: var(--text-body); }
+.firstseen__chg { font-weight: var(--font-weight-bold); color: var(--text-muted); }
+.firstseen__since, .firstseen__new { color: var(--text-muted); }
+.firstseen--up { background: rgba(22, 163, 74, 0.12); border-color: rgba(22, 163, 74, 0.45); }
+.firstseen--up .firstseen__chg { color: #4ade80; }
+.firstseen--down { background: rgba(239, 68, 68, 0.10); border-color: rgba(239, 68, 68, 0.40); }
+.firstseen--down .firstseen__chg { color: #fca5a5; }
+
 .tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.chip { font-size: var(--font-size-xs); padding: 2px var(--space-3); border-radius: var(--radius-sm); }
+.chip { font-size: 8.6px; padding: 1px var(--space-2); border-radius: var(--radius-sm); }
 .chip--good { background: rgba(22, 163, 74, 0.15); color: #4ade80; }
 .chip--bad { background: rgba(239, 68, 68, 0.12); color: #fca5a5; }
 

@@ -42,14 +42,19 @@ const DEFAULT_TUNING = {
   minConviction: 45, minGem: 60, maxDrawdownFromAth: 80,
 };
 const BOUNDS = {
-  minLiquidity: [8_000, 400_000],
-  minVolume: [8_000, 800_000],
-  minTx: [40, 1200],
-  minLockedPct: [0, 100],
-  minConviction: [35, 92],
-  minGem: [55, 88],
+  minLiquidity: [8_000, 250_000],
+  minVolume: [8_000, 400_000],
+  minTx: [40, 800],
+  minLockedPct: [0, 92],       // never demand a literally-impossible 100%
+  minConviction: [35, 82],     // capped so a strong pick can still clear the bar
+  minGem: [55, 80],
   maxDrawdownFromAth: [45, 95], // lower = stricter (reject bigger dumps from ATH)
 };
+
+// If the radar surfaces nothing this many scans in a row, it has over-tightened
+// (chasing an unreachable target) — relax a step so the funnel reopens and can
+// keep learning. Without this the gate can strangle itself into permanent empty.
+const STARVE_LIMIT = 2;
 
 function clampWinRate(v) {
   const n = Number(v);
@@ -67,7 +72,7 @@ function clamp(key, v) {
 let mem = {
   tuning: { ...DEFAULT_TUNING, requirePumpComplete: false },
   targetWinRate: DEFAULT_TARGET,
-  picks: [], lastRetuneAt: 0, retunes: 0,
+  picks: [], lastRetuneAt: 0, retunes: 0, starvation: 0,
 };
 try {
   const saved = JSON.parse(readFileSync(FILE_PATH, "utf8"));
@@ -98,6 +103,54 @@ function save() {
 // ---- Public: current tuned thresholds -------------------------------------
 export function getTuning() {
   return { ...mem.tuning };
+}
+
+// ---- Public: starvation guard ---------------------------------------------
+/**
+ * Called after each scan with how many picks it surfaced. If the radar keeps
+ * coming up empty, it has over-tightened — relax a step so the funnel reopens
+ * (otherwise it can never gather the outcomes it needs to improve).
+ */
+export function noteScanYield(shownCount, nowMs) {
+  const now = nowMs ?? Date.now();
+  if (shownCount > 0) {
+    if (mem.starvation) { mem.starvation = 0; save(); }
+    return;
+  }
+  mem.starvation = (mem.starvation || 0) + 1;
+  if (mem.starvation < STARVE_LIMIT) { save(); return; }
+
+  mem.starvation = 0;
+  const t = { ...mem.tuning };
+  t.minConviction = clamp("minConviction", t.minConviction - 8);
+  t.minGem = clamp("minGem", t.minGem - 5);
+  t.minLockedPct = clamp("minLockedPct", t.minLockedPct - 15);
+  t.minLiquidity = clamp("minLiquidity", t.minLiquidity * 0.8);
+  t.minVolume = clamp("minVolume", t.minVolume * 0.8);
+  t.minTx = clamp("minTx", t.minTx - 40);
+  t.maxDrawdownFromAth = clamp("maxDrawdownFromAth", t.maxDrawdownFromAth + 10);
+  t.requirePumpComplete = false;
+  mem.tuning = t;
+  mem.lastRetuneAt = now;
+  save();
+}
+
+// ---- Public: the FIRST time we ever surfaced a token ----------------------
+/**
+ * Earliest recorded snapshot for an address (across the whole history, graded or
+ * not). Lets the UI show the entry price at first detection so the operator can
+ * see whether a screened pick actually ran toward a 10x from where the radar
+ * first flagged it. Returns null if we have no valid price on record.
+ */
+export function getFirstSeen(address) {
+  let first = null;
+  for (const p of mem.picks) {
+    if (p.address !== address) continue;
+    if (p.entryPriceUsd == null || p.entryPriceUsd <= 0) continue;
+    if (!first || p.scannedAt < first.scannedAt) first = p;
+  }
+  if (!first) return null;
+  return { priceUsd: first.entryPriceUsd, marketCap: first.entryMc || null, at: first.scannedAt };
 }
 
 // ---- Public: record the picks a scan surfaced -----------------------------

@@ -18,15 +18,20 @@ const status = reactive({
   aiConfigured: false,
   model: "claude-fable-5",
   telegramConfigured: false,
+  birdeyeConfigured: false,
+  heliusConfigured: false,
+  smartMoneyEnabled: false,
 });
 
 // Local form state. Secret fields stay blank unless the user types a new value
 // (blank = "leave unchanged" on the server).
-const form = reactive({ solscanKey: "", aiMode: "api", aiProvider: "claude", aiKey: "", model: "claude-fable-5" });
+const form = reactive({ solscanKey: "", aiMode: "api", aiProvider: "claude", aiKey: "", model: "claude-fable-5", birdeyeKey: "", heliusKey: "" });
 const saving = ref(false);
-const testMsg = reactive({ solscan: "", ai: "" });
+const testMsg = reactive({ solscan: "", ai: "", smart: "" });
 const showSolscan = ref(false);
 const showAi = ref(false);
+const showBirdeye = ref(false);
+const showHelius = ref(false);
 // Admin token (only needed when the backend has ADMIN_TOKEN set, e.g. public host).
 const adminToken = ref(getAdminToken());
 const showAdmin = ref(false);
@@ -67,6 +72,8 @@ async function save() {
     Object.assign(status, body);
     form.solscanKey = "";
     form.aiKey = "";
+    form.birdeyeKey = "";
+    form.heliusKey = "";
     saveMsg.value = "✅ Tersimpan";
     emit("updated", { ...status });
     return true;
@@ -191,6 +198,55 @@ onMounted(load);
         </template>
         <p v-else class="hint">Local mode runs your Claude Code CLI — no API key, billed to your subscription. Best for personal use.</p>
         <p v-if="testMsg.ai" class="hint">{{ testMsg.ai }}</p>
+      </section>
+
+      <!-- Smart money tracking (Birdeye + Helius) -->
+      <section class="grp">
+        <div class="grp__head">
+          <h3>🧠 Smart money</h3>
+          <span class="pill" :class="status.smartMoneyEnabled ? 'pill--ok' : 'pill--off'">
+            {{ status.smartMoneyEnabled ? "✓ aktif" : "off" }}
+          </span>
+        </div>
+        <p class="hint">
+          <b>Birdeye</b> mendeteksi top trader token (siapa yang akumulasi); <b>Helius</b>
+          memverifikasi wallet-nya mapan (bukan sniper). Birdeye wajib, Helius opsional.
+          Keduanya disimpan server-side. Dipakai saat enrich finalis Pro Radar.
+        </p>
+        <div class="grp__head">
+          <label class="lbl">Birdeye API key</label>
+          <span class="pill" :class="status.birdeyeConfigured ? 'pill--ok' : 'pill--off'">
+            {{ status.birdeyeConfigured ? "✓ set" : "not configured" }}
+          </span>
+        </div>
+        <div class="row">
+          <input
+            class="inp"
+            :type="showBirdeye ? 'text' : 'password'"
+            v-model="form.birdeyeKey"
+            placeholder="paste Birdeye key…"
+            autocomplete="off"
+          />
+          <AppButton variant="ghost" @click="showBirdeye = !showBirdeye">{{ showBirdeye ? "Hide" : "Show" }}</AppButton>
+        </div>
+        <div class="grp__head">
+          <label class="lbl">Helius API key (opsional)</label>
+          <span class="pill" :class="status.heliusConfigured ? 'pill--ok' : 'pill--off'">
+            {{ status.heliusConfigured ? "✓ set" : "not configured" }}
+          </span>
+        </div>
+        <div class="row">
+          <input
+            class="inp"
+            :type="showHelius ? 'text' : 'password'"
+            v-model="form.heliusKey"
+            placeholder="paste Helius key…"
+            autocomplete="off"
+          />
+          <AppButton variant="ghost" @click="showHelius = !showHelius">{{ showHelius ? "Hide" : "Show" }}</AppButton>
+          <AppButton variant="secondary" @click="test('smart')">Test</AppButton>
+        </div>
+        <p v-if="testMsg.smart" class="hint">{{ testMsg.smart }}</p>
       </section>
 
       <footer class="sheet__foot">
