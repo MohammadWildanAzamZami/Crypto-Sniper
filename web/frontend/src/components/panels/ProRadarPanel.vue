@@ -6,7 +6,7 @@
  * if the AI is unavailable. Heuristic + AI opinion — NOT financial advice. DYOR.
  */
 import { ref, onMounted } from "vue";
-import { apiUrl } from "../lib/api.js";
+import { apiUrl } from "../../lib/api.js";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null });
 // Self-learning track record (win rate, graded count, auto-tuned thresholds).

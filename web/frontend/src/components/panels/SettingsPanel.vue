@@ -5,8 +5,8 @@
  * just a "configured" boolean + masked preview. GET returns status, never secrets.
  */
 import { ref, reactive, onMounted } from "vue";
-import AppButton from "./AppButton.vue";
-import { apiUrl, authHeaders, getAdminToken, setAdminToken } from "../lib/api.js";
+import AppButton from "../ui/AppButton.vue";
+import { apiUrl, authHeaders, getAdminToken, setAdminToken } from "../../lib/api.js";
 
 const emit = defineEmits(["close", "updated"]);
 

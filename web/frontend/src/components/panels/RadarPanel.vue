@@ -6,7 +6,7 @@
  * Heuristic only — memecoins are extremely risky. Not financial advice.
  */
 import { ref } from "vue";
-import { apiUrl } from "../lib/api.js";
+import { apiUrl } from "../../lib/api.js";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [] });
 const loading = ref(false);

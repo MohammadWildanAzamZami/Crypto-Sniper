@@ -8,8 +8,8 @@
 import { ref, reactive, nextTick, onMounted } from "vue";
 import ChatMessage from "./ChatMessage.vue";
 import ChatComposer from "./ChatComposer.vue";
-import SettingsPanel from "./SettingsPanel.vue";
-import { apiUrl } from "../lib/api.js";
+import SettingsPanel from "../panels/SettingsPanel.vue";
+import { apiUrl } from "../../lib/api.js";
 
 // items: { kind:'msg', role, text, time } | { kind:'tool', name, status, isError } | { kind:'error', text }
 const items = ref([]);

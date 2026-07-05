@@ -1,6 +1,6 @@
 <script setup>
 import ExplorerPage from "./pages/ExplorerPage.vue";
-import ChatWidget from "./components/ChatWidget.vue";
+import ChatWidget from "./components/chat/ChatWidget.vue";
 </script>
 
 <template>

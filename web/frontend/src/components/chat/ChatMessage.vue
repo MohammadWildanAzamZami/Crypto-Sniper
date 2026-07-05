@@ -6,7 +6,7 @@
  *   tool      — a centered system pill ("memakai screen_token")
  */
 import { computed } from "vue";
-import { renderMarkdown } from "../lib/markdown.js";
+import { renderMarkdown } from "../../lib/markdown.js";
 
 const props = defineProps({
   role: { type: String, required: true }, // user | assistant | tool

@@ -7,9 +7,9 @@
  * the UI never handles a wallet or private key.
  */
 import { ref, computed } from "vue";
-import AppButton from "./AppButton.vue";
-import AppInput from "./AppInput.vue";
-import { apiUrl } from "../lib/api.js";
+import AppButton from "../ui/AppButton.vue";
+import AppInput from "../ui/AppInput.vue";
+import { apiUrl } from "../../lib/api.js";
 
 // USDC mint as a safe, always-listed default so the panel demos out-of-the-box.
 const address = ref("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");

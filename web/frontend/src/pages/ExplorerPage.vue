@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount } from "vue";
-import AppButton from "../components/AppButton.vue";
-import StatList from "../components/StatList.vue";
-import ScreenerPanel from "../components/ScreenerPanel.vue";
-import RadarPanel from "../components/RadarPanel.vue";
-import ProRadarPanel from "../components/ProRadarPanel.vue";
-import ManualScoringPanel from "../components/ManualScoringPanel.vue";
-// import ChecklistPanel from "../components/ChecklistPanel.vue"; // disembunyikan sementara
+import AppButton from "../components/ui/AppButton.vue";
+import StatList from "../components/ui/StatList.vue";
+import ScreenerPanel from "../components/panels/ScreenerPanel.vue";
+import RadarPanel from "../components/panels/RadarPanel.vue";
+import ProRadarPanel from "../components/panels/ProRadarPanel.vue";
+import ManualScoringPanel from "../components/panels/ManualScoringPanel.vue";
+// import ChecklistPanel from "../components/panels/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
 
 const chain = useResource("chain-info");
