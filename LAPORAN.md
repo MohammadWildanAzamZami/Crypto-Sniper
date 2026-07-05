@@ -267,6 +267,40 @@ flowchart TD
     class Z0 off;
 ```
 
+**Breakdown perhitungan smartScore** — 5 komponen dijumlah lalu di-*clamp* 0–100.
+Contoh nyata sebuah token (10 top trader): net buy **$54.000**, **2** whale lagi
+akumulasi, **5** trader profit, **7** trader net-buy, **3** dari 4 wallet teratas
+terverifikasi mapan (Helius).
+
+```mermaid
+flowchart LR
+    subgraph IN[Data mentah dari Birdeye + Helius]
+      D1[netBuyUsd = +$54.000]
+      D2[whalesBuying = 2]
+      D3[profitable = 5]
+      D4[accumulating = 7]
+      D5[established = 3]
+    end
+
+    D1 --> C1["Tekanan beli USD<br/>netBuyUsd / 3000, cap 30<br/>54000/3000 = 18 → <b>+18</b>"]
+    D2 --> C2["Whale akumulasi<br/>whalesBuying × 12, cap 24<br/>2×12 = 24 → <b>+24</b>"]
+    D3 --> C3["Trader profit<br/>profitable × 4, cap 16<br/>5×4 = 20 → cap → <b>+16</b>"]
+    D4 --> C4["Sebaran net-buy<br/>accumulating × 3, cap 15<br/>7×3 = 21 → cap → <b>+15</b>"]
+    D5 --> C5["Wallet mapan Helius<br/>established × 5, cap 15<br/>3×5 = 15 → <b>+15</b><br/>(tanpa Helius: +8 netral)"]
+
+    C1 & C2 & C3 & C4 & C5 --> SUM["Σ = 18+24+16+15+15 = <b>88</b><br/>clamp 0–100 → smartScore <b>88</b>"]
+    SUM --> Q["Pro Radar:<br/>quality += round 88 × 0.12<br/>= <b>+11</b> (maks +12)"]
+
+    classDef comp fill:#0f172a,stroke:#38bdf8,color:#e0f2fe;
+    classDef out fill:#052e2b,stroke:#34d399,color:#d1fae5;
+    class C1,C2,C3,C4,C5 comp;
+    class SUM,Q out;
+```
+
+> Bobot terbesar ada di **tekanan beli USD (maks 30)** dan **whale akumulasi (maks 24)**
+> — dua komponen ini saja bisa menyumbang **54 dari 100**. Artinya smartScore tinggi
+> hampir selalu berarti *uang besar sedang masuk*, bukan sekadar ramai transaksi kecil.
+
 Plus dua perbaikan pendukung: **starvation guard** (`learn.js`) supaya pengontrol
 target 90% tak mencekik radar sampai kosong permanen (kalau kosong 2× beruntun,
 ambang otomatis dilonggarkan), dan **`loadenv.js`** (memuat `.env` sebelum modul lain
