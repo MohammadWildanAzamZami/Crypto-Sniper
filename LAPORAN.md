@@ -220,6 +220,53 @@ dan badge **🧠 Smart N · 🐋** di kartu. Birdeye **wajib**, Helius opsional;
 degrade ke null (fitur off) tanpa key. Ada **retry saat 429** agar burst free-tier
 tidak membuat semua null. Key diisi di **Settings → 🧠 Smart money** (server-side, gitignored).
 
+**Flowchart alur Smart money tracking** (`fetchSmartMoney` di `smartMoney.js`):
+
+```mermaid
+flowchart TD
+    A([Mint masuk saat scan<br/>1 kandidat token]) --> B{Birdeye key ada?<br/>& bukan skipLock}
+    B -- Tidak --> Z0([smartMoney = null<br/>fitur OFF, scan tetap jalan])
+    B -- Ya --> C[["BIRDEYE — SIAPA yang beli?<br/>GET /defi/v2/tokens/top_traders<br/>24h · top 10 · sort by volume"]]
+
+    C --> D{Ada trader?<br/>array tidak kosong}
+    D -- Tidak / error --> Z0
+    D -- Ya --> E[Ambil per trader:<br/>buyUsd, sellUsd, trades,<br/>tags whale/bundler, pnl]
+
+    E --> F[/Hitung agregat/]
+    F --> F1[netBuyUsd = Σ buyUsd − sellUsd]
+    F --> F2[accumulating = jml trader buy > sell]
+    F --> F3[whales = jml tag 'whale']
+    F --> F4[profitable = jml pnl > 0]
+    F --> F5[whalesBuying = whale DAN buy>sell]
+
+    F1 & F2 & F3 & F4 & F5 --> G{Helius key ada?}
+    G -- Ya --> H[["HELIUS — wallet ASLI?<br/>top 4 trader → GET /transactions limit 20"]]
+    H --> H1[established = jml wallet<br/>dgn txCount ≥ 10]
+    G -- Tidak --> I[established = null<br/>skor pakai +8 netral]
+
+    H1 --> S
+    I --> S
+
+    S[["SKOR 0–100"]] --> S1[+ netBuyUsd/3000  max 30]
+    S --> S2[+ whalesBuying×12  max 24]
+    S --> S3[+ profitable×4  max 16]
+    S --> S4[+ accumulating×3  max 15]
+    S --> S5[+ established×5 max 15<br/>atau +8 jika tanpa Helius]
+
+    S1 & S2 & S3 & S4 & S5 --> T[clamp 0–100 → smartScore]
+    T --> U[/report.smartMoney = score, netBuyUsd,<br/>accumulating, whales, profitable, established/]
+
+    U --> V[["Pro Radar konsumsi sinyal"]]
+    V --> V1[quality += round smartScore × 0.12<br/>max +12 tailwind]
+    V --> V2[Sinyal ikut ke AI, gerbang kualitas & UI]
+    V1 & V2 --> W([Keputusan akhir kandidat<br/>ranking / alert Telegram])
+
+    classDef src fill:#1e293b,stroke:#38bdf8,color:#e0f2fe;
+    classDef off fill:#3f1d1d,stroke:#f87171,color:#fee2e2;
+    class C,H,S,V src;
+    class Z0 off;
+```
+
 Plus dua perbaikan pendukung: **starvation guard** (`learn.js`) supaya pengontrol
 target 90% tak mencekik radar sampai kosong permanen (kalau kosong 2× beruntun,
 ambang otomatis dilonggarkan), dan **`loadenv.js`** (memuat `.env` sebelum modul lain
