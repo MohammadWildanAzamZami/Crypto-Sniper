@@ -23,7 +23,6 @@ onMounted(loadTrack);
 const money = (n) => (typeof n === "number" ? "$" + Math.round(n).toLocaleString() : "—");
 const loading = ref(false);
 const error = ref("");
-const copied = ref("");
 const copiedAddr = ref("");
 const failedLogos = ref(new Set());
 // Address of the token whose DexScreener chart is currently expanded (one at a
@@ -84,7 +83,6 @@ function smartClass(s) {
 function closeScan() {
   scan.value = { scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null };
   error.value = "";
-  copied.value = "";
   openChart.value = "";
 }
 
@@ -103,15 +101,6 @@ async function runScan() {
   } finally {
     loading.value = false;
   }
-}
-
-async function buy(m) {
-  try {
-    await navigator.clipboard.writeText(m.address);
-    copied.value = m.address;
-    setTimeout(() => { if (copied.value === m.address) copied.value = ""; }, 2500);
-  } catch { /* clipboard blocked; user can still open the bot */ }
-  window.open("https://t.me/solana_trojanbot", "_blank", "noopener");
 }
 </script>
 
@@ -380,9 +369,6 @@ async function buy(m) {
           <button type="button" class="lnk lnkbtn" @click="toggleChart(m)">
             {{ openChart === m.address ? "📊 Sembunyikan chart" : "📈 Lihat chart" }}
           </button>
-          <button class="buy" @click="buy(m)">
-            {{ copied === m.address ? "✅ Alamat disalin — paste di Trojan" : "🤖 Buy via Trojan" }}
-          </button>
         </div>
       </li>
     </ul>
@@ -596,12 +582,6 @@ async function buy(m) {
 .lnk:hover { color: var(--text-link-hover); }
 .lnkbtn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .lnkbtn:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; border-radius: var(--radius-xs); }
-.buy {
-  padding: var(--space-2) var(--space-5); border: 1px solid #16a34a; border-radius: var(--radius-sm);
-  background: #16a34a; color: #fff; font: inherit; font-weight: var(--font-weight-medium); cursor: pointer;
-}
-.buy:hover { background: #15803d; }
-.buy:focus-visible { outline: 2px solid #4ade80; outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .panel__head { flex-direction: column; }

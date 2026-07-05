@@ -17,7 +17,6 @@ const inputError = ref("");
 const loading = ref(false);
 const error = ref("");
 const report = ref(null);
-const buyHint = ref("");
 const logoBroken = ref(false);
 const caCopied = ref(false);
 
@@ -70,32 +69,11 @@ const usd = (n) =>
 // DexScreener embeddable chart for the deepest pair of the searched token.
 const chartUrl = computed(() => report.value?.token?.chartUrl || null);
 
-// The screened mint (Trojan's start param only carries referral codes, so we
-// can't auto-load a token via the link — we copy the CA and open the bot).
-const tokenMint = computed(() => {
-  const m = String(report.value?.trojanLink || "").match(/start=([^&]+)/);
-  return m ? m[1] : report.value?.token?.address || "";
-});
-
 function clearResult() {
   report.value = null;
   error.value = "";
-  buyHint.value = "";
   inputError.value = "";
   address.value = "";
-}
-
-async function buyViaTrojan() {
-  const mint = tokenMint.value;
-  if (mint) {
-    try {
-      await navigator.clipboard.writeText(mint);
-      buyHint.value = "✅ Alamat token disalin. Tekan Start di Trojan (jika bot baru), lalu tempel (paste) alamatnya ke chat — token langsung dimuat.";
-    } catch {
-      buyHint.value = "Salin alamat ini lalu tempel di chat Trojan: " + mint;
-    }
-  }
-  window.open("https://t.me/solana_trojanbot", "_blank", "noopener");
 }
 
 function validate() {
@@ -270,11 +248,7 @@ async function screen() {
       <!-- Actions -->
       <div class="actions">
         <button type="button" class="btn-del" @click="clearResult">Hapus</button>
-        <button type="button" class="link link--buy" @click="buyViaTrojan">
-          🤖 Buy via Trojan
-        </button>
       </div>
-      <p v-if="buyHint" class="panel__note" role="status">{{ buyHint }}</p>
 
       <p class="disclaimer">{{ report.disclaimer }}</p>
     </div>
@@ -389,14 +363,6 @@ async function screen() {
 .actions { display: flex; gap: var(--space-5); flex-wrap: wrap; }
 .link { color: var(--text-link); text-decoration: none; font-size: var(--font-size-sm); }
 .link:hover { color: var(--text-link-hover); }
-.link--buy {
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid #16a34a; border-radius: var(--radius-sm);
-  background: #16a34a; color: #fff; font: inherit; font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-.link--buy:hover { background: #15803d; color: #fff; }
-.link--buy:focus-visible { outline: 2px solid #4ade80; outline-offset: 2px; }
 
 .disclaimer { margin: 0; font-size: var(--font-size-xs); color: var(--text-muted); font-style: italic; }
 

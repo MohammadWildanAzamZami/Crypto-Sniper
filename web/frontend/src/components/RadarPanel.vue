@@ -11,7 +11,6 @@ import { apiUrl } from "../lib/api.js";
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [] });
 const loading = ref(false);
 const error = ref("");
-const copied = ref("");
 const copiedAddr = ref("");
 const failedLogos = ref(new Set());
 
@@ -45,7 +44,6 @@ function ago(ms) {
 function closeScan() {
   scan.value = { scannedAt: 0, candidatesScanned: 0, matches: [] };
   error.value = "";
-  copied.value = "";
 }
 
 async function runScan() {
@@ -62,15 +60,6 @@ async function runScan() {
   } finally {
     loading.value = false;
   }
-}
-
-async function buy(m) {
-  try {
-    await navigator.clipboard.writeText(m.address);
-    copied.value = m.address;
-    setTimeout(() => { if (copied.value === m.address) copied.value = ""; }, 2500);
-  } catch { /* clipboard blocked; user can still open the bot */ }
-  window.open("https://t.me/solana_trojanbot", "_blank", "noopener");
 }
 </script>
 
@@ -159,9 +148,6 @@ async function buy(m) {
 
         <div class="card__actions">
           <a class="lnk" :href="m.url" target="_blank" rel="noopener">📈 Chart</a>
-          <button class="buy" @click="buy(m)">
-            {{ copied === m.address ? "✅ Alamat disalin — paste di Trojan" : "🤖 Buy via Trojan" }}
-          </button>
         </div>
       </li>
     </ul>
@@ -256,14 +242,6 @@ async function buy(m) {
 .card__actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .lnk { color: var(--text-link); text-decoration: none; font-size: var(--font-size-sm); }
 .lnk:hover { color: var(--text-link-hover); }
-.buy {
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid #16a34a; border-radius: var(--radius-sm);
-  background: #16a34a; color: #fff; font: inherit; font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-.buy:hover { background: #15803d; }
-.buy:focus-visible { outline: 2px solid #4ade80; outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .panel__head { flex-direction: column; }
