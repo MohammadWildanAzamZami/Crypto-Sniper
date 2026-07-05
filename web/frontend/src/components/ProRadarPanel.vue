@@ -74,6 +74,12 @@ function actionClass(a) { return "act act--" + (a || "WATCH").toLowerCase(); }
 function actionLabel(a) {
   return a === "APE" ? "🚀 APE" : a === "AVOID" ? "🛑 AVOID" : "👀 WATCH";
 }
+// Smart money strength band → drives bar/label color. Aligns with the +12
+// Quality tailwind: ≥70 is a strong accumulation signal, <40 is weak/noise.
+function smartClass(s) {
+  const n = Number(s) || 0;
+  return "smart--" + (n >= 70 ? "hi" : n >= 40 ? "mid" : "lo");
+}
 
 function closeScan() {
   scan.value = { scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null };
@@ -257,6 +263,36 @@ async function buy(m) {
             <div class="conv__fill" :style="{ width: m.ai.conviction + '%' }"></div>
           </div>
           <span class="conv__num">Conviction {{ m.ai.conviction }}/100</span>
+        </div>
+
+        <!-- Smart money meter: smartScore bar + signal chips (Birdeye + Helius) -->
+        <div v-if="m.smart" class="smart">
+          <div class="smart__row">
+            <span class="smart__label">🧠 Smart money</span>
+            <div
+              class="smart__bar"
+              role="progressbar"
+              :aria-valuenow="m.smart.score"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`Skor smart money ${m.smart.score} dari 100`"
+            >
+              <div class="smart__fill" :class="smartClass(m.smart.score)" :style="{ width: m.smart.score + '%' }"></div>
+            </div>
+            <span class="smart__num" :class="smartClass(m.smart.score)">{{ m.smart.score }}/100</span>
+          </div>
+          <div class="smart__chips">
+            <span
+              v-if="m.smart.netBuyUsd"
+              class="smart__chip"
+              :class="m.smart.netBuyUsd >= 0 ? 'is-buy' : 'is-sell'"
+            >{{ m.smart.netBuyUsd >= 0 ? "📈 net beli" : "📉 net jual" }}
+              ${{ Math.abs(Math.round(m.smart.netBuyUsd)).toLocaleString() }}</span>
+            <span v-if="m.smart.accumulating" class="smart__chip">🟢 {{ m.smart.accumulating }} akumulasi</span>
+            <span v-if="m.smart.whales" class="smart__chip">🐋 {{ m.smart.whales }} whale</span>
+            <span v-if="m.smart.profitable" class="smart__chip">✅ {{ m.smart.profitable }} profit</span>
+            <span v-if="m.smart.established != null" class="smart__chip" title="Wallet terverifikasi mapan via Helius">🛡️ {{ m.smart.established }} mapan</span>
+          </div>
         </div>
 
         <p v-if="m.ai?.thesis" class="thesis">“{{ m.ai.thesis }}”</p>
@@ -472,6 +508,24 @@ async function buy(m) {
 .conv__bar { flex: 1; height: 8px; background: rgba(124, 58, 237, 0.15); border-radius: 999px; overflow: hidden; }
 .conv__fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #a855f7); border-radius: 999px; }
 .conv__num { flex: none; font-size: var(--font-size-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Smart money meter — mirrors the conviction meter but colour-banded by strength. */
+.smart { display: flex; flex-direction: column; gap: var(--space-2); }
+.smart__row { display: flex; align-items: center; gap: var(--space-3); }
+.smart__label { flex: none; font-size: var(--font-size-xs); color: var(--text-muted); }
+.smart__bar { flex: 1; height: 8px; background: rgba(234, 179, 8, 0.12); border-radius: 999px; overflow: hidden; }
+.smart__fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.smart__fill.smart--hi { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.smart__fill.smart--mid { background: linear-gradient(90deg, #eab308, #fde047); }
+.smart__fill.smart--lo { background: linear-gradient(90deg, #a16207, #d97706); }
+.smart__num { flex: none; font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-medium); }
+.smart__num.smart--hi { color: #4ade80; }
+.smart__num.smart--mid { color: #fde047; }
+.smart__num.smart--lo { color: #d97706; }
+.smart__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.smart__chip { font-size: 9px; padding: 1px var(--space-2); border-radius: 999px; background: rgba(148, 163, 184, 0.14); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.28); font-variant-numeric: tabular-nums; }
+.smart__chip.is-buy { background: rgba(16, 163, 74, 0.16); color: #4ade80; border-color: rgba(16, 163, 74, 0.5); }
+.smart__chip.is-sell { background: rgba(220, 38, 38, 0.16); color: #f87171; border-color: rgba(220, 38, 38, 0.5); }
 
 .thesis { margin: 0; font-size: var(--font-size-sm); color: var(--text-body); font-style: italic; }
 
