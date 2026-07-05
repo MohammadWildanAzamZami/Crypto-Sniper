@@ -19,6 +19,12 @@ node_modules/
 # Pro Radar self-learning memory (tracked picks + graded outcomes + tuned thresholds)
 .radar-memory.json
 **/.radar-memory.json
+# Sniper Engine smart-wallet watchlist (Modul B — learned wallet track records)
+.watchlist-state.json
+**/.watchlist-state.json
+# Sniper Engine live monitor signals (Modul C)
+.sniper-state.json
+**/.sniper-state.json
 
 # Build output
 dist/

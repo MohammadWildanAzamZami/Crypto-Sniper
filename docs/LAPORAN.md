@@ -29,7 +29,26 @@ browser ↔ API yang sekaligus **menyajikan frontend build** (mode satu port :87
 
 ## 🆕 Pembaruan terbaru (ringkas, biar gampang dibaca)
 
-Fitur-fitur paling baru di **Pro Radar** (urut dari yang terbaru). Detail teknis
+### 🎯 SNIPER ENGINE — sistem baru (paling besar!)
+
+Sekarang web/app ini bisa jadi **sniper crypto** sungguhan: menemukan token yang
+sedang **diakumulasi smart money SEBELUM naik**. Kerjanya sebagai satu loop yang
+**belajar sendiri**, dibagi 3 panel baru (urutannya di halaman: Bedah → Watchlist → Sinyal):
+
+| Panel | Apa gunanya buat kamu |
+|-------|-----------------------|
+| 🔬 **Bedah Coin** | Tempel alamat token yang **sudah naik** → dibongkar **siapa yang beli lebih awal** (saat market cap masih kecil), siapa yang **hold vs jual**, mana yang **bundle/bot**, dan **kandidat smart wallet** untuk dibuntuti. Jawab pertanyaan "kok bisa naik ribuan persen — siapa di baliknya?" |
+| 🎯 **Watchlist Smart Wallet** | Wallet yang **berulang kali menangkap winner lebih awal** direkam **otomatis** dari Bedah Coin (hanya kalau tokennya benar-benar winner ≥10x), lalu diperingkat sesuai rekam jejak. Makin sering kamu bedah winner, makin pintar daftarnya. |
+| 🎯 **Sinyal Sniper Live** | Server memantau 40 wallet terbaik tiap 5 menit. Begitu **beberapa dari mereka borong token kecil yang sama** → muncul sinyal "smart money lagi akumulasi" — kesempatan masuk **sebelum** pump. Auto-refresh + tombol sweep manual. |
+
+> Datanya dari **Birdeye** (riwayat trade dari awal) + **Helius** (verifikasi wallet).
+> Semua setelan bisa diubah lewat env (`SNIPER_SIGNAL_MIN`, `SNIPER_WATCH_SIZE`, dll).
+> Kualitas sinyal makin tajam seiring Watchlist diisi lebih banyak winner beragam.
+> Detail lengkap + keputusan desain ada di **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**.
+
+### Pembaruan Pro Radar
+
+Fitur-fitur terbaru di **Pro Radar** (urut dari yang terbaru). Detail teknis
 ada di [bagian 2.3](#23--pro-radar--10x-radar-bertenaga-ai-fable-5).
 
 | Fitur | Apa gunanya buat kamu |
@@ -353,6 +372,30 @@ membaca `process.env` — memperbaiki seeding key dari `.env`).
   di-seed dari `.env` saat boot.
 - Browser hanya bisa baca **status** (boolean) dan menulis nilai baru; GET tidak
   pernah mengembalikan nilai secret. Tombol "Test" memprobe key tanpa membocorkannya.
+
+### 2.9 🎯 Sniper Engine (Bedah Coin + Watchlist + Live Monitor)
+**File:** `web/server/screener/autopsy.js`, `watchlist.js`, `sniper.js`,
+`web/server/routes/autopsy.js`; UI: `AutopsyPanel.vue`, `WatchlistPanel.vue`,
+`SniperPanel.vue`. **Dokumen desain penuh:** [SNIPER-ENGINE.md](SNIPER-ENGINE.md).
+
+Loop 3 modul yang mengubah "siapa yang menangkap winner kemarin" menjadi "siapa
+yang sedang membeli calon winner sekarang":
+
+- **Modul A — Bedah Coin** (`GET /api/autopsy?mint=`): tarik riwayat trade token
+  dari paling awal (Birdeye `txs/token?sort=asc`), hitung mcap tiap trade, ambil
+  **early buyer** 2 tier (ultra <$50k, early <$100k) + entry→now, hold/jual,
+  umur wallet (Helius), deteksi **bundle/bot**, hasilkan **kandidat smart wallet**.
+- **Modul B — Watchlist** (`GET /api/watchlist`): kandidat dari token **winner**
+  (≥10x) direkam **otomatis**, diperingkat reputasi (berapa winner tertangkap).
+  Top 40 = aktif. Persisten di `screener/.watchlist-state.json` (gitignored).
+- **Modul C — Live Monitor** (`GET /api/sniper/signals`, `/sniper/sweep`): job
+  latar tiap 5 menit membaca buy terbaru wallet aktif (Helius), dan memunculkan
+  **sinyal** saat ≥2 wallet borong token kecil yang sama. Enrich Birdeye paralel
+  (~11 detik/sweep), dedupe + TTL. Persisten di `screener/.sniper-state.json`.
+
+Semua degrade aman (tanpa key → fitur mati; gagal → null, tak pernah throw).
+Setelan via env: `SNIPER_SIGNAL_MIN`, `SNIPER_WATCH_SIZE`, `SNIPER_POLL_MIN`,
+`SNIPER_WINNER_MIN_X`, `SNIPER_SIGNAL_MAX_MCAP`. **Bukan nasihat keuangan.**
 
 ---
 

@@ -23,6 +23,7 @@ The repo grew from "Solscan MCP server + a sample explorer page" into a full
 | **GEM Score™ screener** | ✅ Works | 0–100 score, 3 weighted pillars; DexScreener-only works key-less |
 | **10x Radar** (auto-screener) | ✅ Works | discover → screen → filter → Telegram, runs on an interval/Cron |
 | **Pro Radar** (AI-boosted radar) | ✅ Works | 10x funnel + RugCheck/Pump.fun enrich + hard quality gate + **Fable 5** rank + **win-rate self-tuning** + **smart money** (Birdeye+Helius) + inline chart; `GET /api/pro-radar`, degrades gracefully. See §3.4 |
+| **Sniper Engine** (Bedah Coin + Watchlist + Live Monitor) | ✅ Works | Forensic autopsy of a pumped token → early-buyer smart wallets → self-learning watchlist → live monitor raises accumulation signals. `GET /api/autopsy`, `/api/watchlist`, `/api/sniper/signals`. Needs Birdeye+Helius. Full design + decisions in **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)** |
 | **AI Analyst chat** | ✅ Works | Claude tool-loop over SSE; API key or local Claude-CLI mode; default model now `claude-fable-5` |
 | **Telegram alerts + Trojan link** | ✅ Works | HTML alert + 1-tap buy deep-link (no wallet held) |
 | **Node MCP server** (`web/mcp`) | ✅ Works | 5 screener tools for Claude Desktop, shares the screening core |
@@ -197,6 +198,41 @@ so `.env` is loaded before any module initialises.
 **Inline chart.** Clicking a token in the Pro Radar list embeds its DexScreener chart
 (inline on desktop, floating overlay on mobile with the attribution footer masked and the
 token logo in the header); the backend sends a `chartUrl` per match.
+
+### 3.4b Sniper Engine — Bedah Coin → Watchlist → Live Monitor
+
+A three-module loop that turns "who bought the last winner early" into "who is
+buying the next one now". Built in three stages; full design, decisions (D1–D7),
+and the calibration log live in **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**.
+
+- **Modul A — Bedah Coin (`screener/autopsy.js`, `GET /api/autopsy?mint=`).**
+  Forensic autopsy of a token that already pumped. Pages Birdeye
+  `txs/token?sort_type=asc` (oldest-first trades) until market cap crosses $100k,
+  reconstructs `mcapAtTrade = price × supply`, and extracts the **early buyers**
+  in two tiers (ultra-early <$50k, early <$100k). For each: entry→now multiple,
+  held-vs-sold, Helius wallet age (mapan/fresh). Detects **bundle/bot** clusters
+  (same-second buys with near-uniform amounts) and excludes them. Output: ranked
+  **smart-wallet candidates**. Cost-bounded (≤8 pages; top candidates verified).
+- **Modul B — Watchlist (`screener/watchlist.js`, `GET /api/watchlist`).**
+  Self-learning store keyed by wallet. When an autopsy of a **real winner**
+  (`launchToNowX ≥ SNIPER_WINNER_MIN_X`, default 10) runs, its clean candidates
+  are auto-recorded as "catches" (idempotent per mint). Reputation 0–100 from
+  distinct winners caught + entry quality + Helius-established. Top
+  `SNIPER_WATCH_SIZE` (40) = the **active** set. Persists to
+  `screener/.watchlist-state.json` (gitignored).
+- **Modul C — Live Monitor (`screener/sniper.js`, `GET /api/sniper/signals` +
+  `/sniper/sweep`).** A background sweep every `SNIPER_POLL_MIN` (5 min) reads each
+  active wallet's recent buys (Helius parsed txs / `tokenTransfers`), groups by
+  token, and raises a **signal** when ≥ `SNIPER_SIGNAL_MIN` (2) distinct proven
+  wallets are buying the same still-small token (mcap < `SNIPER_SIGNAL_MAX_MCAP`,
+  2M). Signals dedupe + expire (TTL); Birdeye enrichment is bounded/parallel
+  (cap 20 candidates → ~11 s/sweep). Persists to `screener/.sniper-state.json`.
+
+All degrade safely (no key → feature off; failures → null, never throw). Signal
+quality rises as the watchlist accumulates more diverse winners — early on it can
+be noisy with wallets from a single token. UI: three panels (`AutopsyPanel`,
+`WatchlistPanel`, `SniperPanel`) in `ExplorerPage`, after Pro Radar. NOT financial
+advice — the whole engine is heuristic.
 
 ### 3.5 AI analyst — server-side tool-loop
 `ai/anthropic.js` runs Claude's agentic tool-use loop server-side and streams the

@@ -11,6 +11,7 @@ import settingsRoutes from "./routes/settings.js";
 import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
+import autopsyRoutes, { sniperSweepOnce } from "./routes/autopsy.js";
 import proxyRoutes from "./routes/proxy.js";
 
 const PORT = process.env.PORT || 8787;
@@ -36,6 +37,7 @@ app.use("/api", settingsRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", screenRoutes);
 app.use("/api", radarRoutes);
+app.use("/api", autopsyRoutes);
 app.use("/api", proxyRoutes);
 
 // ---- Serve the built frontend (single-port mode) ----
@@ -59,6 +61,14 @@ const radarMins = Number(process.env.RADAR_INTERVAL_MIN || 15);
 if (radarMins > 0) {
   setInterval(() => runRadarOnce().catch(() => {}), radarMins * 60_000);
   console.log(`[radar] auto-scan tiap ${radarMins} menit`);
+}
+
+// Sniper live monitor (Modul C): sweep the active watchlist for smart-money
+// accumulation on fresh tokens. 0 disables it; needs a Helius key to do anything.
+const sniperMins = Number(process.env.SNIPER_POLL_MIN || 5);
+if (sniperMins > 0) {
+  setInterval(() => sniperSweepOnce().catch(() => {}), sniperMins * 60_000);
+  console.log(`[sniper] live monitor tiap ${sniperMins} menit`);
 }
 app.listen(PORT, () => {
   console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);

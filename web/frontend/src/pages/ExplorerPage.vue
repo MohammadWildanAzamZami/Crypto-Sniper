@@ -5,6 +5,9 @@ import StatList from "../components/ui/StatList.vue";
 import ScreenerPanel from "../components/panels/ScreenerPanel.vue";
 import RadarPanel from "../components/panels/RadarPanel.vue";
 import ProRadarPanel from "../components/panels/ProRadarPanel.vue";
+import AutopsyPanel from "../components/panels/AutopsyPanel.vue";
+import WatchlistPanel from "../components/panels/WatchlistPanel.vue";
+import SniperPanel from "../components/panels/SniperPanel.vue";
 import ManualScoringPanel from "../components/panels/ManualScoringPanel.vue";
 // import ChecklistPanel from "../components/panels/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
@@ -51,6 +54,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     <RadarPanel />
 
     <ProRadarPanel />
+
+    <AutopsyPanel />
+
+    <WatchlistPanel />
+
+    <SniperPanel />
 
     <ScreenerPanel />
 
