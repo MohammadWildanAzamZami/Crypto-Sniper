@@ -43,12 +43,15 @@ backbone; Solscan (holders) and RugCheck (LP lock) only enrich the score.
 
 ```
 Memecoin-Screener/
-├── CLAUDE.md              # Auto-loaded context for Claude Code
-├── HANDOVER.md            # This file
-├── LAPORAN.md             # Indonesian overview + flowcharts of everything built
-├── web/PRO-RADAR.md       # Pro Radar (Fable 5) data-flow + Mermaid/ASCII flowcharts
+├── CLAUDE.md              # Auto-loaded context for Claude Code (stays at root)
 ├── README.md              # Original project README (install + usage)
-├── TOOLS.md               # Reference for all Rust MCP tools
+├── docs/                  # All project documentation, centralised
+│   ├── HANDOVER.md        # This file
+│   ├── LAPORAN.md         # Indonesian overview + flowcharts of everything built
+│   ├── PRO-RADAR.md       # Pro Radar (Fable 5) data-flow + Mermaid/ASCII flowcharts
+│   ├── SCREENER.md        # Screener deep-dive
+│   ├── DEPLOY.md          # Deployment notes
+│   └── TOOLS.md           # Reference for all Rust MCP tools
 ├── Cargo.toml / .lock     # Rust crate manifest
 ├── src/                   # Rust MCP server (37 Solscan tools over stdio)
 │   ├── main.rs            # Entry point: env key → serve over stdio
@@ -127,7 +130,7 @@ finalists with RugCheck LP-lock data and runs an AI ranking pass via
 an `action` (APE/WATCH/AVOID). The AI runs through whatever mode is configured (local
 Claude-CLI or Anthropic API); if it's unavailable it **degrades to pure-heuristic GEM
 ordering** and returns `aiUsed:false` (the UI shows a ⚠️ badge). Exposed at
-`GET /api/pro-radar`. Full data-flow + flowcharts live in `web/PRO-RADAR.md`.
+`GET /api/pro-radar`. Full data-flow + flowcharts live in `docs/PRO-RADAR.md`.
 
 **Quality gate (`screener/quality.js`).** After enrichment, a hard gate runs
 *before* the AI: it drops `rugged` tokens, zero-market-cap, thin liquidity/volume,
@@ -311,7 +314,7 @@ Ordered by leverage. Each item is independently shippable.
 - [ ] Remove dead structs (#3) or wire them to tools.
 - [ ] Switch `Arc<Mutex<String>>` → `Arc<String>` for the key (#6).
 - [ ] Add `.gitignore` coverage for `web/**/node_modules`, `.env`, `target/` (verify).
-- [ ] Document required Solscan plan tier per tool in `TOOLS.md`.
+- [ ] Document required Solscan plan tier per tool in `docs/TOOLS.md`.
 
 ### Phase 2 — Reliability of the MCP server
 - [ ] Centralize request building (one helper) to kill the copy-paste in `api.rs`.

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Context for Claude Code working in this repository. Read this first, then see
-[HANDOVER.md](HANDOVER.md) for the full state, decisions, and enhancement roadmap.
+[docs/HANDOVER.md](docs/HANDOVER.md) for the full state, decisions, and enhancement roadmap.
 
 ## What this repo is
 

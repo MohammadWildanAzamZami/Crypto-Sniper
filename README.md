@@ -45,15 +45,18 @@ SolScanMcp/
 │   │   ├── index.js           # entry point server (port 8787)
 │   │   └── .env.example       # contoh konfigurasi (copy jadi .env)
 │   ├── frontend/              # UI Vue 3 (port 5173)
-│   │   └── src/components/ScreenerPanel.vue   # ⭐ panel GEM Score
-│   ├── mcp/server.js          # MCP server versi Node (untuk Claude Desktop)
-│   └── SCREENER.md            # dokumentasi detail screener
-├── CLAUDE.md / HANDOVER.md / TOOLS.md   # catatan arsitektur & daftar tools
+│   │   └── src/components/panels/ScreenerPanel.vue   # ⭐ panel GEM Score
+│   └── mcp/server.js          # MCP server versi Node (untuk Claude Desktop)
+├── docs/                      # semua dokumentasi terpusat
+│   ├── SCREENER.md            # dokumentasi detail screener
+│   ├── PRO-RADAR.md           # alur Pro Radar (Fable 5) + flowchart
+│   ├── HANDOVER.md / LAPORAN.md / TOOLS.md / DEPLOY.md
+├── CLAUDE.md                  # konteks auto-load untuk Claude Code
 └── README.md                  # file ini
 ```
 
 > 💡 **Kalau mau nambah/edit logika screener, mulai dari `web/server/screener/`.**
-> Kalau mau ubah tampilan, ke `web/frontend/src/components/ScreenerPanel.vue`.
+> Kalau mau ubah tampilan, ke `web/frontend/src/components/panels/ScreenerPanel.vue`.
 
 ---
 

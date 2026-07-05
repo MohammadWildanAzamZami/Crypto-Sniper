@@ -88,8 +88,8 @@ Alur: **Discover → Screen → Filter → Alert**
 
 ### 2.3 🧠 Pro Radar — 10x Radar bertenaga AI (Fable 5)
 **File:** `web/server/screener/proRadar.js`, `web/server/ai/analyze.js`,
-komponen frontend `web/frontend/src/components/ProRadarPanel.vue`
-**Endpoint:** `GET /api/pro-radar` · **Dokumen alur lengkap:** [web/PRO-RADAR.md](web/PRO-RADAR.md)
+komponen frontend `web/frontend/src/components/panels/ProRadarPanel.vue`
+**Endpoint:** `GET /api/pro-radar` · **Dokumen alur lengkap:** [PRO-RADAR.md](PRO-RADAR.md)
 
 Funnel penemuannya sama seperti 10x Radar, tapi finalisnya di-*enrich* dengan data
 liquidity-lock lalu diperingkat oleh model **Fable 5** (`claude-fable-5`) yang menilai
@@ -150,7 +150,7 @@ tesis, katalis, red flag, action) untuk digambar sebagai kartu + meter convictio
 Perbandingan singkat vs 10x Radar: Pro Radar menjaring lebih lebar (28 vs 18),
 menambah **LP-lock enrichment** untuk finalis + **peringkat AI** (conviction/tesis/
 red flag); trade-off-nya lebih lambat (ada langkah enrich + panggilan AI). Alur &
-flowchart Mermaid/ASCII lengkap ada di [web/PRO-RADAR.md](web/PRO-RADAR.md).
+flowchart Mermaid/ASCII lengkap ada di [PRO-RADAR.md](PRO-RADAR.md).
 
 #### 🆕 Peningkatan v2 — Gerbang kualitas + Self-tuning + Chart inline
 **File baru:** `web/server/screener/quality.js`, `web/server/screener/learn.js`

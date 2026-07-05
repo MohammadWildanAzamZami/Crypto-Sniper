@@ -3,7 +3,7 @@
 // a Fable 5 ranking pass that scores conviction and explains each pick. Falls
 // back to pure-heuristic ordering when the AI is unavailable.
 //
-// Pipeline (see PRO-RADAR.md for the flowchart):
+// Pipeline (see docs/PRO-RADAR.md for the flowchart):
 //   discover → fast screen (all) → heuristic pre-filter → enrich top-N with lock
 //   → Fable 5 rank → merge + sort by conviction.
 
