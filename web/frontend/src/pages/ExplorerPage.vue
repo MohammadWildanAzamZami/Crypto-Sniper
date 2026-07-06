@@ -46,10 +46,11 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
       <p class="eyebrow">Solana · DexScreener / RugCheck</p>
       <h1>Screening Memecoin Solana</h1>
       <p class="page__sub">
-        🚀 10x Radar &amp; GEM Score otomatis di atas. Kalkulator manual untuk input data
-        DexScreener &amp; RugCheck ada di bawah.
+        Tool Pencari Memecoin dengan teknologi AI Agent menggunakan logic Smart Money Tracking.
       </p>
     </header>
+
+    <ScreenerPanel />
 
     <RadarPanel />
 
@@ -60,8 +61,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     <WatchlistPanel />
 
     <SniperPanel />
-
-    <ScreenerPanel />
 
     <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
     <ChecklistPanel />
