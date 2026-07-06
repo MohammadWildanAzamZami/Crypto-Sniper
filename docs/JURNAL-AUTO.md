@@ -3,17 +3,21 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 01:48** · Total **66** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 01:50** · Total **68** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 2 commit
+## 2026-07-07 (Selasa) — 4 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
 
+**🐛 Perbaikan**
+- fix(jurnal): push foreground di post-commit agar andal di Windows  `f8dd08c`
+
 **📝 Dokumentasi**
 - docs: jurnal harian pengembangan + subjudul halaman jadi 'AI Agent'  `6dd606e`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `6679ced`
 
 ## 2026-07-06 (Senin) — 1 commit
 
