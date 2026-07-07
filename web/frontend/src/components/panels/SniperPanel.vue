@@ -272,6 +272,13 @@ onBeforeUnmount(() => {
                 class="sn-safe"
                 title="Lolos gate keamanan: bukan rug/honeypot, likuiditas & mcap di atas batas."
               >🛡️</span>
+              <span
+                v-if="s.holders != null"
+                class="sn-hold"
+                :class="s.soldOff > 0 ? 'sn-hold--mixed' : 'sn-hold--all'"
+                :title="s.holders + ' dari ' + (s.positions ? s.positions.length : s.holders) + ' smart wallet masih memegang token ini'
+                  + (s.soldOff > 0 ? ' · ' + s.soldOff + ' sudah jual' : '')"
+              >🖐 {{ s.holders }}/{{ s.positions ? s.positions.length : s.holders }} pegang</span>
               <span class="sn-mcap">
                 {{ s.unverified ? "mcap ?" : money(s.mcap) }}<span v-if="s.liquidityUsd" class="sn-liq"> · liq {{ money(s.liquidityUsd) }}</span>
               </span>
@@ -365,7 +372,12 @@ onBeforeUnmount(() => {
                   👛 Posisi Smart Money <span class="pos__n">{{ s.positions.length }} wallet</span>
                 </div>
                 <ul class="pos__list">
-                  <li v-for="p in s.positions" :key="p.owner" class="pos__row">
+                  <li v-for="p in s.positions" :key="p.owner" class="pos__row" :class="p.holding === false ? 'pos__row--sold' : ''">
+                    <span
+                      class="pos__hold"
+                      :class="p.holding === true ? 'pos__hold--in' : p.holding === false ? 'pos__hold--out' : ''"
+                      :title="p.holding === true ? 'Masih memegang token' : p.holding === false ? 'Sudah menjual' : 'Status hold tidak diketahui'"
+                    >{{ p.holding === true ? "🟢" : p.holding === false ? "🔴" : "·" }}</span>
                     <span class="pos__rep" :title="'Reputasi ' + p.reputation + (p.established ? ' · wallet mapan' : '')">{{ p.reputation }}</span>
                     <button class="pos__addr" type="button" :title="'Salin: ' + p.owner" @click="copy(p.owner)">
                       {{ copied === p.owner ? "✓" : shortMint(p.owner) }}
@@ -506,6 +518,20 @@ onBeforeUnmount(() => {
 .sn-mcap { color: var(--text-muted); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
 .sn-liq { color: var(--text-muted); opacity: 0.8; }
 .sn-safe { flex: none; font-size: var(--font-size-sm); cursor: help; }
+.sn-hold {
+  flex: none; font-size: var(--font-size-xs); font-weight: 700; cursor: help; white-space: nowrap;
+  padding: 1px 6px; border-radius: var(--radius-sm);
+}
+.sn-hold--all {
+  color: var(--text-success);
+  background: color-mix(in srgb, var(--text-success) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-success) 40%, transparent);
+}
+.sn-hold--mixed {
+  color: var(--text-warning, var(--text-body));
+  background: color-mix(in srgb, var(--text-warning, var(--text-muted)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-warning, var(--text-muted)) 40%, transparent);
+}
 .sn-score {
   flex: none; font-weight: 700; font-size: var(--font-size-xs); cursor: help; white-space: nowrap;
   color: var(--text-accent, var(--text-body)); font-variant-numeric: tabular-nums;
@@ -619,11 +645,14 @@ onBeforeUnmount(() => {
 .pos__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 200px; overflow-y: auto; scrollbar-width: thin; }
 .pos__row {
   display: grid; align-items: center; gap: var(--space-3);
-  grid-template-columns: auto auto 1fr auto auto;
+  grid-template-columns: auto auto auto 1fr auto auto;
   padding: var(--space-2) var(--space-3);
   background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
 }
+.pos__row--sold { opacity: 0.55; }
+.pos__hold { font-size: 10px; text-align: center; min-width: 14px; }
+.pos__hold.pos__hold--out { filter: grayscale(0.1); }
 .pos__rep {
   min-width: 26px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--text-success); background: color-mix(in srgb, var(--text-success) 14%, transparent);
@@ -644,7 +673,7 @@ onBeforeUnmount(() => {
 .pos__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.4; }
 
 @media (max-width: 560px) {
-  .pos__row { grid-template-columns: auto 1fr auto; row-gap: 2px; }
+  .pos__row { grid-template-columns: auto auto 1fr auto; row-gap: 2px; }
   .pos__at { grid-column: 2; }
   .pos__entry { grid-column: 2 / 4; }
 }

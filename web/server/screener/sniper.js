@@ -53,7 +53,7 @@ const AWAL_PROFILE = Object.freeze({
   signalMin: 2, maxMcap: 2_000_000, minMcap: 20_000, minLiquidity: 0, minLockedPct: 0,
   scoreMin: 0, cobuyWindowMin: 15, lookbackMin: 90, recentTx: 20, signalTtlMin: 360,
   maxEnrich: 20, requireSwap: false, allowUnknownMcap: true, netBuyOnly: false,
-  minBuyUsd: 0, repWeighted: false, safetyGate: false,
+  minBuyUsd: 0, repWeighted: false, safetyGate: false, trackHolding: false,
 });
 const profileFor = (variant) => (variant === "awal" ? AWAL_PROFILE : getParams());
 
@@ -199,6 +199,39 @@ async function tokenSnapshot(mint, key) {
       mcap: Math.round(Number(d.marketCap ?? d.mc) || 0),
       priceUsd: Number(d.price) || 0,
     };
+  } catch { return null; }
+}
+
+// SPL token program IDs — classic + Token-2022 (some newer memecoins use it).
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+const HELIUS_RPC = (key) => `https://mainnet.helius-rpc.com/?api-key=${key}`;
+
+// The set of SPL mints a wallet CURRENTLY holds (uiAmount > 0). Used to tell
+// whether the smart wallets behind a signal still hold the token or have exited.
+// One RPC call per program (classic + Token-2022) so we don't miss holdings.
+// Returns Set<mint>, or null on failure — the caller treats null as "unknown" and
+// never prunes a signal on an unknown, so a transient RPC blip can't wipe signals.
+async function walletHoldings(owner, key) {
+  try {
+    const held = new Set();
+    for (const programId of [TOKEN_PROGRAM, TOKEN_2022_PROGRAM]) {
+      const body = { jsonrpc: "2.0", id: 1, method: "getTokenAccountsByOwner",
+        params: [owner, { programId }, { encoding: "jsonParsed" }] };
+      const res = await fetchRetry(HELIUS_RPC(key), {
+        method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res || !res.ok) return null; // fail-safe: unknown, don't prune
+      const accts = (await res.json())?.result?.value;
+      if (!Array.isArray(accts)) return null;
+      for (const a of accts) {
+        const info = a?.account?.data?.parsed?.info;
+        const amt = Number(info?.tokenAmount?.uiAmount) || 0;
+        if (info?.mint && amt > 0) held.add(info.mint);
+      }
+    }
+    return held;
   } catch { return null; }
 }
 
@@ -413,6 +446,42 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
     });
     if (!existing) newSignals++;
   });
+
+  // 4.5) Hold / exit reconciliation. Check whether the smart wallets behind each
+  // LIVE signal still hold the token on-chain. Drop a signal once every known wallet
+  // has SOLD (smart money fully exited); keep — and keep alive (refresh TTL) — a
+  // signal while ≥1 wallet still holds, so it stays visible as long as smart money
+  // is holding or accumulating. Fail-safe: a wallet whose balance can't be fetched
+  // is "unknown" and never counts toward an exit, so an RPC blip can't wipe signals.
+  if (P.trackHolding && signals.size > 0) {
+    const owners = [...new Set([...signals.values()].flatMap((s) => s.wallets || []))];
+    const fetched = await mapPool(owners, POOL, (o) => walletHoldings(o, heliusKey).then((set) => ({ o, set })));
+    const holdMap = new Map(fetched.filter(Boolean).map((x) => [x.o, x.set])); // owner → Set|null
+    for (const [mint, s] of signals) {
+      let holders = 0, sold = 0, unknown = 0;
+      for (const p of s.positions || []) {
+        const set = holdMap.get(p.owner);
+        if (set == null) { p.holding = null; unknown++; }         // fetch failed → unknown
+        else if (set.has(mint)) { p.holding = true; holders++; }  // still holds
+        else { p.holding = false; sold++; }                       // exited / sold
+      }
+      s.holders = holders;
+      s.soldOff = sold;
+      s.holdersUnknown = unknown;
+      // Remove once the smart money still HOLDING drops below the confluence
+      // threshold AND some have already sold — i.e. fewer than signalMin (2) wallets
+      // still hold and there's been an exit. Requires every position resolved (no
+      // unknown) so a transient RPC blip can't wipe a signal. Covers full-exit too
+      // (holders 0 < signalMin).
+      if (unknown === 0 && sold > 0 && holders < P.signalMin && (s.positions?.length || 0) > 0) {
+        signals.delete(mint);
+        continue;
+      }
+      // Still held (≥ signalMin) but not re-bought this sweep → refresh TTL so it
+      // stays visible while smart money keeps holding.
+      if (s.updatedAt < now && holders > 0) s.updatedAt = now;
+    }
+  }
 
   // 5) Expire stale signals so the list stays fresh/actionable.
   const cutoff = now - P.signalTtlMin * 60_000;

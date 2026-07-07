@@ -74,6 +74,11 @@ export const PARAM_DEFS = [
     group: "Gate", label: "LP locked minimum (%)",
     hint: "Hanya menolak bila RugCheck benar-benar mengembalikan angka % (0 = advisory / nonaktif)." },
 
+  // ── Posisi (hold / exit) ─────────────────────────────────────────────────
+  { key: "trackHolding", env: "SNIPER_TRACK_HOLDING", type: "bool", def: true,
+    group: "Posisi", label: "Lacak hold / exit smart money",
+    hint: "Tiap sweep cek saldo token wallet: buang sinyal saat SEMUA smart money sudah jual, dan pertahankan sinyal selama masih ada yang memegang (atau masih akumulasi)." },
+
   // ── Mesin ────────────────────────────────────────────────────────────────
   { key: "maxEnrich", env: "SNIPER_MAX_ENRICH", type: "int", def: 20, min: 1, max: 100, step: 1,
     group: "Mesin", label: "Kandidat di-enrich / sweep",
