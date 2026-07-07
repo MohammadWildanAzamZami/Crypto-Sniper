@@ -123,6 +123,14 @@ export function getWatchlist({ limit = 200 } = {}) {
   };
 }
 
+/** Reputation/meta for one wallet (for the live monitor to annotate signals).
+ * Returns zeros for an unknown wallet — never throws. */
+export function getWalletMeta(owner) {
+  const w = wallets.get(owner);
+  if (!w) return { reputation: 0, catches: 0, established: false };
+  return { reputation: w.reputation, catches: w.catches.length, established: w.established };
+}
+
 /** The active set the live monitor should poll (top WATCH_SIZE by reputation). */
 export function getActiveWallets() {
   return [...wallets.values()]

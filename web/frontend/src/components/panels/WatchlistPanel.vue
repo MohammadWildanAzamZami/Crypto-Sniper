@@ -9,10 +9,21 @@
 import { ref, onMounted } from "vue";
 import { apiUrl } from "../../lib/api.js";
 
+// Tab: "smart" = self-learning smart-wallet ranking (Modul B); "influencer" =
+// manually tracked influencer wallets (Modul B2).
+const mode = ref("smart");
+
 const data = ref(null);
 const loading = ref(false);
 const error = ref("");
 const copied = ref("");
+
+// Influencer tab state.
+const inf = ref(null);           // { total, influencers: [...] }
+const infLoading = ref(false);
+const infError = ref("");
+const form = ref({ owner: "", label: "", handle: "" });
+const adding = ref(false);
 
 const shortAddr = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "—");
 const xFmt = (n) => (typeof n === "number" && n > 0 ? (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(1)) + "x" : "—");
@@ -40,6 +51,62 @@ async function load() {
     loading.value = false;
   }
 }
+// ---- Influencer tab (Modul B2) --------------------------------------------
+async function loadInfluencers() {
+  if (infLoading.value) return;
+  infLoading.value = true;
+  infError.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/influencers"));
+    const body = await r.json();
+    if (!r.ok) infError.value = body?.error || `Gagal memuat (${r.status})`;
+    else inf.value = body;
+  } catch {
+    infError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  } finally {
+    infLoading.value = false;
+  }
+}
+
+async function addInfluencer() {
+  if (adding.value) return;
+  const owner = form.value.owner.trim();
+  const label = form.value.label.trim();
+  if (!owner || !label) { infError.value = "Alamat wallet dan label wajib diisi."; return; }
+  adding.value = true;
+  infError.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/influencers"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ owner, label, handle: form.value.handle.trim() }),
+    });
+    const body = await r.json();
+    if (!r.ok) infError.value = body?.error || `Gagal menambah (${r.status})`;
+    else { form.value = { owner: "", label: "", handle: "" }; await loadInfluencers(); }
+  } catch {
+    infError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  } finally {
+    adding.value = false;
+  }
+}
+
+async function removeInfluencer(owner) {
+  infError.value = "";
+  try {
+    const r = await fetch(apiUrl(`/api/influencers/${owner}`), { method: "DELETE" });
+    if (!r.ok) { const b = await r.json().catch(() => ({})); infError.value = b?.error || `Gagal menghapus (${r.status})`; return; }
+    await loadInfluencers();
+  } catch {
+    infError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  }
+}
+
+function switchMode(m) {
+  mode.value = m;
+  if (m === "influencer" && !inf.value) loadInfluencers();
+}
+
 onMounted(load);
 </script>
 
@@ -47,17 +114,39 @@ onMounted(load);
   <section class="panel" aria-labelledby="watchlist-h">
     <div class="panel__head">
       <div>
-        <h2 id="watchlist-h">🎯 Watchlist Smart Wallet <span class="tag">Sniper</span></h2>
-        <p class="panel__sub">
+        <h2 id="watchlist-h">🎯 Watchlist Wallet <span class="tag">Sniper</span></h2>
+        <p v-if="mode === 'smart'" class="panel__sub">
           Wallet yang <b>berulang kali menangkap winner lebih awal</b> — direkam otomatis dari Bedah Coin,
           diperingkat sesuai rekam jejak. Yang teratas = <b>aktif dipantau</b> (untuk monitor live berikutnya).
         </p>
+        <p v-else class="panel__sub">
+          Wallet <b>influencer yang kamu masukkan sendiri</b> — dipantau monitor live. <b>Satu</b> influencer beli
+          token fresh sudah cukup memunculkan sinyal (tak perlu menunggu ≥2 wallet). Heuristik, bukan nasihat keuangan.
+        </p>
       </div>
-      <button class="scanbtn" :disabled="loading" @click="load">
-        {{ loading ? "Memuat…" : "↻ Segarkan" }}
+      <button
+        class="scanbtn"
+        :disabled="mode === 'smart' ? loading : infLoading"
+        @click="mode === 'smart' ? load() : loadInfluencers()"
+      >
+        {{ (mode === 'smart' ? loading : infLoading) ? "Memuat…" : "↻ Segarkan" }}
       </button>
     </div>
 
+    <!-- Tab switch: smart-wallet ranking (Modul B) vs manual influencers (Modul B2). -->
+    <div class="wl-tabs" role="tablist" aria-label="Mode watchlist">
+      <button
+        class="wl-tab" :class="mode === 'smart' ? 'wl-tab--on' : ''"
+        role="tab" :aria-selected="mode === 'smart'" @click="switchMode('smart')"
+      >Smart Wallet</button>
+      <button
+        class="wl-tab" :class="mode === 'influencer' ? 'wl-tab--on' : ''"
+        role="tab" :aria-selected="mode === 'influencer'" @click="switchMode('influencer')"
+      >⭐ Influencer</button>
+    </div>
+
+    <!-- ============ TAB: SMART WALLET (Modul B) ============ -->
+    <template v-if="mode === 'smart'">
     <p v-if="error" class="panel__error" role="alert">{{ error }}</p>
 
     <template v-if="data">
@@ -75,8 +164,9 @@ onMounted(load);
         smart wallet-nya akan otomatis masuk ke sini.
       </p>
 
-      <!-- Ranked list -->
-      <ul v-else class="wl-list">
+      <!-- Ranked list — scroll box, ~4 wallet terlihat default -->
+      <div v-else class="wl-scroll" :class="data.wallets.length > 4 ? 'wl-scroll--more' : ''">
+        <ul class="wl-list">
         <li v-for="w in data.wallets" :key="w.owner" class="wl-row" :class="w.active ? 'wl-row--active' : ''">
           <span class="wl-rank">#{{ w.rank }}</span>
           <button class="wl-addr" type="button" :title="'Salin: ' + w.owner" @click="copy(w.owner)">
@@ -95,12 +185,90 @@ onMounted(load);
             <span v-if="w.active" class="wl-badge wl-badge--active">dipantau</span>
           </span>
         </li>
-      </ul>
+        </ul>
+      </div>
+      <p v-if="data.wallets.length > 4" class="wl-scroll-hint">
+        Menampilkan 4 dari <b>{{ data.wallets.length }}</b> wallet — scroll di dalam kotak untuk lihat sisanya.
+      </p>
 
       <p class="wl-note">
         ⏳ Monitor live (alert saat wallet ini mulai borong token baru) belum aktif — itu tahap berikutnya (Modul C).
         Track record heuristik, bukan nasihat keuangan.
       </p>
+    </template>
+    </template>
+
+    <!-- ============ TAB: INFLUENCER (Modul B2) ============ -->
+    <template v-else>
+      <p v-if="infError" class="panel__error" role="alert">{{ infError }}</p>
+
+      <!-- Add form -->
+      <form class="inf-form" @submit.prevent="addInfluencer">
+        <input
+          v-model="form.owner" class="inf-input inf-input--addr" type="text" spellcheck="false"
+          placeholder="Alamat wallet (base58 Solana)" aria-label="Alamat wallet influencer"
+        />
+        <input
+          v-model="form.label" class="inf-input" type="text"
+          placeholder="Nama / label (mis. Ansem)" aria-label="Nama atau label influencer"
+        />
+        <input
+          v-model="form.handle" class="inf-input inf-input--handle" type="text" spellcheck="false"
+          placeholder="@handle X (opsional)" aria-label="Handle X influencer (opsional)"
+        />
+        <button class="inf-add" type="submit" :disabled="adding">{{ adding ? "Menambah…" : "+ Tambah" }}</button>
+      </form>
+
+      <template v-if="inf">
+        <div class="wl-summary">
+          <div class="wl-chip"><b>{{ inf.total }}</b> influencer dipantau</div>
+          <div class="wl-chip wl-chip--ok">1 beli = <b>sinyal</b></div>
+        </div>
+
+        <!-- Empty state + cara mendapatkan alamat -->
+        <div v-if="!inf.influencers.length" class="inf-empty">
+          <p>Belum ada influencer. Tambahkan alamat wallet di atas untuk mulai memantaunya secara live.</p>
+          <p class="inf-empty__hint">
+            <b>Cara dapat alamatnya (verifikasi silang, jangan percaya satu sumber):</b>
+          </p>
+          <ul class="inf-empty__list">
+            <li>Influencer publikasi sendiri — bio/pinned tweet X, link “my wallet”.</li>
+            <li>Platform intel: <b>Arkham</b> & <b>Nansen</b> yang melabeli wallet entity.</li>
+            <li>Domain <b>SNS</b> (<code>.sol</code>) atau thread doxx komunitas yang terverifikasi.</li>
+            <li><b>Awas:</b> influencer sering pakai burner/rotasi wallet — perlakukan sebagai heuristik.</li>
+          </ul>
+        </div>
+
+        <!-- List -->
+        <div v-else class="wl-scroll" :class="inf.influencers.length > 4 ? 'wl-scroll--more' : ''">
+          <ul class="wl-list">
+            <li v-for="f in inf.influencers" :key="f.owner" class="wl-row inf-row">
+              <span class="inf-star" aria-hidden="true">⭐</span>
+              <span class="inf-name">
+                {{ f.label }}
+                <a
+                  v-if="f.handle" class="inf-handle" :href="'https://x.com/' + f.handle"
+                  target="_blank" rel="noopener noreferrer"
+                >@{{ f.handle }}</a>
+              </span>
+              <button class="wl-addr" type="button" :title="'Salin: ' + f.owner" @click="copy(f.owner)">
+                {{ copied === f.owner ? "✓ tersalin" : shortAddr(f.owner) }}
+              </button>
+              <span class="inf-spacer"></span>
+              <button class="inf-del" type="button" :title="'Hapus ' + f.label" @click="removeInfluencer(f.owner)">
+                Hapus
+              </button>
+            </li>
+          </ul>
+        </div>
+        <p v-if="inf.influencers.length > 4" class="wl-scroll-hint">
+          Menampilkan 4 dari <b>{{ inf.influencers.length }}</b> influencer — scroll untuk lihat sisanya.
+        </p>
+
+        <p class="wl-note">
+          Sinyal “influencer beli” muncul di panel <b>🎯 Sinyal Sniper Live</b>. Tetap DYOR — bukan nasihat keuangan.
+        </p>
+      </template>
     </template>
   </section>
 </template>
@@ -125,7 +293,64 @@ onMounted(load);
 }
 .scanbtn:hover:not(:disabled) { border-color: var(--text-success); }
 .scanbtn:disabled { opacity: 0.55; cursor: not-allowed; }
-.scanbtn:focus-visible, .wl-addr:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.scanbtn:focus-visible, .wl-addr:focus-visible,
+.wl-tab:focus-visible, .inf-input:focus-visible, .inf-add:focus-visible, .inf-del:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 2px;
+}
+
+/* Tabs */
+.wl-tabs { display: flex; gap: var(--space-2); }
+.wl-tab {
+  padding: var(--space-2) var(--space-4); font: inherit; font-size: var(--font-size-sm); cursor: pointer;
+  background: var(--bg-raised); color: var(--text-muted);
+  border: 1px solid var(--border-default); border-radius: var(--control-radius);
+  transition: border-color var(--motion-duration-instant) var(--motion-ease), color var(--motion-duration-instant) var(--motion-ease);
+}
+.wl-tab:hover { color: var(--text-body); border-color: var(--text-success); }
+.wl-tab--on { color: var(--text-on-accent); background: var(--bg-accent); border-color: transparent; }
+
+/* Influencer add form */
+.inf-form { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.inf-input {
+  flex: 1 1 160px; min-width: 0; padding: var(--space-3) var(--space-4);
+  font: inherit; font-size: var(--font-size-sm);
+  background: var(--bg-raised); color: var(--text-body);
+  border: 1px solid var(--border-default); border-radius: var(--control-radius);
+}
+.inf-input::placeholder { color: var(--text-muted); }
+.inf-input:hover { border-color: var(--text-success); }
+.inf-input--addr { flex-basis: 100%; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.inf-input--handle { flex-basis: 140px; }
+.inf-add {
+  flex: none; padding: var(--space-3) var(--space-5); font: inherit; font-weight: var(--font-weight-medium);
+  cursor: pointer; border: 1px solid transparent; border-radius: var(--control-radius);
+  background: var(--bg-accent); color: var(--text-on-accent);
+}
+.inf-add:hover:not(:disabled) { opacity: 0.92; }
+.inf-add:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.inf-empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.6; display: grid; gap: var(--space-2); }
+.inf-empty p { margin: 0; }
+.inf-empty__hint { color: var(--text-body); }
+.inf-empty__list { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1, 4px); }
+.inf-empty__list code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.9em;
+  background: var(--bg-raised); padding: 0 4px; border-radius: var(--radius-sm);
+}
+
+/* Influencer row */
+.inf-row { gap: var(--space-3); }
+.inf-star { flex: none; }
+.inf-name { flex: 1 1 auto; min-width: 0; color: var(--text-body); font-weight: 600; font-size: var(--font-size-sm); }
+.inf-handle { color: var(--text-link, #4d9fff); text-decoration: none; font-weight: 400; margin-left: var(--space-2); }
+.inf-handle:hover { text-decoration: underline; }
+.inf-spacer { flex: 1 1 auto; }
+.inf-del {
+  flex: none; padding: 2px 10px; font: inherit; font-size: var(--font-size-xs); cursor: pointer;
+  background: var(--bg-raised); color: var(--text-muted);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+}
+.inf-del:hover { color: var(--text-error); border-color: var(--text-error); }
 
 .wl-summary { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .wl-chip {
@@ -137,6 +362,31 @@ onMounted(load);
 .wl-chip--ok b { color: var(--text-success); }
 
 .wl-empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.6; }
+
+/* Scroll box: tampilkan tepat 4 wallet default, sisanya di-scroll di dalam kotak.
+   Tinggi dihitung dari (jumlah baris × tinggi baris) + gap antar-baris + padding
+   kotak, jadi selalu pas 4 baris berapa pun panjang daftarnya. */
+.wl-scroll {
+  --wl-rows: 4;          /* jumlah wallet terlihat sebelum harus scroll */
+  --wl-row-h: 44px;      /* perkiraan tinggi satu baris wallet */
+  border: 1px solid var(--border-default); border-radius: var(--control-radius);
+  background: var(--bg-raised); padding: var(--space-2);
+}
+.wl-scroll--more {
+  max-height: calc(
+    var(--wl-rows) * var(--wl-row-h)
+    + (var(--wl-rows) - 1) * var(--space-2)
+    + 2 * var(--space-2)
+  );
+  overflow-y: auto;
+  scrollbar-width: thin; scrollbar-gutter: stable;
+}
+.wl-scroll--more::-webkit-scrollbar { width: 8px; }
+.wl-scroll--more::-webkit-scrollbar-thumb {
+  background: var(--border-default); border-radius: 999px;
+}
+.wl-scroll-hint { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); }
+.wl-scroll-hint b { color: var(--text-body); }
 
 .wl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .wl-row {
@@ -175,5 +425,8 @@ onMounted(load);
 
 @media (max-width: 560px) {
   .wl-catches { flex-basis: 100%; order: 5; }
+  /* Baris jadi 2 baris di layar kecil (catches turun ke bawah) → naikkan
+     perkiraan tinggi baris agar tetap ~4 wallet yang terlihat. */
+  .wl-scroll { --wl-row-h: 68px; }
 }
 </style>

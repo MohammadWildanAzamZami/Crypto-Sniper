@@ -39,6 +39,14 @@ const saveMsg = ref("");
 
 const MODELS = ["claude-fable-5"];
 
+// Sniper v2 parameters — rendered data-driven from the registry, so a new param
+// added server-side (PARAM_DEFS) appears here automatically with no code change.
+const sniperParams = ref([]);    // [{ key, type, group, label, hint, min, max, step, value, envDefault, overridden }]
+const sniperGroups = ref([]);
+const sniperForm = reactive({}); // key → current value (bound to inputs)
+const sniperMsg = ref("");
+const savingSniper = ref(false);
+
 async function load() {
   const r = await fetch(apiUrl("/api/settings"));
   const s = await r.json();
@@ -46,6 +54,58 @@ async function load() {
   form.aiMode = s.aiMode;
   form.aiProvider = s.aiProvider;
   form.model = s.model;
+}
+
+// Fill the local form from the server's resolved param values (also reflects clamping).
+function fillSniper(body) {
+  sniperParams.value = body.params || [];
+  sniperGroups.value = body.groups || [];
+  for (const p of sniperParams.value) sniperForm[p.key] = p.value;
+}
+
+async function loadSniper() {
+  try {
+    const r = await fetch(apiUrl("/api/sniper/params"));
+    if (r.ok) fillSniper(await r.json());
+  } catch { /* backend down — section stays empty, rest of Settings still works */ }
+}
+
+const sniperByGroup = (group) => sniperParams.value.filter((p) => p.group === group);
+const fmtDef = (p) => (p.type === "bool" ? (p.envDefault ? "on" : "off") : p.envDefault);
+
+async function saveSniper() {
+  savingSniper.value = true;
+  sniperMsg.value = "";
+  persistAdminToken();
+  try {
+    // Send null for values equal to the env default so they don't become spurious
+    // overrides — keeps the "diubah" badge meaningful. Changed values are sent as-is
+    // (the server coerces + clamps them).
+    const patch = {};
+    for (const p of sniperParams.value) {
+      const v = sniperForm[p.key];
+      patch[p.key] = v === p.envDefault ? null : v;
+    }
+    const r = await fetch(apiUrl("/api/sniper/params"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(patch),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) { sniperMsg.value = `⚠️ ${body.error || `Gagal (${r.status})`}`; return; }
+    fillSniper(body);
+    sniperMsg.value = "✅ Tersimpan — berlaku di sweep berikutnya";
+  } catch {
+    sniperMsg.value = "⚠️ Network error — backend tidak terjangkau.";
+  } finally {
+    savingSniper.value = false;
+  }
+}
+
+// Reset one param to its env default, then persist immediately.
+function resetSniper(p) {
+  sniperForm[p.key] = p.envDefault;
+  saveSniper();
 }
 
 // Persist the admin token to this browser whenever it changes.
@@ -101,7 +161,7 @@ async function test(target) {
   await load();
 }
 
-onMounted(load);
+onMounted(() => { load(); loadSniper(); });
 </script>
 
 <template>
@@ -249,6 +309,55 @@ onMounted(load);
         <p v-if="testMsg.smart" class="hint">{{ testMsg.smart }}</p>
       </section>
 
+      <!-- Sniper v2 parameters (data-driven from the registry) -->
+      <section class="grp" v-if="sniperParams.length">
+        <div class="grp__head">
+          <h3>🎯 Sniper — parameter</h3>
+          <span class="pill pill--ok">v2</span>
+        </div>
+        <p class="hint">
+          Ambang &amp; tunable mesin <b>Sinyal Sniper Live</b>. Perubahan berlaku di
+          <b>sweep berikutnya</b> tanpa restart. Env <code>SNIPER_*</code> jadi nilai default.
+        </p>
+
+        <div v-for="g in sniperGroups" :key="g" class="pgroup">
+          <h4 class="pgroup__title">{{ g }}</h4>
+          <div v-for="p in sniperByGroup(g)" :key="p.key" class="param">
+            <div class="param__row">
+              <label class="lbl" :for="`sp-${p.key}`">
+                {{ p.label }}
+                <span v-if="p.overridden" class="tag-diff">diubah</span>
+              </label>
+              <label v-if="p.type === 'bool'" class="switch">
+                <input :id="`sp-${p.key}`" type="checkbox" v-model="sniperForm[p.key]" />
+                <span>{{ sniperForm[p.key] ? "aktif" : "nonaktif" }}</span>
+              </label>
+              <input
+                v-else
+                :id="`sp-${p.key}`"
+                class="inp inp--num"
+                type="number"
+                :min="p.min"
+                :max="p.max"
+                :step="p.step"
+                v-model.number="sniperForm[p.key]"
+              />
+            </div>
+            <p class="hint param__hint">
+              {{ p.hint }}
+              <button v-if="p.overridden" class="reset" type="button" @click="resetSniper(p)">
+                ↺ default ({{ fmtDef(p) }})
+              </button>
+            </p>
+          </div>
+        </div>
+
+        <div class="row">
+          <AppButton :loading="savingSniper" @click="saveSniper">Simpan parameter</AppButton>
+          <span class="hint" aria-live="polite">{{ sniperMsg }}</span>
+        </div>
+      </section>
+
       <footer class="sheet__foot">
         <span class="hint" aria-live="polite">{{ saveMsg }}</span>
         <AppButton :loading="saving" @click="save">Save</AppButton>
@@ -307,4 +416,31 @@ onMounted(load);
 }
 .pill--ok { color: var(--text-success); border-color: var(--text-success); }
 .pill--off { color: var(--text-muted); }
+
+/* Sniper v2 parameter groups */
+.pgroup { display: grid; gap: var(--space-3); }
+.pgroup__title {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.param { display: grid; gap: var(--space-1); }
+.param__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.param__row .lbl { display: inline-flex; align-items: center; gap: var(--space-2); }
+.param__hint { margin: 0; }
+.inp--num { flex: 0 0 auto; width: 120px; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.switch { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-body); }
+.tag-diff {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-warning, var(--text-success)); border: 1px solid currentColor;
+  border-radius: 999px; padding: 0 var(--space-2);
+}
+.reset {
+  margin-left: var(--space-2); padding: 0; border: 0; background: none;
+  color: var(--text-link, var(--text-success)); font-size: var(--font-size-xs);
+  cursor: pointer; text-decoration: underline;
+}
+.reset:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 </style>

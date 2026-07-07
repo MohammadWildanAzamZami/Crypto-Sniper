@@ -22,9 +22,17 @@ node_modules/
 # Sniper Engine smart-wallet watchlist (Modul B — learned wallet track records)
 .watchlist-state.json
 **/.watchlist-state.json
-# Sniper Engine live monitor signals (Modul C)
+# Sniper Engine live monitor signals (Modul C) — v2 (tajam) + awal (headcount)
 .sniper-state.json
 **/.sniper-state.json
+.sniper-awal-state.json
+**/.sniper-awal-state.json
+# Sniper Engine v2 runtime parameter overrides (Settings UI)
+.sniper-params.json
+**/.sniper-params.json
+# Influencer watchlist (Modul B2)
+.influencers-state.json
+**/.influencers-state.json
 
 # Build output
 dist/

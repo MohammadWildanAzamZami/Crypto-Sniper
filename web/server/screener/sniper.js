@@ -11,41 +11,64 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { getActiveWallets, POLL_MIN } from "./watchlist.js";
+import { getActiveWallets, getWalletMeta, POLL_MIN } from "./watchlist.js";
+import { screenToken } from "./screen.js";
+import { getParams } from "./sniperParams.js";
 
 const HELIUS = "https://api.helius.xyz";
 const BIRDEYE = "https://public-api.birdeye.so";
-const FILE_PATH = fileURLToPath(new URL("./.sniper-state.json", import.meta.url));
 
-// Tunables (env-overridable — same spirit as the watchlist D5 knobs).
-const SIGNAL_MIN = Number(process.env.SNIPER_SIGNAL_MIN || 2);              // distinct wallets buying same token → signal
-const SIGNAL_MAX_MCAP = Number(process.env.SNIPER_SIGNAL_MAX_MCAP || 2_000_000); // only flag still-early tokens
-const RECENT_TX = Number(process.env.SNIPER_RECENT_TX || 20);              // recent txs scanned per wallet
-const LOOKBACK_MIN = Number(process.env.SNIPER_LOOKBACK_MIN || 90);        // only buys newer than this count
-const SIGNAL_TTL_MIN = Number(process.env.SNIPER_SIGNAL_TTL_MIN || 360);   // signals expire after this
-const MAX_ENRICH = Number(process.env.SNIPER_MAX_ENRICH || 20);           // cap Birdeye enrich per sweep
-const POOL = 5;                                                            // Helius/Birdeye concurrency
+// v2: every sniper tunable now lives in a runtime-editable registry
+// (sniperParams.js) and is read at SWEEP time via getParams() — so a change from the
+// Settings UI takes effect on the next sweep, no restart. Env vars (SNIPER_*) still
+// seed the defaults (backward compatible). See sniperParams.js for the full list:
+//   Deteksi: requireSwap, minBuyUsd (C6 dust), netBuyOnly (C7), lookbackMin, recentTx
+//   Skor:    signalMin, cobuyWindowMin, repWeighted, scoreMin
+//   Gate:    safetyGate, allowUnknownMcap, minMcap, maxMcap, minLiquidity, minLockedPct
+//   Mesin:   maxEnrich, signalTtlMin
+// Only the non-tunable concurrency knob stays a constant here.
+const POOL = 5; // Helius/Birdeye concurrency (fixed — burst safety, not a signal knob)
 
-// Tokens that are never a "fresh gem" — stablecoins / wrapped SOL.
-const IGNORE_MINTS = new Set([
-  "So11111111111111111111111111111111111111112",
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+// Tokens that are never a "fresh gem" — wrapped SOL + USD stables.
+const WSOL = "So11111111111111111111111111111111111111112";
+const STABLE_USD = new Set([
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
 ]);
+const IGNORE_MINTS = new Set([WSOL, ...STABLE_USD]);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---- Signal store (file-persisted; survives a restart briefly) ------------
-/** @type {Map<string, object>} mint → signal */
-let signals = new Map();
-try {
-  const saved = JSON.parse(readFileSync(FILE_PATH, "utf8"));
-  if (Array.isArray(saved.signals)) signals = new Map(saved.signals.map((s) => [s.mint, s]));
-} catch { /* no file / unreadable — start empty */ }
+// ---- Two independent signal streams, ONE engine --------------------------
+// v2 is a superset of v1, so both streams run the SAME sweep code with different
+// profiles + separate stores:
+//   - "v2"   : the sharp, runtime-editable profile from the registry (getParams()).
+//   - "awal" : the ORIGINAL v1 headcount behaviour — a FIXED loose profile with
+//              net-buy / dust / safety-gate / reputation-weighting all OFF, so a mere
+//              count of distinct wallets buying a still-small token raises a signal.
+//              Kept as a reference baseline beside v2; intentionally NOT editable.
+const AWAL_PROFILE = Object.freeze({
+  signalMin: 2, maxMcap: 2_000_000, minMcap: 0, minLiquidity: 0, minLockedPct: 0,
+  scoreMin: 0, cobuyWindowMin: 15, lookbackMin: 90, recentTx: 20, signalTtlMin: 360,
+  maxEnrich: 20, requireSwap: false, allowUnknownMcap: true, netBuyOnly: false,
+  minBuyUsd: 0, repWeighted: false, safetyGate: false,
+});
+const profileFor = (variant) => (variant === "awal" ? AWAL_PROFILE : getParams());
 
-function save() {
+// Per-variant store, file-persisted; fail-safe on a read-only/ephemeral FS.
+const STORES = {
+  v2:   { file: fileURLToPath(new URL("./.sniper-state.json", import.meta.url)),      signals: new Map() },
+  awal: { file: fileURLToPath(new URL("./.sniper-awal-state.json", import.meta.url)), signals: new Map() },
+};
+for (const st of Object.values(STORES)) {
   try {
-    writeFileSync(FILE_PATH, JSON.stringify({ signals: [...signals.values()] }, null, 2), "utf8");
+    const saved = JSON.parse(readFileSync(st.file, "utf8"));
+    if (Array.isArray(saved.signals)) st.signals = new Map(saved.signals.map((s) => [s.mint, s]));
+  } catch { /* no file / unreadable — start empty */ }
+}
+function save(store) {
+  try {
+    writeFileSync(store.file, JSON.stringify({ signals: [...store.signals.values()] }, null, 2), "utf8");
   } catch { /* read-only FS — keep in memory */ }
 }
 
@@ -76,30 +99,85 @@ async function mapPool(items, limit, fn) {
   return out;
 }
 
-// A wallet's recent token BUYS: tokens it RECEIVED in a swap within the lookback
-// window. Returns [{ mint, at }]. Uses Helius parsed txs + tokenTransfers.
-async function recentBuys(owner, key, sinceSec) {
-  const res = await fetchRetry(`${HELIUS}/v0/addresses/${owner}/transactions?api-key=${key}&limit=${RECENT_TX}`, {
+// A wallet's recent token SWAPS (buys AND sells) within the lookback window, from
+// Helius parsed txs. Returns [{ mint, side:'buy'|'sell', at, tokens, priceUsd, sizeUsd }].
+//
+// C2: a receipt alone is NOT a buy. A BUY = owner spent consideration (native SOL
+// out, or wSOL/USDC/USDT out) AND received a non-stable token in the SAME tx. A
+// SELL is the mirror: owner sent a non-stable token AND received consideration.
+// Tracking sells is what lets the sweep compute a NET position (C7) so a wallet that
+// bought then dumped in-window isn't counted as accumulating. With P.requireSwap we
+// also insist the tx parses as a swap (kills airdrops/inbound sends/self-transfers).
+//
+// C9: consideration is valued in USD (current SOL price, ~ok within the lookback) to
+// surface each wallet's ENTRY price/size. Detection stays price-independent — a
+// SOL-paid buy still counts if solPrice is unknown, it just has no USD size.
+// C6: dust buys below P.minBuyUsd are dropped (bot test-buys); a buy whose size is
+// unmeasurable (solPrice unknown / multi-token) is kept (fail-open, never silently lost).
+async function recentSwaps(owner, key, sinceSec, solPrice, P) {
+  const res = await fetchRetry(`${HELIUS}/v0/addresses/${owner}/transactions?api-key=${key}&limit=${P.recentTx}`, {
     headers: { accept: "application/json" },
   });
   if (!res || !res.ok) return [];
   const arr = await res.json();
   if (!Array.isArray(arr)) return [];
-  const buys = [];
+  const swaps = [];
   for (const tx of arr) {
     const at = Number(tx.timestamp) || 0;
     if (at < sinceSec) continue;
-    // A "buy" = this wallet received a non-stable token in the tx.
+    if (P.requireSwap && tx.type !== "SWAP" && !tx.events?.swap) continue;
+
     const transfers = Array.isArray(tx.tokenTransfers) ? tx.tokenTransfers : [];
+    const natives = Array.isArray(tx.nativeTransfers) ? tx.nativeTransfers : [];
+
+    // Consideration the owner PAID (→ buy) and RECEIVED (→ sell), amount-based.
+    let solOut = 0, wsolOut = 0, stableOut = 0, solIn = 0, wsolIn = 0, stableIn = 0;
+    for (const n of natives) {
+      if (n.fromUserAccount === owner) solOut += Number(n.amount) || 0; // lamports
+      else if (n.toUserAccount === owner) solIn += Number(n.amount) || 0;
+    }
+    const received = new Map(); // non-stable tokens owner got (bought)
+    const sent = new Map();     // non-stable tokens owner gave (sold)
     for (const t of transfers) {
-      if (t.toUserAccount !== owner) continue;
-      const mint = t.mint;
-      if (!mint || IGNORE_MINTS.has(mint)) continue;
-      if (Number(t.tokenAmount) <= 0) continue;
-      buys.push({ mint, at });
+      const amt = Number(t.tokenAmount) || 0;
+      if (amt <= 0) continue;
+      if (t.fromUserAccount === owner) {
+        if (t.mint === WSOL) wsolOut += amt;
+        else if (STABLE_USD.has(t.mint)) stableOut += amt;
+        else if (t.mint) sent.set(t.mint, (sent.get(t.mint) || 0) + amt);
+      } else if (t.toUserAccount === owner) {
+        if (t.mint === WSOL) wsolIn += amt;
+        else if (STABLE_USD.has(t.mint)) stableIn += amt;
+        else if (t.mint && !IGNORE_MINTS.has(t.mint)) received.set(t.mint, (received.get(t.mint) || 0) + amt);
+      }
+    }
+
+    const paidUsd = (solOut / 1e9 + wsolOut) * solPrice + stableOut; // 0 if solPrice unknown & no stable
+    const recvUsd = (solIn / 1e9 + wsolIn) * solPrice + stableIn;
+
+    // BUY leg: paid consideration + received target token(s). Entry price/size only
+    // unambiguous when a single target token was received.
+    if ((solOut > 0 || wsolOut > 0 || stableOut > 0) && received.size > 0) {
+      const single = received.size === 1;
+      for (const [mint, amt] of received) {
+        const priceUsd = single && paidUsd > 0 && amt > 0 ? paidUsd / amt : null;
+        const sizeUsd = single && paidUsd > 0 ? paidUsd : null;
+        // C6 dust filter — only drop when the size is actually measurable.
+        if (P.minBuyUsd > 0 && sizeUsd != null && sizeUsd < P.minBuyUsd) continue;
+        swaps.push({ mint, side: "buy", at, tokens: amt, priceUsd, sizeUsd });
+      }
+    }
+    // SELL leg: received consideration + sent target token(s).
+    if ((solIn > 0 || wsolIn > 0 || stableIn > 0) && sent.size > 0) {
+      const single = sent.size === 1;
+      for (const [mint, amt] of sent) {
+        const priceUsd = single && recvUsd > 0 && amt > 0 ? recvUsd / amt : null;
+        const sizeUsd = single && recvUsd > 0 ? recvUsd : null;
+        swaps.push({ mint, side: "sell", at, tokens: amt, priceUsd, sizeUsd });
+      }
     }
   }
-  return buys;
+  return swaps;
 }
 
 // Enrich a candidate token with current mcap/identity so we only signal ones that
@@ -112,8 +190,52 @@ async function tokenSnapshot(mint, key) {
     if (!res || !res.ok) return null;
     const d = (await res.json())?.data;
     if (!d) return null;
-    return { symbol: d.symbol || "", name: d.name || "", mcap: Math.round(Number(d.marketCap ?? d.mc) || 0), priceUsd: Number(d.price) || 0 };
+    return {
+      symbol: d.symbol || "",
+      name: d.name || "",
+      logoUrl: d.logoURI || d.logo || null,
+      mcap: Math.round(Number(d.marketCap ?? d.mc) || 0),
+      priceUsd: Number(d.price) || 0,
+    };
   } catch { return null; }
+}
+
+// C4 safety gate. Reuses the canonical screener (screenToken → DexScreener +
+// RugCheck + Pump.fun) and applies sniper-appropriate red lines. NOTE: we do NOT
+// apply Pro Radar's full quality gate — that demands mature volume/graduation,
+// which would reject exactly the fresh "before pump" tokens the sniper targets.
+// Returns { ok, reasons, unscreenable, metrics }. `metrics` (DexScreener) doubles
+// as an identity/mcap fallback when Birdeye doesn't know the token. Never throws.
+async function safetyCheck(mint, { heliusKey }, P) {
+  let report;
+  try {
+    // No birdeyeKey → skips the (unneeded here) Birdeye smart-money call; no
+    // solscanKey → holders null. We only want DexScreener + RugCheck + Pump.fun.
+    report = await screenToken(mint, { nowMs: Date.now(), heliusKey });
+  } catch {
+    return { ok: false, unscreenable: true, reasons: ["belum listing DEX — tak bisa diverifikasi"], metrics: null };
+  }
+  const m = report.metrics || {};
+  const lock = report.liquidityLock || null;
+  const pump = report.pumpfun || null;
+  const liq = m.liquidityUsd || 0;
+  const mc = m.marketCap || 0;
+  const { buys = 0, sells = 0 } = m.txns24h || {};
+  const tx = buys + sells;
+  const ratio = tx > 0 ? buys / tx : 0.5;
+
+  const reasons = [];
+  if (lock?.rugged) reasons.push("ditandai rugged (RugCheck)");
+  if (pump?.banned) reasons.push("di-ban Pump.fun");
+  if (pump?.nsfw) reasons.push("ditandai NSFW (Pump.fun)");
+  if (pump?.hidden) reasons.push("disembunyikan Pump.fun");
+  if (liq < P.minLiquidity) reasons.push(`likuiditas $${Math.round(liq).toLocaleString()} di bawah batas`);
+  if (mc > 0 && mc < P.minMcap) reasons.push("mcap terlalu mikro");
+  if (typeof lock?.lockedPct === "number" && lock.lockedPct < P.minLockedPct) reasons.push(`LP locked ${lock.lockedPct}% rendah`);
+  // Honeypot shape only once there are enough trades to judge (avoids false positives on brand-new tokens).
+  if (tx >= 10 && ratio > 0.95) reasons.push("hampir semua beli — indikasi honeypot");
+
+  return { ok: reasons.length === 0, reasons, unscreenable: false, metrics: m };
 }
 
 /**
@@ -121,56 +243,164 @@ async function tokenSnapshot(mint, key) {
  * and raises/refreshes a signal when ≥ SIGNAL_MIN distinct wallets bought the same
  * still-small token. Returns { swept, candidates, newSignals, signals }.
  */
-export async function runSniperSweep({ heliusKey, birdeyeKey, nowMs } = {}) {
+export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, nowMs } = {}) {
   const now = nowMs ?? Date.now();
-  if (!heliusKey) return { disabled: true, reason: "Helius key belum diset", swept: 0, newSignals: 0, signals: getSignals().signals };
+  if (!heliusKey) return { variant, disabled: true, reason: "Helius key belum diset", swept: 0, newSignals: 0, signals: getSignals(variant).signals };
 
+  // Resolve this variant's profile + store. v2 = editable registry; awal = fixed v1.
+  const P = profileFor(variant);
+  const store = STORES[variant] || STORES.v2;
+  const signals = store.signals;
+
+  // Sweep the active smart wallets (Modul B, auto-ranked by reputation).
   const active = getActiveWallets();
-  if (active.length === 0) return { swept: 0, candidates: 0, newSignals: 0, signals: getSignals().signals };
+  if (active.length === 0) return { variant, swept: 0, candidates: 0, newSignals: 0, signals: getSignals(variant).signals };
 
-  const sinceSec = Math.floor(now / 1000) - LOOKBACK_MIN * 60;
+  const sinceSec = Math.floor(now / 1000) - P.lookbackMin * 60;
 
-  // 1) Gather each active wallet's recent buys.
-  const perWallet = await mapPool(active, POOL, (owner) => recentBuys(owner, heliusKey, sinceSec).then((b) => ({ owner, b })));
+  // Current SOL price (once per sweep) so we can value each buy in USD. Best-effort:
+  // if Birdeye is down, solPrice = 0 and buys still count, just without a USD entry.
+  const solPrice = (await tokenSnapshot(WSOL, birdeyeKey))?.priceUsd || 0;
 
-  // 2) Group by token: which distinct watchlist wallets bought it, and when.
-  const byToken = new Map(); // mint → { wallets:Set, lastAt }
+  // 1) Gather each active wallet's recent swaps (buys + sells, with entry price/size).
+  const perWallet = await mapPool(active, POOL, (owner) => recentSwaps(owner, heliusKey, sinceSec, solPrice, P).then((s) => ({ owner, swaps: s })));
+
+  // 2) Group by token → per wallet, accumulate buy/sell token amounts and keep the
+  // EARLIEST buy in the window as its entry (at + price + size). lastAt tracks the
+  // freshest BUY so the "last activity" reflects accumulation, not an exit.
+  const byToken = new Map(); // mint → { wallets: Map(owner → {at, priceUsd, sizeUsd, buyTokens, sellTokens}), lastAt }
   for (const row of perWallet) {
     if (!row) continue;
-    for (const buy of row.b) {
-      let g = byToken.get(buy.mint);
-      if (!g) { g = { wallets: new Set(), lastAt: 0 }; byToken.set(buy.mint, g); }
-      g.wallets.add(row.owner);
-      if (buy.at > g.lastAt) g.lastAt = buy.at;
+    for (const s of row.swaps) {
+      let g = byToken.get(s.mint);
+      if (!g) { g = { wallets: new Map(), lastAt: 0 }; byToken.set(s.mint, g); }
+      let w = g.wallets.get(row.owner);
+      if (!w) { w = { at: Infinity, priceUsd: null, sizeUsd: null, buyTokens: 0, sellTokens: 0 }; g.wallets.set(row.owner, w); }
+      if (s.side === "buy") {
+        w.buyTokens += s.tokens;
+        if (s.at < w.at) { w.at = s.at; w.priceUsd = s.priceUsd; w.sizeUsd = s.sizeUsd; } // earliest buy = entry
+        if (s.at > g.lastAt) g.lastAt = s.at;
+      } else {
+        w.sellTokens += s.tokens;
+      }
     }
   }
 
-  // 3) Candidates = tokens with enough distinct smart wallets buying. Strongest
-  // first (most wallets), capped so a burst of bot-traded tokens can't blow up the
-  // enrichment cost — we only care about the top confluence anyway.
-  const candidates = [...byToken.entries()]
-    .filter(([, g]) => g.wallets.size >= SIGNAL_MIN)
-    .sort((a, b) => b[1].wallets.size - a[1].wallets.size)
-    .slice(0, MAX_ENRICH);
+  // 3) Per token, keep only wallets that actually accumulated: bought something and
+  // (C7 netBuyOnly) whose net token position is positive — a wallet that bought then
+  // dumped in-window isn't "accumulating". Candidates = tokens with enough such
+  // wallets (confluence). Strongest first, capped so a burst can't blow up enrich cost.
+  const tokenAgg = [];
+  for (const [mint, g] of byToken) {
+    const eff = new Map();
+    let netFiltered = 0;
+    for (const [owner, w] of g.wallets) {
+      if (w.buyTokens <= 0) continue;                                   // only-sold / never bought here
+      if (P.netBuyOnly && w.buyTokens - w.sellTokens <= 0) { netFiltered++; continue; } // C7 net ≤ 0
+      eff.set(owner, { at: w.at, priceUsd: w.priceUsd, sizeUsd: w.sizeUsd });
+    }
+    if (eff.size > 0) tokenAgg.push({ mint, wallets: eff, lastAt: g.lastAt, netFiltered });
+  }
+  const candidates = tokenAgg
+    .filter((t) => t.wallets.size >= P.signalMin)
+    .sort((a, b) => b.wallets.size - a.wallets.size)
+    .slice(0, P.maxEnrich);
 
-  // 4) Enrich (bounded-concurrency Birdeye) + gate by mcap (still early), then
-  // raise/refresh signals.
+  // 4) Enrich (Birdeye identity/price) + C4 safety gate (screener: liquidity, rug,
+  // LP, honeypot), then raise/refresh signals. Both run bounded-concurrency.
   let newSignals = 0;
-  const snaps = await mapPool(candidates, POOL, ([mint]) => tokenSnapshot(mint, birdeyeKey));
-  candidates.forEach(([mint, g], i) => {
+  const snaps = await mapPool(candidates, POOL, (t) => tokenSnapshot(t.mint, birdeyeKey));
+  const safeties = await mapPool(candidates, POOL, (t) => (P.safetyGate ? safetyCheck(t.mint, { heliusKey }, P) : null));
+  candidates.forEach((t, i) => {
+    const { mint, wallets, lastAt, netFiltered } = t;
     const snap = snaps[i];
-    if (!snap) return;
-    if (snap.mcap > 0 && snap.mcap > SIGNAL_MAX_MCAP) return; // already too big — missed the early window
+    const safety = safeties[i];
+    const dsm = safety?.metrics || null; // DexScreener metrics — second source
+
+    // Identity/price: prefer Birdeye, fall back to DexScreener (from the safety
+    // check). This is what lets a Birdeye-unknown token still resolve a real mcap
+    // and count as verified — the C1 "fresh token" path, now backed by a source.
+    const symbol = snap?.symbol || dsm?.symbol || "";
+    const name = snap?.name || dsm?.name || "";
+    const logoUrl = snap?.logoUrl || dsm?.logoUrl || null;
+    const mcap = snap && snap.mcap > 0 ? snap.mcap : Math.round(dsm?.marketCap || 0);
+    const curPrice = snap?.priceUsd || dsm?.priceUsd || 0;
+    const liquidityUsd = dsm ? Math.round(dsm.liquidityUsd || 0) : null;
+    const known = mcap > 0;
+
+    // Gate. With safetyGate on, a candidate must clear the safety check — an
+    // unsafe OR unverifiable (not on any DEX) token is withheld (fail-closed), so
+    // `unverified` tokens only ever reach the UI once on-chain safety is clean.
+    if (P.safetyGate) {
+      if (!safety || !safety.ok) return;
+    } else if (!known && !P.allowUnknownMcap) {
+      return;
+    }
+    if (known && mcap > P.maxMcap) return; // already too big — missed the early window
+
+    // C9: per-wallet smart-money positions — reputation + entry + current PnL.
+    const positions = [...wallets.entries()].map(([owner, e]) => {
+      const meta = getWalletMeta(owner);
+      const pnlX = curPrice > 0 && e.priceUsd > 0 ? curPrice / e.priceUsd : null;
+      const entryMcap = known && pnlX ? Math.round(mcap / pnlX) : null;
+      return {
+        owner,
+        reputation: meta.reputation,
+        established: meta.established,
+        at: e.at * 1000,
+        entryPriceUsd: e.priceUsd || null,
+        entryMcap,
+        sizeUsd: e.sizeUsd ? Math.round(e.sizeUsd) : null,
+        pnlX,
+      };
+    }).sort((a, b) => b.reputation - a.reputation || (b.sizeUsd || 0) - (a.sizeUsd || 0));
+
+    // C5/C10: composite strength score. Reputation dominates (weighted Σ, or a flat
+    // per-head value when REP_WEIGHTED is off), plus a log-scaled buy-size bonus and
+    // a co-buy density bonus (wallets buying within the tight COBUY window = coordinated
+    // conviction). Below SCORE_MIN → too weak, withhold.
+    const repSum = positions.reduce((s, p) => s + (p.reputation || 0), 0);
+    const repComponent = P.repWeighted ? repSum : wallets.size * 50;
+    const totalSize = positions.reduce((s, p) => s + (p.sizeUsd || 0), 0);
+    const sizeBonus = totalSize > 0 ? Math.min(60, Math.log10(Math.max(1, totalSize)) * 15) : 0;
+
+    const times = positions.map((p) => p.at).filter(Boolean).sort((a, b) => a - b); // ms, ascending
+    const winMs = P.cobuyWindowMin * 60_000;
+    let maxCobuy = times.length ? 1 : 0;
+    for (let a = 0; a < times.length; a++) {
+      let c = 1;
+      for (let b = a + 1; b < times.length; b++) { if (times[b] - times[a] <= winMs) c++; else break; }
+      if (c > maxCobuy) maxCobuy = c;
+    }
+    const cobuyBonus = Math.max(0, maxCobuy - 1) * 30;
+    const score = Math.round(repComponent + sizeBonus + cobuyBonus);
+    if (score < P.scoreMin) return; // confluence too weak — "sedikit tapi tajam"
+
+    const topRep = positions.reduce((m, p) => Math.max(m, p.reputation || 0), 0);
+    const why = [`${wallets.size} smart wallet sepakat`];
+    if (P.repWeighted && repSum > 0) why.push(`reputasi total ${repSum} (top ${topRep})`);
+    if (maxCobuy >= 2) why.push(`${maxCobuy} beli dalam ${P.cobuyWindowMin} menit (rapat)`);
+    if (totalSize > 0) why.push(`total beli ~$${Math.round(totalSize).toLocaleString()}`);
+    if (netFiltered > 0) why.push(`${netFiltered} wallet diabaikan (net jual)`);
+
     const existing = signals.get(mint);
     signals.set(mint, {
       mint,
-      symbol: snap.symbol,
-      name: snap.name,
-      mcap: snap.mcap,
-      priceUsd: snap.priceUsd,
-      walletCount: g.wallets.size,
-      wallets: [...g.wallets],
-      lastBuyAt: g.lastAt * 1000,
+      symbol,
+      name,
+      logoUrl,
+      mcap,
+      priceUsd: curPrice,
+      liquidityUsd,
+      unverified: !known,                    // market data not confirmed → UI warns, DYOR
+      safetyChecked: P.safetyGate,           // passed the C4 gate this sweep
+      score,
+      why,
+      walletCount: wallets.size,
+      netFiltered,                           // C7: wallets dropped for net-selling in-window
+      wallets: [...wallets.keys()],
+      positions,
+      lastBuyAt: lastAt * 1000,
       firstDetectedAt: existing?.firstDetectedAt || now,
       updatedAt: now,
       isNew: !existing,
@@ -179,21 +409,32 @@ export async function runSniperSweep({ heliusKey, birdeyeKey, nowMs } = {}) {
   });
 
   // 5) Expire stale signals so the list stays fresh/actionable.
-  const cutoff = now - SIGNAL_TTL_MIN * 60_000;
+  const cutoff = now - P.signalTtlMin * 60_000;
   for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
 
-  save();
-  return { swept: active.length, candidates: candidates.length, newSignals, signals: getSignals().signals };
+  save(store);
+  return { variant, swept: active.length, candidates: candidates.length, newSignals, signals: getSignals(variant).signals };
 }
 
 /** Current live signals (freshest first), plus config for the UI. */
-export function getSignals() {
-  const list = [...signals.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+export function getSignals(variant = "v2") {
+  const P = profileFor(variant);
+  const store = STORES[variant] || STORES.v2;
+  // C10: rank by composite strength first, then recency as a tiebreak.
+  const list = [...store.signals.values()].sort((a, b) => (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
   return {
+    variant,
     count: list.length,
-    signalMin: SIGNAL_MIN,
-    maxMcap: SIGNAL_MAX_MCAP,
+    signalMin: P.signalMin,
+    maxMcap: P.maxMcap,
     pollMin: POLL_MIN,
+    safetyGate: P.safetyGate,
+    minMcap: P.minMcap,
+    minLiquidity: P.minLiquidity,
+    scoreMin: P.scoreMin,
+    cobuyWindow: P.cobuyWindowMin,
+    netBuyOnly: P.netBuyOnly,
+    editable: variant !== "awal",
     signals: list,
   };
 }

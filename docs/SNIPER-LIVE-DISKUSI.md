@@ -4,7 +4,7 @@
 > fitur/parameter. Bukan spec final — ini bahan diskusi. Referensi kode:
 > `web/server/screener/sniper.js`, sumber data `web/server/screener/watchlist.js`,
 > UI `web/frontend/src/components/panels/SniperPanel.vue`.
-> Status per: 2026-07-06.
+> Status per: 2026-07-07 (v2 — lihat §Progres).
 
 ---
 
@@ -34,8 +34,9 @@ di `index.js:70`):
    (2jt). Simpan/refresh sinyal.
 6. **Expire** — sinyal > `SIGNAL_TTL_MIN` (360m) dihapus.
 
-Tunable sekarang: `SIGNAL_MIN`, `SIGNAL_MAX_MCAP`, `RECENT_TX`, `LOOKBACK_MIN`,
-`SIGNAL_TTL_MIN`, `MAX_ENRICH`, `POLL_MIN`, `WATCH_SIZE`.
+Tunable sekarang: **v2 memindah semua tunable ke registry** `screener/sniperParams.js`
+(dibaca per-sweep, bisa diedit live dari UI) — lihat §Progres. `POLL_MIN`/`WATCH_SIZE`
+tetap env (mengatur `setInterval`/ukuran watchlist saat boot, bukan tunable per-sweep).
 
 ---
 
@@ -180,6 +181,43 @@ Yang tak dikenal Birdeye lolos ke UI **hanya** kalau on-chain safety-nya bersih.
   chip "skor ≥ N". Tunable: `SNIPER_REP_WEIGHTED`, `SNIPER_SCORE_MIN`, `SNIPER_COBUY_WINDOW_MIN`.
   Catatan: dengan watchlist masih baru (reputasi rendah), sinyal bisa jarang lolos —
   turunkan `SNIPER_SCORE_MIN` sementara untuk testing.
+- ✅ **v2 — Registry parameter runtime-editable + mesin net-buy** (2026-07-07).
+  Semua tunable dipindah dari 15+ konstanta modul `const X = Number(process.env…)`
+  (dibaca sekali saat import) ke **registry bermetadata** `screener/sniperParams.js`
+  (17 param: key, tipe, min/maks, grup, label, hint). Mesin membaca nilai **per-sweep**
+  via `getParams()` → edit dari UI berlaku di **sweep berikutnya tanpa restart**; env
+  `SNIPER_*` tetap jadi default (backward compatible), dan nilai di-**clamp** ke min/maks
+  (termasuk seed env, mis. `SNIPER_COBUY_WINDOW_MIN=1440` → 180). Endpoint
+  `GET /api/sniper/params` (publik) + `POST` (admin-gated seperti `/settings`); override
+  persist ke `.sniper-params.json` (gitignored, fail-safe FS read-only). UI: section
+  **"🎯 Sniper — parameter"** di `SettingsPanel.vue` yang **data-driven dari registry**
+  (param baru otomatis muncul, tak perlu sentuh Vue) + tombol reset per-field.
+  Menambah parameter berikutnya = **1 entri** `PARAM_DEFS`.
+  - **C6 (dust filter)** — param baru `minBuyUsd` (default 100): abaikan test-buy di bawah
+    nilai ini; beli yang ukurannya tak terukur (harga SOL down / multi-token) tetap
+    dihitung (fail-open, tak hilang diam-diam).
+  - **C7 (sadar jual / net-buy)** — param baru `netBuyOnly` (default on). `recentBuys()`
+    jadi `recentSwaps()` yang juga mendeteksi **SELL** (owner mengirim token & menerima
+    SOL/stable). Per wallet-per-token dihitung `buyTokens − sellTokens`; wallet yang net
+    ≤ 0 (beli lalu dump di window) **tidak dihitung** ke konfluensi. Sinyal bawa field
+    `netFiltered` (berapa wallet dibuang) + alasan di `why[]`. *Terbukti aktif pada data
+    live saat verifikasi.*
+- ✅ **Dua aliran terpisah — "Awal" (v1) vs "v2"** (2026-07-07). Sinyal Sniper Live kini
+  punya **dua stream independen** yang jalan berdampingan, supaya baseline lama tetap
+  terlihat di samping mesin tajam:
+  - **`awal`** — perilaku **v1 asli (headcount)**: profil longgar **fixed** (tak
+    editable) dengan `netBuyOnly`/`requireSwap`/dust/`safetyGate`/`repWeighted` semua
+    **OFF**; sekadar hitung wallet distinct beli token kecil yang sama. Ramai & mentah.
+  - **`v2`** — profil tajam runtime-editable dari registry (net-buy + dust + safety
+    gate + skor tertimbang).
+  - **Satu mesin, dua profil.** Karena v2 superset v1, `runSniperSweep({variant})`
+    memakai `AWAL_PROFILE` (fixed) atau `getParams()` (registry) — tanpa duplikasi
+    logika. Dua store terpisah (`.sniper-state.json` + `.sniper-awal-state.json`),
+    keduanya disapu tiap interval oleh `sniperSweepOnce()` (awal cepat: tanpa
+    safety-check). Endpoint: `/api/sniper/signals`+`/sniper/sweep` (v2, canonical) dan
+    `/api/sniper/awal/signals`+`/awal/sweep`. `getSignals(variant)` bawa `variant` +
+    `editable`. UI `SniperPanel.vue`: **tab "v2 · tajam / Awal · ramai"**, `refresh`/`sweep`
+    sadar-variant. Verifikasi live: awal ~17–32 sinyal (longgar) vs v2 0 (preset ketat).
 - ⏳ **Berikutnya:** Tahap 4 (alert Telegram/push C13).
 
 ## 6. Catatan implementasi (kalau lanjut)
