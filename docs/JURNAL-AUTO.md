@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 16:42** · Total **84** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 16:54** · Total **86** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 20 commit
+## 2026-07-07 (Selasa) — 22 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
@@ -34,6 +34,8 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `7642cb0`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `b2d5363`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `4a513e5`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `b548175`
+- docs(sniper): rekap parameter Awal (v1) vs v2 + entri log v2/dua-aliran  `544c8eb`
 
 ## 2026-07-06 (Senin) — 1 commit
 
