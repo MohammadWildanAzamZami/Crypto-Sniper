@@ -48,7 +48,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //              count of distinct wallets buying a still-small token raises a signal.
 //              Kept as a reference baseline beside v2; intentionally NOT editable.
 const AWAL_PROFILE = Object.freeze({
-  signalMin: 2, maxMcap: 2_000_000, minMcap: 0, minLiquidity: 0, minLockedPct: 0,
+  // minMcap floor $20rb tetap diberlakukan meski profil ini "longgar" — sesuai
+  // permintaan batas minimal market cap di sinyal sniper live untuk semua aliran.
+  signalMin: 2, maxMcap: 2_000_000, minMcap: 20_000, minLiquidity: 0, minLockedPct: 0,
   scoreMin: 0, cobuyWindowMin: 15, lookbackMin: 90, recentTx: 20, signalTtlMin: 360,
   maxEnrich: 20, requireSwap: false, allowUnknownMcap: true, netBuyOnly: false,
   minBuyUsd: 0, repWeighted: false, safetyGate: false,
@@ -337,6 +339,10 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
       return;
     }
     if (known && mcap > P.maxMcap) return; // already too big — missed the early window
+    // Hard mcap floor on the DISPLAYED mcap (Birdeye→DexScreener). Enforced here for
+    // BOTH streams and regardless of safetyGate, so the "batas minimal market cap"
+    // holds even when safetyCheck's DexScreener mcap disagrees or is unknown.
+    if (known && P.minMcap > 0 && mcap < P.minMcap) return; // below the mcap floor — too micro
 
     // C9: per-wallet smart-money positions — reputation + entry + current PnL.
     const positions = [...wallets.entries()].map(([owner, e]) => {
@@ -420,8 +426,14 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
 export function getSignals(variant = "v2") {
   const P = profileFor(variant);
   const store = STORES[variant] || STORES.v2;
+  // Batas minimal market cap ditegakkan juga di titik BACA — jadi menaikkan floor
+  // langsung menyembunyikan sinyal lama yang mcap-nya di bawah ambang (tanpa nunggu
+  // TTL). Hanya menyaring yang mcap-nya diketahui (>0); unverified diurus terpisah.
+  const floor = P.minMcap > 0 ? P.minMcap : 0;
   // C10: rank by composite strength first, then recency as a tiebreak.
-  const list = [...store.signals.values()].sort((a, b) => (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
+  const list = [...store.signals.values()]
+    .filter((s) => !(floor > 0 && s.mcap > 0 && s.mcap < floor))
+    .sort((a, b) => (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
   return {
     variant,
     count: list.length,

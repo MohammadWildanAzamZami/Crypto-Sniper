@@ -86,7 +86,7 @@ Satu mesin, dua aliran sinyal (store terpisah):
 | Endpoint | `/api/sniper/sweep`, `/api/sniper/signals` | `/api/sniper/awal/sweep`, `/api/sniper/awal/signals` |
 | Tujuan | Sinyal tajam & aman | Pembanding "apa adanya" (headcount murni) |
 
-Profil `awal` (dari `sniper.js`): `signalMin 2, maxMcap 2jt, minMcap 0, minLiquidity
+Profil `awal` (dari `sniper.js`): `signalMin 2, maxMcap 2jt, minMcap 20rb, minLiquidity
 0, scoreMin 0, cobuyWindow 15, lookback 90, recentTx 20, ttl 360, requireSwap
 false, allowUnknownMcap true, netBuyOnly false, minBuyUsd 0, repWeighted false,
 safetyGate false`.
