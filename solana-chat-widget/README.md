@@ -70,7 +70,7 @@ Set env `ANTHROPIC_API_KEY` (dan `ALLOWED_ORIGIN` ke domain web-mu) di dashboard
 | Env | Default | Fungsi |
 |-----|---------|--------|
 | `ANTHROPIC_API_KEY` | — | **Wajib.** Key dari console.anthropic.com |
-| `ANTHROPIC_MODEL` | `claude-opus-4-8` | Ganti ke `claude-haiku-4-5` untuk lebih murah |
+| `ANTHROPIC_MODEL` | `claude-fable-5` | Ganti ke `claude-haiku-4-5` untuk lebih murah |
 | `PORT` | `8788` | Port backend |
 | `ALLOWED_ORIGIN` | `*` | Origin yang boleh memanggil (set domainmu di produksi) |
 | `RATE_MAX` | `15` | Maks request `/api/chat` per menit per IP |

@@ -37,7 +37,7 @@ const adminToken = ref(getAdminToken());
 const showAdmin = ref(false);
 const saveMsg = ref("");
 
-const MODELS = ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"];
+const MODELS = ["claude-fable-5"];
 
 async function load() {
   const r = await fetch(apiUrl("/api/settings"));

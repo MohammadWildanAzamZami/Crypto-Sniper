@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // __dirname is web/server/ai → the MCP server lives at web/mcp/server.js
 const MCP_SERVER = path.resolve(__dirname, "../../mcp/server.js");
+const DEFAULT_MODEL = "claude-fable-5";
 // Use the SAME node binary running this server so the CLI can launch the MCP
 // even though node is a portable install that may not be on the CLI's PATH.
 const NODE_BIN = process.execPath;
@@ -34,7 +35,7 @@ function sse(res, obj) {
  * @param {object} opts { messages, claudePath, solscanKey, telegram }
  * @param {object} res  Express response with SSE headers set
  */
-export async function localChat({ messages, claudePath, solscanKey }, res) {
+export async function localChat({ messages, claudePath, model, solscanKey }, res) {
   const last = [...messages].reverse().find((m) => m.role === "user");
   if (!last) {
     sse(res, { type: "error", error: "No user message to answer." });
@@ -63,6 +64,7 @@ export async function localChat({ messages, claudePath, solscanKey }, res) {
   const bin = claudePath || "claude";
   const args = [
     "-p", last.content,
+    "--model", model || DEFAULT_MODEL,
     "--append-system-prompt", SYSTEM,
     "--output-format", "json",
     "--mcp-config", cfgPath,
@@ -72,12 +74,21 @@ export async function localChat({ messages, claudePath, solscanKey }, res) {
 
   sse(res, { type: "tool", name: "claude-code (local)", status: "start" });
 
+  // Local mode = the CLI's own subscription login. If the server was booted with
+  // an ANTHROPIC_API_KEY in its env (seeded from .env for API mode), the spawned
+  // CLI would inherit it, flip into "external API key" mode, and fail with
+  // "Invalid API key" whenever that key is unset/low-balance. Strip the API-key
+  // env vars from the child so it always falls back to the logged-in account.
+  const childEnv = { ...process.env };
+  delete childEnv.ANTHROPIC_API_KEY;
+  delete childEnv.ANTHROPIC_AUTH_TOKEN;
+
   // Return a promise that resolves only when the child process exits, so the
   // caller keeps the SSE stream open until the answer is ready.
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(bin, args, { windowsHide: true });
+      child = spawn(bin, args, { windowsHide: true, env: childEnv });
     } catch (err) {
       sse(res, { type: "error", error: `Could not launch claude CLI: ${err.message}` });
       return resolve();

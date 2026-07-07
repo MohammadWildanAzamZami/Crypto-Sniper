@@ -28,7 +28,7 @@ router.post("/chat", chatLimit, chatDaily, async (req, res) => {
   const st = getState();
   try {
     if (st.aiMode === "local") {
-      await localChat({ messages, claudePath: st.claudePath, solscanKey: solscanKey() }, res);
+      await localChat({ messages, claudePath: st.claudePath, model: st.model, solscanKey: solscanKey() }, res);
     } else if (st.aiProvider === "claude") {
       if (!st.aiKey) {
         res.write(`data: ${JSON.stringify({ type: "error", error: "No Anthropic API key. Add one in Settings, or switch to Local mode." })}\n\n`);
