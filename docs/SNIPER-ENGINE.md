@@ -335,6 +335,54 @@ flowchart TD
 
 ---
 
+## 🎛️ Parameter Sniper Live — Awal (v1) vs v2
+
+Sejak **v2 (2026-07-07)**, Modul C punya **dua aliran sinyal independen** yang jalan
+berdampingan (satu mesin, dua profil — v2 adalah superset v1):
+
+- **Awal** — perilaku v1 asli (headcount). Profil **FIXED** (`AWAL_PROFILE` di
+  `sniper.js`, tak bisa diedit): semua gate mati, sekadar hitung wallet distinct.
+- **v2** — profil **tajam & editable** dari registry `screener/sniperParams.js`,
+  dibaca per-sweep via `getParams()` → bisa diubah live dari **Settings → 🎯 Sniper**
+  tanpa restart. Env `SNIPER_*` jadi default; nilai di-clamp ke min/maks.
+
+Kolom **v2 (default)** = nilai default kode (registry). Nilai runtime bisa ditimpa
+(disimpan di `screener/.sniper-params.json`, **gitignored** — tak ikut ke repo).
+
+| Parameter | Grup | **Awal** (fixed) | **v2** (default) | Fungsi |
+|---|---|:--:|:--:|---|
+| `requireSwap` | Deteksi | ❌ off | ✅ on | Wajib swap asli (bayar SOL/stable keluar) |
+| `minBuyUsd` | Deteksi | 0 | 100 | Filter test-buy dust (C6) |
+| `netBuyOnly` | Deteksi | ❌ off | ✅ on | Buang wallet net-jual di window (C7) |
+| `lookbackMin` | Deteksi | 90 | 90 | Jendela lihat-balik (menit) |
+| `recentTx` | Deteksi | 20 | 20 | Tx discan per wallet |
+| `signalMin` | Skor | 2 | 2 | Min wallet distinct beli token sama |
+| `cobuyWindowMin` | Skor | 15 | 15 | Window "beli barengan" (konviksi) |
+| `repWeighted` | Skor | ❌ (flat 50/wallet) | ✅ (Σ reputasi) | Skor tertimbang reputasi |
+| `scoreMin` | Skor | 0 | 150 | Ambang skor komposit |
+| `safetyGate` | Gate | ❌ off | ✅ on | Cek rug/honeypot/likuiditas (reuse Bedah Coin) |
+| `allowUnknownMcap` | Gate | on | on | Izinkan token fresh (label `unverified`) |
+| `minMcap` | Gate | 0 | 15.000 | Lantai mcap |
+| `maxMcap` | Gate | 2.000.000 | 2.000.000 | Plafon mcap (ruang upside) |
+| `minLiquidity` | Gate | 0 | 8.000 | Lantai likuiditas (anti-rug) |
+| `minLockedPct` | Gate | 0 | 0 | Min LP locked (0 = advisory) |
+| `maxEnrich` | Mesin | 20 | 20 | Kandidat di-enrich per sweep |
+| `signalTtlMin` | Mesin | 360 | 360 | Umur sinyal / TTL (menit) |
+
+**Endpoint & store** (dua-duanya disapu tiap interval oleh `sniperSweepOnce()`):
+
+| | Awal | v2 (canonical) |
+|---|---|---|
+| Signals | `GET /api/sniper/awal/signals` | `GET /api/sniper/signals` |
+| Sweep manual | `GET /api/sniper/awal/sweep` | `GET /api/sniper/sweep` |
+| Store (gitignored) | `.sniper-awal-state.json` | `.sniper-state.json` |
+| Parameter | — (fixed) | `GET/POST /api/sniper/params` |
+
+**Preset "tajam" (contoh override runtime yang dipakai saat kalibrasi 2026-07-07):**
+`signalMin=2, scoreMin=240, cobuyWindowMin=30, minLiquidity=10.000, minMcap=20.000,`
+`maxMcap=1.500.000, minLockedPct=30, lookbackMin=180, signalTtlMin=240` — anti-rug &
+sangat jarang. Dial paling cepat untuk melonggarkan: turunkan `scoreMin`.
+
 ## 🗓️ Log perkembangan
 
 - **2026-07-05** — File dibuat. Fondasi dibaca (smartMoney/discover/proRadar).
@@ -377,6 +425,14 @@ flowchart TD
   semua mcap ~$2rb). Bug performa (enrich sekuensial ~60s) diperbaiki → cap 20
   kandidat + enrich paralel → **~11s**. Env tunable: SNIPER_SIGNAL_MIN (2),
   SNIPER_SIGNAL_MAX_MCAP (2jt), SNIPER_LOOKBACK_MIN (90), SNIPER_MAX_ENRICH (20).
+- **2026-07-07** — 🟢 **MODUL C v2 + DUA ALIRAN.** (1) Registry parameter
+  `screener/sniperParams.js` (17 tunable, editable live via Settings, tanpa restart);
+  mesin baca per-sweep. (2) Mesin net-buy: `recentSwaps()` deteksi jual → net-position
+  per wallet (C7), filter dust `minBuyUsd` (C6). (3) **Dua aliran**: "awal" (v1
+  headcount, profil fixed) + "v2" (tajam, editable) — dua store, dual sweep, endpoint
+  `/api/sniper/awal/*`, tab di `SniperPanel.vue`. Rekap parameter lengkap: lihat
+  §"Parameter Sniper Live" di atas. Terverifikasi live (awal ~17–32 sinyal vs v2
+  0 pada preset ketat). Commit `097396f`.
 
 ---
 
