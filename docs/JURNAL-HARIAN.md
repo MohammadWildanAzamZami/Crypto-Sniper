@@ -5,7 +5,7 @@ dengan teknologi AI Agent + logic Smart Money Tracking), disusun dari riwayat
 git repo. Setiap hari dikelompokkan jadi: **Ditambahkan**, **Diubah**, dan
 **Dirapikan/Perbaikan**.
 
-Periode: **28 Juni 2026 – 7 Juli 2026** · 48 commit.
+Periode: **28 Juni 2026 – 7 Juli 2026** · 77 commit (di luar auto-rekap harian).
 
 ---
 
@@ -132,14 +132,40 @@ Hari terpadat: dari nol sampai fitur utama jalan (24 commit).
 
 ---
 
-## 📅 Hari 9 — Senin, 7 Juli 2026 (penyempurnaan copy)
+## 📅 Hari 9 — Senin, 7 Juli 2026 (Fable 5 di semua, Sniper v2, flowchart, perbaikan mode AI)
+
+**Ditambahkan**
+- **Sniper Live v2** — registry parameter yang bisa diubah **live dari Settings**
+  (berlaku di sweep berikutnya, tanpa restart), mesin **net-buy** (wallet yang
+  beli lalu jual di window tidak dihitung sebagai akumulasi), dan **dua aliran**
+  sinyal berjalan paralel (**Awal/v1** & **v2**).
+- **Flowchart alur** (Mermaid + ASCII) untuk **Bedah Coin (Modul A)** dan
+  **Sniper Live (Modul C)** — ditambahkan di LAPORAN.md (§7 & §8) dan
+  SNIPER-ENGINE.md.
+- **REKAP-PARAMETER.md** — rekap semua parameter (Awal v1 vs v2) + peta/flowchart
+  semua tool.
+- **SNIPER-LIVE-DISKUSI.md** — dokumen bahan bedah Modul C (celah & parameter baru).
 
 **Diubah**
-- Subjudul halaman utama diganti jadi:
-  *"Tool Pencari Memecoin dengan teknologi AI Agent menggunakan logic Smart
-  Money Tracking."*
-- Verifikasi tampilan: app dijalankan (Vite dev server) dan dicek render-nya
+- **Semua model AI dikunci ke Fable 5** (`claude-fable-5`): dropdown model di
+  Settings jadi satu pilihan; default widget chat + `.env.example` → Fable 5;
+  chat lokal, Pro Radar, dan "Jelaskan sinyal" kini meneruskan
+  `--model claude-fable-5`. *(Pengurangan: opsi Opus/Sonnet/Haiku dihapus dari UI.)*
+- Subjudul halaman utama → *"Tool Pencari Memecoin dengan teknologi AI Agent
+  menggunakan logic Smart Money Tracking."*
+- Verifikasi tampilan: app dijalankan (Vite + Express) dan dicek render-nya
   di browser — semua panel tampil normal.
+
+**Perbaikan**
+- **Mode AI lokal jadi independen dari API key.** CLI `claude` yang di-spawn tidak
+  lagi mewarisi `ANTHROPIC_API_KEY` dari `.env` (diperbaiki di `local.js`,
+  `explainSignal.js`, `analyze.js`) — sebelumnya gagal *"Invalid API key"* saat
+  key .env kosong / saldo rendah.
+- **"Jelaskan sinyal ini"** tak lagi memaksa jalur API saat mode Local. Sebelumnya
+  selalu pakai API key (walau saldo habis) → error 400 *"credit balance too low"*.
+  Kini pilihan mode Local menang → jalan lewat CLI langganan tanpa biaya.
+- Flowchart Mermaid: node keputusan gate dikutip agar aman di-parse GitHub.
+- Jurnal harian: push post-commit dibuat foreground agar andal di Windows.
 
 ---
 
@@ -151,7 +177,7 @@ Hari terpadat: dari nol sampai fitur utama jalan (24 commit).
 | **10x Radar** | Auto-screening token Solana potensi tinggi (funnel cepat ~8 dtk) |
 | **Pro Radar (Fable 5)** | 10x Radar + AI: gerbang kualitas, self-tuning, target win-rate |
 | **Smart Money Tracking** | Top traders (Birdeye) + verifikasi wallet (Helius) + meter |
-| **Sniper / Bedah Coin** | Bongkar early buyers, hold/jual, bundle/bot, Watchlist, Live Monitor |
+| **Sniper / Bedah Coin** | Bongkar early buyers, hold/jual, bundle/bot, Watchlist, Live Monitor (v2: net-buy, dua aliran Awal/v2, parameter live dari Settings) |
 | **Kalkulator manual** | Modal skoring manual (input DexScreener/RugCheck) |
 | **Chat AI** | Asisten gaya WhatsApp, default mode lokal (tanpa biaya) |
 | **Chat widget** | Bubble chat AI embeddable untuk situs lain |

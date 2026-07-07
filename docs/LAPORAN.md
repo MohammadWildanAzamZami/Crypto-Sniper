@@ -46,6 +46,15 @@ sedang **diakumulasi smart money SEBELUM naik**. Kerjanya sebagai satu loop yang
 > Kualitas sinyal makin tajam seiring Watchlist diisi lebih banyak winner beragam.
 > Detail lengkap + keputusan desain ada di **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**.
 
+### 🆕 Pembaruan 7 Juli 2026 (Sniper v2 · Fable 5 · flowchart · mode AI)
+
+| Perubahan | Ringkas |
+|-----------|---------|
+| 🎯 **Sniper Live v2** | Registry parameter yang bisa **diubah live dari Settings** (berlaku sweep berikutnya, tanpa restart), mesin **net-buy** (wallet beli-lalu-jual tidak dihitung akumulasi), dan **dua aliran** sinyal paralel (**Awal/v1** & **v2**). Rekap parameter Awal vs v2 di **[REKAP-PARAMETER.md](REKAP-PARAMETER.md)**. |
+| 🧠 **Semua model → Fable 5** | Dropdown model di Settings dikunci ke `claude-fable-5` (opsi lain dihapus); default widget chat & `.env.example` ikut Fable 5; chat lokal, Pro Radar, dan "Jelaskan sinyal" meneruskan `--model claude-fable-5`. |
+| 🔧 **Mode AI lokal andal** | CLI `claude` yang di-spawn tidak lagi mewarisi `ANTHROPIC_API_KEY` dari `.env`, sehingga mode Local **selalu pakai login langganan** (gratis) dan tak lagi gagal *"Invalid API key"* / *"credit balance too low"* saat key API kosong/low-balance. "Jelaskan sinyal" juga tidak lagi memaksa jalur API saat mode Local. |
+| 🔀 **Flowchart alur** | Diagram Mermaid + ASCII untuk **Bedah Coin (§7)** dan **Sniper Live (§8)** ditambahkan (juga di SNIPER-ENGINE.md). |
+
 ### Pembaruan Pro Radar
 
 Fitur-fitur terbaru di **Pro Radar** (urut dari yang terbaru). Detail teknis
