@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 21:35** · Total **99** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 22:27** · Total **101** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 35 commit
+## 2026-07-07 (Selasa) — 37 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
@@ -49,6 +49,8 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `02b291d`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `629f338`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `7358a0c`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `e253b99`
+- docs: tambah seksi + flowchart kategori Smart Money (REKAP-PARAMETER & SNIPER-ENGINE)  `1594167`
 
 ## 2026-07-06 (Senin) — 1 commit
 
