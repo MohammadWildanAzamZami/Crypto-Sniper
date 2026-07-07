@@ -272,7 +272,7 @@ flowchart TD
     I -- tidak --> X["dibuang"]
     I -- ya --> J["urut per jumlah wallet → ambil maks maxEnrich"]
     J --> K["4 · Enrich: tokenSnapshot Birdeye +<br/>safetyCheck (DexScreener+RugCheck+Pump.fun)"]
-    K --> L{lolos gate C4?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot}
+    K --> L{"lolos gate C4?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot"}
     L -- tidak --> X
     L -- ya --> M["skor komposit = reputasi + size-bonus + cobuy-bonus"]
     M --> N{skor ≥ scoreMin?}

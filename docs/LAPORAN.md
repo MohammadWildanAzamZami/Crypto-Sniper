@@ -771,7 +771,7 @@ flowchart TD
     I -- tidak --> X["dibuang"]
     J --> K
     subgraph S4["4 · ENRICH + GATE keamanan (C4)"]
-      K["tokenSnapshot Birdeye +<br/>safetyCheck: DexScreener+RugCheck+Pump.fun"] --> L{lolos gate?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot}
+      K["tokenSnapshot Birdeye +<br/>safetyCheck: DexScreener+RugCheck+Pump.fun"] --> L{"lolos gate?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot"}
     end
     L -- tidak --> X
     L -- ya --> M["skor = reputasi + size-bonus + cobuy-bonus"]
