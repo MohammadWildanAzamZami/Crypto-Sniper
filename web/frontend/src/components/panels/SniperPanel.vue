@@ -6,10 +6,14 @@
  * pump. The server sweeps on a background interval; this panel reads the signals
  * and can trigger a sweep on demand. Heuristic — NOT financial advice. DYOR.
  */
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { apiUrl } from "../../lib/api.js";
 
 const data = ref(null);
+// Sembunyikan token `unverified` dari tampilan (sementara). Engine tetap
+// menghasilkannya — ini murni filter tampilan, jadi gampang dihidupkan lagi.
+const visibleSignals = computed(() => (data.value?.signals || []).filter((s) => !s.unverified));
+const hiddenUnverified = computed(() => (data.value?.signals || []).filter((s) => s.unverified).length);
 const loading = ref(false);   // manual sweep in progress
 const refreshing = ref(false);
 const error = ref("");
@@ -184,7 +188,12 @@ onBeforeUnmount(() => {
 
     <template v-if="data">
       <div class="sn-summary">
-        <div class="sn-chip"><b>{{ data.count }}</b> sinyal aktif</div>
+        <div class="sn-chip"><b>{{ visibleSignals.length }}</b> sinyal aktif</div>
+        <div
+          v-if="hiddenUnverified"
+          class="sn-chip"
+          title="Token unverified (data pasar belum terverifikasi) sedang disembunyikan dari tampilan."
+        >⚠ <b>{{ hiddenUnverified }}</b> unverified disembunyikan</div>
         <div class="sn-chip">≥<b>{{ data.signalMin }}</b> wallet sepakat</div>
         <div class="sn-chip">maks mcap <b>{{ money(data.maxMcap) }}</b></div>
         <div class="sn-chip">auto tiap <b>{{ data.pollMin }}m</b></div>
@@ -205,9 +214,15 @@ onBeforeUnmount(() => {
         >net-buy</div>
       </div>
 
-      <p v-if="!data.signals.length" class="sn-empty">
-        Belum ada sinyal. Monitor menunggu ≥{{ data.signalMin }} wallet Watchlist membeli token kecil yang sama.
-        Makin banyak winner yang kamu Bedah → makin pintar Watchlist → makin tajam sinyalnya.
+      <p v-if="!visibleSignals.length" class="sn-empty">
+        <template v-if="hiddenUnverified">
+          {{ hiddenUnverified }} sinyal ada tapi semuanya <b>unverified</b> — sedang disembunyikan.
+          Tunggu sampai token terverifikasi, atau tampilkan lagi token unverified.
+        </template>
+        <template v-else>
+          Belum ada sinyal. Monitor menunggu ≥{{ data.signalMin }} wallet Watchlist membeli token kecil yang sama.
+          Makin banyak winner yang kamu Bedah → makin pintar Watchlist → makin tajam sinyalnya.
+        </template>
       </p>
 
       <!-- Scroll box: tampil 4 sinyal default, sisanya di-scroll di dalam kotak.
@@ -216,10 +231,10 @@ onBeforeUnmount(() => {
       <div
         v-else
         class="sn-scroll"
-        :class="[data.signals.length > 4 ? 'sn-scroll--more' : '', openExplain ? 'sn-scroll--explaining' : '']"
+        :class="[visibleSignals.length > 4 ? 'sn-scroll--more' : '', openExplain ? 'sn-scroll--explaining' : '']"
       >
         <ul class="sn-list">
-        <li v-for="s in data.signals" :key="s.mint" class="sn-row" :class="s.isNew ? 'sn-row--new' : ''">
+        <li v-for="s in visibleSignals" :key="s.mint" class="sn-row" :class="s.isNew ? 'sn-row--new' : ''">
           <div class="sn-top">
             <div class="sn-main">
               <button
@@ -370,8 +385,8 @@ onBeforeUnmount(() => {
         </li>
         </ul>
       </div>
-      <p v-if="data.signals.length > 4" class="sn-scroll-hint">
-        Menampilkan 4 dari <b>{{ data.signals.length }}</b> sinyal — scroll di dalam kotak untuk lihat sisanya.
+      <p v-if="visibleSignals.length > 4" class="sn-scroll-hint">
+        Menampilkan 4 dari <b>{{ visibleSignals.length }}</b> sinyal — scroll di dalam kotak untuk lihat sisanya.
       </p>
 
       <p class="sn-note">
