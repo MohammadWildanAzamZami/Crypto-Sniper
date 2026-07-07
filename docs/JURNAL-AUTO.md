@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 16:35** · Total **80** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 16:40** · Total **82** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 16 commit
+## 2026-07-07 (Selasa) — 18 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
@@ -16,6 +16,7 @@
 
 **🐛 Perbaikan**
 - fix(jurnal): push foreground di post-commit agar andal di Windows  `f8dd08c`
+- fix(ai): mode lokal "Jelaskan sinyal" independen dari API key  `e9cc831`
 
 **📝 Dokumentasi**
 - docs: jurnal harian pengembangan + subjudul halaman jadi 'AI Agent'  `6dd606e`
@@ -30,6 +31,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `6210985`
 - docs(sniper): quote node keputusan gate agar Mermaid parse aman  `7ac1dc8`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `7642cb0`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `b2d5363`
 
 ## 2026-07-06 (Senin) — 1 commit
 
