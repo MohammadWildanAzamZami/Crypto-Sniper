@@ -101,6 +101,47 @@ safetyGate false`.
 | `SNIPER_POLL_MIN` | `5` | Interval monitor live (menit). |
 | `SNIPER_WINNER_MIN_X` | `10` | Definisi "winner": token pump ≥ Nx dari launch → wallet-nya direkam. |
 
+### 🏅 Reputasi Watchlist — `computeReputation()`
+
+> Inilah "smart money"-nya **Sniper Live** (beda dari [Smart Money score](#-kategori-smart-money--smartmoneyjs)
+> yang per-token dari Birdeye). Reputasi = **rekam jejak wallet** yang dibangun otomatis
+> dari Bedah Coin. Wallet yang menangkap winner **berulang kali** naik peringkat; **top 40**
+> jadi aktif dipantau. Dipakai sweep lewat `repWeighted` (skor sinyal = Σ reputasi wallet).
+
+**Kapan dicatat:** sebuah wallet dapat "catch" hanya kalau autopsy token itu memang
+**winner** (`launchToNowX ≥ WINNER_MIN_X = 10`). Dedupe per mint (1 token = 1 catch per
+wallet), simpan maks **20 catch** terbaru per wallet.
+
+**Bobot reputasi (0–100):**
+| Komponen | Rumus | Cap | Penuh saat |
+|---|---|---|---|
+| Winner berbeda ditangkap | `catches × 20` | **60** | 3 winner |
+| Kualitas entry (log-scale) | `log10(max(1, avgX)) × 8` | **25** | avgX ≈ 1.300× |
+| Wallet mapan (Helius) | `+15` bila `established` | **15** | wallet terverifikasi |
+
+`reputation = round(min(100, Σ))`, di mana `avgX` = rata-rata `xFromEntry` (entry→now)
+seluruh catch. **Catch count adalah sinyal utama** — 1 beli awal yang beruntung itu noise;
+menangkap winner demi winner itu edge. Internal caps (non-env): `MAX_WALLETS=2000`,
+`MAX_CATCHES=20`.
+
+**Ranking → aktif:** wallet diurut reputasi desc; **top `WATCH_SIZE` (40)** = aktif
+(dipantau Modul C). Endpoint: `GET /api/watchlist`.
+
+### 🔀 Flowchart — reputasi Watchlist
+
+```mermaid
+flowchart TB
+  A["🔬 Bedah Coin (Modul A)<br/>autopsy → smartWalletCandidates"] --> W{"Token winner?<br/>launchToNowX ≥ 10 (WINNER_MIN_X)"}
+  W -->|tidak| SKIP["diabaikan — tak dicatat"]
+  W -->|ya| C["Catat 'catch' per wallet<br/>(dedupe per mint · maks 20)"]
+  C --> B1["catches × 20 (cap 60)"] --> R(["reputation 0–100"])
+  C --> B2["log10(avgX) × 8 (cap 25)"] --> R
+  C --> B3["established? +15"] --> R
+  R --> RANK["Ranking by reputation ↓"]
+  RANK --> ACT["Top WATCH_SIZE (40)<br/>= AKTIF dipantau"]
+  ACT --> SNIPE["🎯 Sniper Live (Modul C)<br/>skor sinyal = Σ reputasi wallet (repWeighted)"]
+```
+
 ---
 
 ## 📡 Parameter Radar (10x Radar & Pro Radar)

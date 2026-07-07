@@ -433,6 +433,44 @@ flowchart TB
   SC --> UI["UI band:<br/>≥70 kuat · 40–69 sedang · <40 lemah"]
 ```
 
+## 🏅 Reputasi Watchlist (Modul B) — `watchlist.js`
+
+> Inilah "smart money"-nya **Sniper Live**: rekam jejak wallet yang dibangun otomatis
+> dari Bedah Coin (Modul A). Beda dari [Smart Money score](#-kategori-smart-money--smartmoneyjs)
+> per-token (Birdeye). Reputasi inilah yang dipakai sweep Modul C lewat `repWeighted`
+> (skor sinyal = Σ reputasi wallet). Detail juga di
+> [REKAP-PARAMETER.md](REKAP-PARAMETER.md#-reputasi-watchlist--computereputation).
+
+**Kapan dicatat:** wallet dapat "catch" hanya bila autopsy token = **winner**
+(`launchToNowX ≥ WINNER_MIN_X = 10`). Dedupe per mint (1 token = 1 catch/wallet),
+simpan maks 20 catch terbaru.
+
+**Bobot reputasi (0–100):**
+| Komponen | Rumus | Cap |
+|---|---|---|
+| Winner berbeda ditangkap | `catches × 20` | 60 |
+| Kualitas entry (log-scale) | `log10(max(1, avgX)) × 8` | 25 |
+| Wallet mapan (Helius) | `+15` bila `established` | 15 |
+
+`reputation = round(min(100, Σ))`; `avgX` = rata-rata `xFromEntry` semua catch.
+**Catch count = sinyal utama.** Ranking desc → **top `WATCH_SIZE` (40) = aktif** dipantau
+Modul C.
+
+### 🔀 Flowchart — reputasi Watchlist
+
+```mermaid
+flowchart TB
+  A["🔬 Bedah Coin (Modul A)<br/>autopsy → smartWalletCandidates"] --> W{"Token winner?<br/>launchToNowX ≥ 10 (WINNER_MIN_X)"}
+  W -->|tidak| SKIP["diabaikan — tak dicatat"]
+  W -->|ya| C["Catat 'catch' per wallet<br/>(dedupe per mint · maks 20)"]
+  C --> B1["catches × 20 (cap 60)"] --> R(["reputation 0–100"])
+  C --> B2["log10(avgX) × 8 (cap 25)"] --> R
+  C --> B3["established? +15"] --> R
+  R --> RANK["Ranking by reputation ↓"]
+  RANK --> ACT["Top WATCH_SIZE (40)<br/>= AKTIF dipantau"]
+  ACT --> SNIPE["🎯 Sniper Live (Modul C)<br/>skor sinyal = Σ reputasi wallet (repWeighted)"]
+```
+
 ## 🗓️ Log perkembangan
 
 - **2026-07-05** — File dibuat. Fondasi dibaca (smartMoney/discover/proRadar).
