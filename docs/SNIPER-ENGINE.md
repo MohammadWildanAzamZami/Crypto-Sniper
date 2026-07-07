@@ -383,6 +383,56 @@ Kolom **v2 (default)** = nilai default kode (registry). Nilai runtime bisa ditim
 `maxMcap=1.500.000, minLockedPct=30, lookbackMin=180, signalTtlMin=240` — anti-rug &
 sangat jarang. Dial paling cepat untuk melonggarkan: turunkan `scoreMin`.
 
+## 🧠 Kategori Smart Money — `smartMoney.js`
+
+> **Penting — dua "smart money" yang berbeda:**
+> - **Reputasi Watchlist** (Modul B) = wallet yang berulang menangkap winner. Inilah
+>   yang dipakai **Sniper Live** untuk memberi skor sinyal (`repWeighted`, `scoreMin`).
+> - **Smart Money score (bab ini)** = skor 0–100 per token dari **Birdeye + Helius**,
+>   dipakai **GEM Screener & Pro Radar** (badge "🧠 Smart"). BUKAN dipakai langsung
+>   oleh sweep Sniper, tapi konsep yang sama (uang pintar) → didokumentasikan di sini
+>   agar satu tempat. Detail tabel juga di [REKAP-PARAMETER.md](REKAP-PARAMETER.md#-kategori-smart-money--smartmoneyjs).
+
+### Input & sinyal turunan
+| Sumber | Ambil | Sinyal turunan (dari 10 top trader 24h) |
+|---|---|---|
+| **Birdeye** `top_traders` (24h, top 10, by volume) | `buyUsd`, `sellUsd`, `tags`, `pnl` | `netBuyUsd = Σ(buy−sell)` · `accumulating = #(buy>sell)` · `whales`/`whalesBuying` · `profitable = #(pnl>0)` |
+| **Helius** (verifikasi top 4) | `txCount` | `established = #(txCount ≥ 10)` — wallet mapan vs sniper sekali pakai |
+
+### Bobot skor → `smartScore` (0–100)
+| Komponen | Rumus | Cap | Penuh saat |
+|---|---|---|---|
+| Tekanan beli bersih | `netBuyUsd / 3000` | 30 | net-buy ≥ $90rb |
+| Whale akumulasi | `whalesBuying × 12` | 24 | 2 whale beli |
+| Trader profit | `profitable × 4` | 16 | 4 trader profit |
+| Breadth | `accumulating × 3` | 15 | 5 net-buyer |
+| Wallet mapan | `established × 5` (atau **+8** flat tanpa Helius) | 15 | 3 wallet mapan |
+
+`smartScore = clamp(0,100,Σ)`. Wajib `BIRDEYE_API_KEY`; Helius opsional (memperkuat).
+Dipakai: **Pro Radar** `quality += round(score × 0.12)` (maks +12); **UI band**
+≥70 kuat / 40–69 sedang / <40 lemah.
+
+### 🔀 Flowchart — perhitungan Smart Money
+
+```mermaid
+flowchart TB
+  M["Token (mint)"] --> BE["Birdeye top_traders<br/>24h · top 10 · by volume"]
+  BE --> T["Per trader:<br/>buyUsd · sellUsd · tags · pnl"]
+  T --> S1["netBuyUsd = Σ(buy − sell)"]
+  T --> S2["accumulating = #(buy > sell)"]
+  T --> S3["whalesBuying = #(whale & buy>sell)"]
+  T --> S4["profitable = #(pnl > 0)"]
+  T --> HE["Helius verifikasi top-4<br/>txCount ≥ 10 = established"]
+  HE --> S5["established (jumlah)"]
+  S1 -->|"/3000, cap 30"| SC(["smartScore 0–100"])
+  S3 -->|"×12, cap 24"| SC
+  S4 -->|"×4, cap 16"| SC
+  S2 -->|"×3, cap 15"| SC
+  S5 -->|"×5, cap 15<br/>(+8 tanpa Helius)"| SC
+  SC --> Q["Pro Radar quality<br/>+ round(score × 0.12) → maks +12"]
+  SC --> UI["UI band:<br/>≥70 kuat · 40–69 sedang · <40 lemah"]
+```
+
 ## 🗓️ Log perkembangan
 
 - **2026-07-05** — File dibuat. Fondasi dibaca (smartMoney/discover/proRadar).

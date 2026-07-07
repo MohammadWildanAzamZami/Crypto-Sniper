@@ -113,6 +113,74 @@ safetyGate false`.
 
 ---
 
+## 🧠 Kategori Smart Money — `smartMoney.js`
+
+> **Beda dengan reputasi Watchlist.** Ada DUA konsep "smart money" di app ini:
+> 1. **Smart Money score (bab ini)** — dihitung dari **Birdeye top-traders + Helius**
+>    untuk SATU token. Dipakai oleh **GEM Screener & Pro Radar** (badge/meter "🧠 Smart").
+> 2. **Reputasi Watchlist** (Modul B) — wallet yang berulang menangkap winner; dipakai
+>    oleh **Sniper Live** (`repWeighted`, `scoreMin`). Lihat tabel Sniper di atas.
+>
+> Bab ini menjelaskan **#1**.
+
+### Sumber & input (dari mana angkanya)
+| Sumber | Ambil apa | Detail |
+|---|---|---|
+| **Birdeye** `top_traders` | WHO trading token ini | `time_frame=24h`, **top 10** by volume. Per trader: `buyUsd`, `sellUsd`, `trades`, `tags` (whale/bundler…), `pnl`. |
+| **Helius** wallet activity | Wallet-nya REAL atau throwaway | Verifikasi **top 4** trader; `txCount ≥ 10` → dihitung **established** (mapan). Opsional. |
+
+### Sinyal turunan (dihitung dari 10 top trader)
+| Nama | Rumus | Arti |
+|---|---|---|
+| `netBuyUsd` | Σ(`buyUsd` − `sellUsd`) | Tekanan beli bersih (USD). |
+| `accumulating` | jumlah trader `buyUsd > sellUsd` | Berapa yang net-beli (breadth). |
+| `whales` | jumlah trader ber-tag `whale` | Jumlah whale. |
+| `whalesBuying` | jumlah `whale` **dan** `buyUsd > sellUsd` | Whale yang sedang akumulasi (sinyal terkuat). |
+| `profitable` | jumlah trader `pnl > 0` | Trader yang lagi profit. |
+| `established` | jumlah top-4 dengan `txCount ≥ 10` (Helius) | Wallet mapan (bukan sniper sekali pakai). |
+
+### Bobot skor → `smartScore` (0–100)
+| Komponen | Rumus | Cap poin | Ambang penuh |
+|---|---|---|---|
+| Tekanan beli bersih | `netBuyUsd / 3000` | **30** | net-buy ≥ $90rb |
+| Whale akumulasi | `whalesBuying × 12` | **24** | 2 whale beli |
+| Trader profit | `profitable × 4` | **16** | 4 trader profit |
+| Breadth (net-buyer) | `accumulating × 3` | **15** | 5 trader net-beli |
+| Wallet mapan (Helius) | `established × 5` (atau **+8** flat bila Helius mati) | **15** | 3 wallet mapan |
+
+`smartScore = clamp(0, 100, Σ komponen)`. **Wajib `BIRDEYE_API_KEY`** (tanpa itu
+fitur mati → `null`). Helius hanya memperkuat (verifikasi wallet).
+
+### Dipakai di mana
+| Pemakai | Efek |
+|---|---|
+| **Pro Radar** quality | `quality += round(smartScore × 0.12)` → **maks +12** poin. |
+| **UI badge/meter** | Band warna: **≥70 kuat** · **40–69 sedang** · **<40 lemah**. |
+| **Enable** | `smartMoneyEnabled = Boolean(BIRDEYE_API_KEY)`. |
+
+### 🔀 Flowchart — perhitungan Smart Money
+
+```mermaid
+flowchart TB
+  M["Token (mint)"] --> BE["Birdeye top_traders<br/>24h · top 10 · by volume"]
+  BE --> T["Per trader:<br/>buyUsd · sellUsd · tags · pnl"]
+  T --> S1["netBuyUsd = Σ(buy − sell)"]
+  T --> S2["accumulating = #(buy > sell)"]
+  T --> S3["whalesBuying = #(whale & buy>sell)"]
+  T --> S4["profitable = #(pnl > 0)"]
+  T --> HE["Helius verifikasi top-4<br/>txCount ≥ 10 = established"]
+  HE --> S5["established (jumlah)"]
+  S1 -->|"/3000, cap 30"| SC(["smartScore 0–100"])
+  S3 -->|"×12, cap 24"| SC
+  S4 -->|"×4, cap 16"| SC
+  S2 -->|"×3, cap 15"| SC
+  S5 -->|"×5, cap 15<br/>(+8 bila tanpa Helius)"| SC
+  SC --> Q["Pro Radar quality<br/>+ round(score × 0.12) → maks +12"]
+  SC --> UI["UI band:<br/>≥70 kuat · 40–69 sedang · <40 lemah"]
+```
+
+---
+
 ## 🚦 Rate limit & kuota (index.js / middleware)
 
 | Key env | Default | Arti |
