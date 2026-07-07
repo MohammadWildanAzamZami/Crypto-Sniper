@@ -377,6 +377,7 @@ membaca `process.env` — memperbaiki seeding key dari `.env`).
 **File:** `web/server/screener/autopsy.js`, `watchlist.js`, `sniper.js`,
 `web/server/routes/autopsy.js`; UI: `AutopsyPanel.vue`, `WatchlistPanel.vue`,
 `SniperPanel.vue`. **Dokumen desain penuh:** [SNIPER-ENGINE.md](SNIPER-ENGINE.md).
+**Flowchart alur Bedah Coin:** lihat [§7](#7-flowchart-alur--bedah-coin-sniper-modul-a).
 
 Loop 3 modul yang mengubah "siapa yang menangkap winner kemarin" menjadi "siapa
 yang sedang membeli calon winner sekarang":
@@ -630,7 +631,104 @@ flowchart TD
 
 ---
 
-## 7. Prinsip arsitektur yang dipegang
+## 7. Flowchart Alur: 🎯 Bedah Coin (Sniper Modul A)
+
+Alur forensik dari tempel mint di **AutopsyPanel** sampai kandidat smart wallet +
+auto-record ke Watchlist. Sumber: `routes/autopsy.js` (`GET /api/autopsy?mint=`) →
+`screener/autopsy.js` (`runAutopsy`) → `screener/watchlist.js` (`recordCandidates`).
+Desain penuh + log di [SNIPER-ENGINE.md](SNIPER-ENGINE.md). Konstanta:
+ultra-early <$50k · early <$100k · page 50×maks 8 (≤400 trade) · Helius cek 10
+teratas · winner = launch→now ≥10x.
+
+### Versi Mermaid (render di GitHub)
+
+```mermaid
+flowchart TD
+    A["User tempel mint di AutopsyPanel<br/>GET /api/autopsy?mint="] --> B{mint valid?<br/>base58 32–44}
+    B -- tidak --> B1["400 — mint tidak valid"]
+    B -- ya --> C{Birdeye key ada?}
+    C -- tidak --> C1["400 — Birdeye wajib"]
+    C -- ya --> D
+
+    subgraph S1["1 · OVERVIEW — Birdeye token_overview"]
+      D["price · marketCap · supply(=mc/price)"] --> E{price&gt;0 &amp; supply&gt;0?}
+    end
+    E -- tidak --> E1["error — token tak ditemukan"]
+    E -- ya --> F
+
+    subgraph S2["2 · PAGING trades — Birdeye txs/token?sort_type=asc"]
+      F["oldest-first · 50/hal · maks 8 hal (≤400)"] --> G["tiap trade: mcap = price × supply"]
+      G --> H{mcap tembus $100k?<br/>atau habis / kena cap}
+      H -- belum --> F
+    end
+    H -- ya --> I
+
+    subgraph S3["3 · FORENSIK early window (mcap < $100k)"]
+      I["pisah buys / sellers · launchMcap"] --> J["agregasi per wallet<br/>firstBuyMcap · usd · tokens · buys"]
+      J --> K["deteksi bundle/sybil<br/>detik sama + jumlah seragam (≥4 w · ≥60%)"]
+      K --> L["tier ultra&lt;$50k / early&lt;$100k<br/>xFromEntry · soldInWindow · bundle?"]
+    end
+    L --> M
+
+    subgraph S4["4 · SKOR + verifikasi — Helius"]
+      M["skor provisional → 10 terbersih"] --> N["Helius txCount → mapan (≥10 tx)?"]
+      N --> O["skor ulang → smartWalletCandidates (top 12)"]
+    end
+    O --> P["laporan JSON: token · window · summary<br/>earlyBuyers · coordination · candidates · notes"]
+
+    P --> Q{winner?<br/>launch→now ≥ 10x}
+    Q -->|Ya| R["recordCandidates → Watchlist (Modul B)<br/>rekam kandidat bersih + reputasi"]
+    Q -->|Tidak| T["skip — tidak direkam"]
+    R --> U["UI AutopsyPanel: early buyer · bundle<br/>kandidat smart wallet + badge watchlist"]
+    T --> U
+```
+
+### Versi ASCII (kalau Mermaid tak render)
+
+```
+        ┌─────────────────────────────────────────────┐
+        │  Tempel mint  →  GET /api/autopsy?mint=<mint>│
+        └──────────────────────┬──────────────────────┘
+                               v
+      mint base58 32–44 ? ──tidak──► 400   |   Birdeye key ? ──tidak──► 400
+                               v (ya, ya)
+ 1) OVERVIEW  ── Birdeye token_overview ─────────────────────────────────────
+    Data : price · marketCap · supply (=mc/price)
+           price>0 & supply>0 ?  ──tidak──►  error token tak ditemukan
+                               v ya
+ 2) PAGING  ── Birdeye txs/token?sort_type=asc (oldest-first) ───────────────
+    Loop : 50 trade/hal · maks 8 hal (≤400) · tiap trade mcap = price × supply
+           mcap tembus $100k / riwayat habis / kena cap ? ──belum──► (loop)
+                               v ya
+ 3) FORENSIK early window (mcap < $100k) ── autopsy.js ──────────────────────
+    - pisah buys / sellers · launchMcap
+    - agregasi per wallet (firstBuyMcap, usd, tokens, buys)
+    - deteksi bundle/sybil (detik sama + jumlah seragam ≥4 wallet, ≥60%)
+    - tier: ultra-early <$50k / early <$100k · xFromEntry · soldInWindow
+                               v
+ 4) SKOR + VERIFIKASI  ── Helius ────────────────────────────────────────────
+    skor provisional → 10 terbersih → Helius txCount (mapan ≥10 tx) →
+    skor ulang → smartWalletCandidates (top 12)
+                               v
+    laporan JSON: token · window · summary · earlyBuyers · coordination · notes
+                               v
+                     winner? launch→now ≥ 10x
+                    ┌──────────┴──────────┐
+                   YA                    TIDAK
+                    v                     v
+        recordCandidates →           skip (tak direkam)
+        Watchlist (Modul B)               │
+                    └──────────┬──────────┘
+                               v
+   UI AutopsyPanel: early buyer · bundle · kandidat smart wallet + badge watchlist
+```
+
+> Token lama: trade paling awal terindeks Birdeye bisa sudah >$100k → tak ada
+> window early (`noEarlyData`). Paling akurat untuk token yang **baru** naik.
+
+---
+
+## 8. Prinsip arsitektur yang dipegang
 
 1. **Key = secret server-side.** Solscan/Anthropic/Telegram key cuma ada di Express
    proxy (`settings.js`); browser hanya lihat status boolean.
@@ -643,7 +741,7 @@ flowchart TD
 
 ---
 
-## 8. Peta file penting
+## 9. Peta file penting
 
 ```
 web/

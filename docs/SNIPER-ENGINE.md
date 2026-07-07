@@ -145,6 +145,105 @@ sampai mcap>$100k, mana dulu) biar hemat kuota API; `log`/catat kalau kena cap.
 
 ---
 
+## 🔀 Flowchart — Modul A "Bedah Coin"
+
+Alur nyata dari klik "Bedah" di UI sampai kandidat smart wallet + auto-record ke
+Watchlist. Sumber: `web/server/routes/autopsy.js` (`GET /api/autopsy?mint=`) →
+`web/server/screener/autopsy.js` (`runAutopsy`) → `watchlist.js` (`recordCandidates`).
+Konstanta: `ULTRA_EARLY_MCAP=$50k`, `EARLY_MCAP=$100k`, `PAGE_SIZE=50`,
+`MAX_PAGES=8` (≤400 trade), `HELIUS_CHECK_LIMIT=10`, winner = `launch→now ≥ 10x`.
+
+### Mermaid
+
+```mermaid
+flowchart TD
+    A["UI AutopsyPanel — tempel mint<br/>GET /api/autopsy?mint="] --> B{mint valid?<br/>base58 32–44}
+    B -- tidak --> B1["400 — mint tidak valid"]
+    B -- ya --> C{Birdeye key ada?}
+    C -- tidak --> C1["400 — Birdeye wajib"]
+    C -- ya --> D["tokenOverview (Birdeye)<br/>price · marketCap · supply"]
+    D --> E{data lengkap?<br/>price&gt;0 &amp; supply&gt;0}
+    E -- tidak --> E1["error — token tak ditemukan"]
+    E -- ya --> F["Page trades OLDEST-first<br/>txs/token?sort_type=asc<br/>50/hal · maks 8 hal (≤400 trade)"]
+    F --> G["Tiap trade: mcap = price × supply"]
+    G --> H{mcap tembus $100k?<br/>atau riwayat habis / kena cap}
+    H -- belum --> F
+    H -- ya --> I["Window early (mcap &lt; $100k)<br/>pisah buys / sellers · launchMcap"]
+    I --> J["Agregasi per wallet<br/>firstBuyMcap · usd · tokens · buys"]
+    J --> K["Deteksi bundle/sybil<br/>detik sama + jumlah seragam<br/>≥4 wallet · ≥60% uniform"]
+    K --> L["Bentuk early buyer<br/>tier ultra&lt;$50k / early&lt;$100k<br/>xFromEntry · soldInWindow · bundle?"]
+    L --> M["Skor provisional → ambil 10 terbersih<br/>Helius txCount → mapan (≥10 tx)?"]
+    M --> N["Skor ulang → smartWalletCandidates (top 12)"]
+    N --> O["Susun laporan JSON<br/>token · window · summary · earlyBuyers<br/>coordination · candidates · notes"]
+    O --> P{winner?<br/>launch→now ≥ 10x}
+    P -- ya --> Q["recordCandidates → Watchlist (Modul B)<br/>rekam kandidat bersih + reputasi"]
+    P -- tidak --> R["skip — tidak direkam"]
+    Q --> S["Response JSON → UI:<br/>early buyer · bundle · kandidat smart wallet"]
+    R --> S
+```
+
+### ASCII
+
+```
+        ┌─────────────────────────────────────────────┐
+        │  UI AutopsyPanel — tempel mint token         │
+        │  GET /api/autopsy?mint=<mint>                │
+        └───────────────────────┬─────────────────────┘
+                                 ▼
+              mint base58 32–44 ?  ──tidak──►  400 mint tidak valid
+                                 │ ya
+                                 ▼
+              Birdeye key ada ?   ──tidak──►  400 Birdeye wajib
+                                 │ ya
+                                 ▼
+        ┌─────────────────────────────────────────────┐
+        │  tokenOverview (Birdeye)                     │
+        │  price · marketCap · supply(=mc/price)       │
+        └───────────────────────┬─────────────────────┘
+                                 ▼
+          price>0 & supply>0 ?  ──tidak──►  error token tak ditemukan
+                                 │ ya
+                                 ▼
+        ┌─────────────────────────────────────────────┐   loop
+        │  Page trades OLDEST-first (sort_type=asc)    │◄────────┐
+        │  50/hal · maks 8 hal (≤400 trade)            │         │
+        │  tiap trade: mcap = price × supply           │         │
+        └───────────────────────┬─────────────────────┘         │
+                                 ▼                               │
+          mcap tembus $100k / habis / kena cap ? ──belum────────┘
+                                 │ ya
+                                 ▼
+        ┌─────────────────────────────────────────────┐
+        │  Window early (mcap < $100k)                 │
+        │  buys · sellers · launchMcap                 │
+        │  agregasi per wallet (firstBuyMcap, usd…)    │
+        │  deteksi bundle (detik sama + seragam ≥4 w)  │
+        │  tier: ultra-early <$50k / early <$100k      │
+        └───────────────────────┬─────────────────────┘
+                                 ▼
+        ┌─────────────────────────────────────────────┐
+        │  Skor provisional → 10 terbersih             │
+        │  Helius txCount → mapan (≥10 tx) ?           │
+        │  skor ulang → smartWalletCandidates (top 12) │
+        └───────────────────────┬─────────────────────┘
+                                 ▼
+                   winner? launch→now ≥ 10x
+                    ┌──────────┴──────────┐
+                 ya │                     │ tidak
+                    ▼                     ▼
+        recordCandidates →           skip (tak direkam)
+        Watchlist (Modul B)               │
+                    └──────────┬──────────┘
+                                 ▼
+        Response JSON → UI: early buyer · bundle · kandidat smart wallet
+```
+
+> Catatan: untuk token lama, trade paling awal yang terindeks Birdeye bisa sudah
+> di atas $100k → tak ada window early (`noEarlyData`). Tool paling akurat untuk
+> token yang **baru** naik (riwayat lengkap tersedia).
+
+---
+
 ## 🗓️ Log perkembangan
 
 - **2026-07-05** — File dibuat. Fondasi dibaca (smartMoney/discover/proRadar).
