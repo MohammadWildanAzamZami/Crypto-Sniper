@@ -244,6 +244,97 @@ flowchart TD
 
 ---
 
+## 🔀 Flowchart — Modul C "Sniper Live" (Live Monitor)
+
+Bagian yang membuat loop **hidup**: tiap `SNIPER_POLL_MIN` (default 5 menit) sistem
+menyapu wallet watchlist aktif (Modul B), membaca buy terbaru mereka (Helius), dan
+memunculkan **sinyal** saat ≥`signalMin` wallet berbeda meng-akumulasi token kecil
+yang sama. Sumber: `index.js` (interval) + `routes/autopsy.js`
+(`/api/sniper/sweep`, `/signals`) → `screener/sniper.js` (`runSniperSweep`).
+Semua ambang bisa diubah live dari Settings (`sniperParams.js`, dibaca per-sweep).
+
+### Mermaid
+
+```mermaid
+flowchart TD
+    T1["⏱️ Interval tiap 5 menit<br/>SNIPER_POLL_MIN (index.js)"] --> A
+    T2["Manual: GET /api/sniper/sweep"] --> A
+    A["runSniperSweep"] --> B{Helius key ada?}
+    B -- tidak --> B1["disabled — sweep dilewati"]
+    B -- ya --> C["getParams() live · getActiveWallets()<br/>= top watchlist (Modul B)"]
+    C --> D{ada wallet aktif?}
+    D -- tidak --> D1["swept 0 — selesai"]
+    D -- ya --> E["solPrice sekali (Birdeye WSOL)<br/>sinceSec = now − lookbackMin"]
+    E --> F["1 · recentSwaps tiap wallet (Helius, pool x5)<br/>BUY=bayar SOL/wSOL/USDC + terima token<br/>SELL=kebalikan · requireSwap · buang dust &lt;minBuyUsd"]
+    F --> G["2 · Grup per token: akumulasi buy/sell<br/>entry=beli paling awal · lastAt=beli terbaru"]
+    G --> H["3 · Keep wallet net-beli (C7 buy−sell&gt;0)"]
+    H --> I{token dgn ≥ signalMin<br/>wallet berbeda?}
+    I -- tidak --> X["dibuang"]
+    I -- ya --> J["urut per jumlah wallet → ambil maks maxEnrich"]
+    J --> K["4 · Enrich: tokenSnapshot Birdeye +<br/>safetyCheck (DexScreener+RugCheck+Pump.fun)"]
+    K --> L{lolos gate C4?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot}
+    L -- tidak --> X
+    L -- ya --> M["skor komposit = reputasi + size-bonus + cobuy-bonus"]
+    M --> N{skor ≥ scoreMin?}
+    N -- tidak --> X
+    N -- ya --> O["raise/refresh SINYAL (dedup per mint)<br/>positions · why · walletCount · PnL"]
+    O --> P["expire sinyal &gt; signalTtlMin<br/>save .sniper-state.json"]
+    P --> Q["GET /api/sniper/signals → SniperPanel<br/>auto-refresh 60s · 'Jelaskan sinyal' (AI Fable 5)"]
+```
+
+### ASCII
+
+```
+   ⏱️ interval 5 menit (index.js)  ─┐
+   manual GET /api/sniper/sweep   ─┴──►  runSniperSweep
+                                             │
+                        Helius key ? ──tidak──►  disabled (dilewati)
+                                             │ ya
+                getParams() live · getActiveWallets() (top watchlist Modul B)
+                                             │
+                         ada wallet aktif ? ──tidak──►  swept 0
+                                             │ ya
+                solPrice (Birdeye WSOL) · sinceSec = now − lookbackMin
+                                             ▼
+ 1) BACA SWAP tiap wallet ── Helius (pool x5) ───────────────────────────────
+    recentSwaps: parse tx dalam window
+      BUY  = bayar SOL/wSOL/USDC  +  terima token non-stable
+      SELL = terima SOL/wSOL/USDC +  kirim token   (dipakai utk NET)
+      requireSwap · buang dust < minBuyUsd · nilai USD pakai solPrice
+                                             ▼
+ 2) GRUP per token
+    akumulasi buyTokens/sellTokens per wallet · entry = beli paling awal ·
+    lastAt = beli terbaru
+                                             ▼
+ 3) SARING confluence
+    keep wallet net-beli (C7: buy−sell > 0)
+    token dgn ≥ signalMin wallet ? ──tidak──►  dibuang
+                                   │ ya
+    urut per jumlah wallet → ambil maks maxEnrich
+                                             ▼
+ 4) ENRICH + GATE keamanan (C4)
+    tokenSnapshot Birdeye (identity/mcap/price)
+    safetyCheck → screenToken (DexScreener + RugCheck + Pump.fun)
+    lolos? tak rugged/ban · liq ≥ min · mcap ∈ [min,max] · LP locked ok ·
+           bukan honeypot   ──tidak──►  dibuang
+                                   │ ya
+    skor komposit = reputasi + size-bonus + cobuy-bonus
+    skor ≥ scoreMin ? ──tidak──►  dibuang ("sedikit tapi tajam")
+                                   │ ya
+                                   ▼
+    RAISE/REFRESH SINYAL (dedup per mint) · positions · why · PnL
+    expire sinyal > signalTtlMin · save .sniper-state.json
+                                             ▼
+   GET /api/sniper/signals → SniperPanel (auto-refresh 60s,
+   tombol "Jelaskan sinyal ini" → AI Fable 5)
+```
+
+> Prinsip: **"sedikit tapi tajam"** — sinyal hanya muncul kalau beberapa wallet
+> ber-reputasi sepakat pada token kecil yang lolos gate keamanan, bukan sekadar
+> satu wallet beli apa saja. Semua degrade aman; sweep tak pernah throw ke loop.
+
+---
+
 ## 🗓️ Log perkembangan
 
 - **2026-07-05** — File dibuat. Fondasi dibaca (smartMoney/discover/proRadar).

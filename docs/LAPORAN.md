@@ -377,7 +377,8 @@ membaca `process.env` — memperbaiki seeding key dari `.env`).
 **File:** `web/server/screener/autopsy.js`, `watchlist.js`, `sniper.js`,
 `web/server/routes/autopsy.js`; UI: `AutopsyPanel.vue`, `WatchlistPanel.vue`,
 `SniperPanel.vue`. **Dokumen desain penuh:** [SNIPER-ENGINE.md](SNIPER-ENGINE.md).
-**Flowchart alur Bedah Coin:** lihat [§7](#7-flowchart-alur--bedah-coin-sniper-modul-a).
+**Flowchart:** Bedah Coin (Modul A) → [§7](#7-flowchart-alur--bedah-coin-sniper-modul-a);
+Sniper Live (Modul C) → [§8](#8-flowchart-alur--sniper-live--live-monitor-modul-c).
 
 Loop 3 modul yang mengubah "siapa yang menangkap winner kemarin" menjadi "siapa
 yang sedang membeli calon winner sekarang":
@@ -728,7 +729,109 @@ flowchart TD
 
 ---
 
-## 8. Prinsip arsitektur yang dipegang
+## 8. Flowchart Alur: 🎯 Sniper Live — Live Monitor (Modul C)
+
+Pasangan hidup dari Bedah Coin (§7). Tiap `SNIPER_POLL_MIN` (default 5 menit) — atau
+saat ditekan manual — sistem menyapu wallet **watchlist aktif** (Modul B), membaca
+buy terbaru tiap wallet via Helius, dan memunculkan **sinyal** ketika ≥`signalMin`
+wallet ber-reputasi meng-akumulasi token kecil yang sama & lolos gate keamanan.
+Sumber: `index.js` (interval) + `routes/autopsy.js` (`/api/sniper/sweep`,
+`/api/sniper/signals`) → `screener/sniper.js` (`runSniperSweep`). Ambang bisa
+diubah live dari Settings (`sniperParams.js`, dibaca tiap sweep).
+
+### Versi Mermaid (render di GitHub)
+
+```mermaid
+flowchart TD
+    T1["⏱️ Interval tiap 5 menit<br/>SNIPER_POLL_MIN (index.js)"] --> A
+    T2["Manual: GET /api/sniper/sweep"] --> A
+    A["runSniperSweep"] --> B{Helius key ada?}
+    B -- tidak --> B1["disabled — dilewati"]
+    B -- ya --> C
+
+    subgraph S0["Persiapan"]
+      C["getParams() live · getActiveWallets()<br/>= top watchlist (Modul B)"] --> D{ada wallet aktif?}
+      D -- ya --> E["solPrice sekali (Birdeye WSOL)<br/>sinceSec = now − lookbackMin"]
+    end
+    D -- tidak --> D1["swept 0 — selesai"]
+
+    E --> F
+    subgraph S1["1 · BACA swap tiap wallet — Helius (pool x5)"]
+      F["recentSwaps dalam window:<br/>BUY=bayar SOL/wSOL/USDC + terima token<br/>SELL=kebalikan · requireSwap · buang dust &lt;minBuyUsd"]
+    end
+    F --> G
+    subgraph S2["2 · GRUP per token"]
+      G["akumulasi buy/sell per wallet<br/>entry=beli paling awal · lastAt=beli terbaru"]
+    end
+    G --> H
+    subgraph S3["3 · SARING confluence"]
+      H["keep wallet net-beli (C7 buy−sell&gt;0)"] --> I{≥ signalMin wallet berbeda?}
+      I -- ya --> J["urut per jumlah wallet → maks maxEnrich"]
+    end
+    I -- tidak --> X["dibuang"]
+    J --> K
+    subgraph S4["4 · ENRICH + GATE keamanan (C4)"]
+      K["tokenSnapshot Birdeye +<br/>safetyCheck: DexScreener+RugCheck+Pump.fun"] --> L{lolos gate?<br/>tak rugged/ban · liq≥min<br/>mcap∈[min,max] · LP ok · bukan honeypot}
+    end
+    L -- tidak --> X
+    L -- ya --> M["skor = reputasi + size-bonus + cobuy-bonus"]
+    M --> N{skor ≥ scoreMin?}
+    N -- tidak --> X
+    N -- ya --> O["raise/refresh SINYAL (dedup per mint)<br/>positions · why · walletCount · PnL"]
+    O --> P["expire sinyal &gt; signalTtlMin · save state"]
+    P --> Q["GET /api/sniper/signals → SniperPanel<br/>auto-refresh 60s · 'Jelaskan sinyal' (AI Fable 5)"]
+```
+
+### Versi ASCII (kalau Mermaid tak render)
+
+```
+   ⏱️ interval 5 menit (index.js)  ─┐
+   manual GET /api/sniper/sweep   ─┴──►  runSniperSweep
+                                             │
+                        Helius key ? ──tidak──►  disabled
+                                             │ ya
+        getParams() live · getActiveWallets() (top watchlist Modul B)
+                        ada wallet aktif ? ──tidak──►  swept 0
+                                             │ ya
+        solPrice (Birdeye WSOL) · sinceSec = now − lookbackMin
+                                             v
+ 1) BACA SWAP tiap wallet ── Helius (pool x5) ───────────────────────────────
+    BUY  = bayar SOL/wSOL/USDC + terima token non-stable
+    SELL = terima SOL/wSOL/USDC + kirim token   (dipakai untuk NET)
+    requireSwap · buang dust < minBuyUsd · nilai USD via solPrice
+                                             v
+ 2) GRUP per token
+    akumulasi buy/sell per wallet · entry = beli paling awal · lastAt = terbaru
+                                             v
+ 3) SARING confluence
+    keep wallet net-beli (C7 buy−sell>0)
+    token dgn ≥ signalMin wallet ? ──tidak──►  dibuang
+                                   │ ya
+    urut per jumlah wallet → ambil maks maxEnrich
+                                             v
+ 4) ENRICH + GATE keamanan (C4)
+    tokenSnapshot Birdeye + safetyCheck (DexScreener + RugCheck + Pump.fun)
+    lolos? tak rugged/ban · liq ≥ min · mcap ∈ [min,max] · LP locked ok ·
+           bukan honeypot   ──tidak──►  dibuang
+                                   │ ya
+    skor = reputasi + size-bonus + cobuy-bonus
+    skor ≥ scoreMin ? ──tidak──►  dibuang ("sedikit tapi tajam")
+                                   │ ya
+                                   v
+    RAISE/REFRESH SINYAL (dedup per mint) · positions · why · PnL
+    expire sinyal > signalTtlMin · save .sniper-state.json
+                                             v
+   GET /api/sniper/signals → SniperPanel (auto-refresh 60s,
+   tombol "Jelaskan sinyal ini" → AI Fable 5)
+```
+
+> **"Sedikit tapi tajam":** sinyal hanya muncul kalau beberapa wallet ber-reputasi
+> sepakat pada token kecil yang lolos gate keamanan — bukan satu wallet beli apa
+> saja. Loop penuh: Bedah Coin (§7) → Watchlist self-learning → Sniper Live (§8).
+
+---
+
+## 9. Prinsip arsitektur yang dipegang
 
 1. **Key = secret server-side.** Solscan/Anthropic/Telegram key cuma ada di Express
    proxy (`settings.js`); browser hanya lihat status boolean.
@@ -741,7 +844,7 @@ flowchart TD
 
 ---
 
-## 9. Peta file penting
+## 10. Peta file penting
 
 ```
 web/
