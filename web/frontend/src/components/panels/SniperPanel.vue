@@ -210,8 +210,14 @@ onBeforeUnmount(() => {
         Makin banyak winner yang kamu Bedah → makin pintar Watchlist → makin tajam sinyalnya.
       </p>
 
-      <!-- Scroll box: tampil 4 sinyal default, sisanya di-scroll di dalam kotak -->
-      <div v-else class="sn-scroll" :class="data.signals.length > 4 ? 'sn-scroll--more' : ''">
+      <!-- Scroll box: tampil 4 sinyal default, sisanya di-scroll di dalam kotak.
+           Saat sebuah penjelasan AI dibuka, kotak otomatis melebar (tambah tinggi)
+           sebesar ruang penjelasan agar 4 token tetap terlihat + teksnya muat. -->
+      <div
+        v-else
+        class="sn-scroll"
+        :class="[data.signals.length > 4 ? 'sn-scroll--more' : '', openExplain ? 'sn-scroll--explaining' : '']"
+      >
         <ul class="sn-list">
         <li v-for="s in data.signals" :key="s.mint" class="sn-row" :class="s.isNew ? 'sn-row--new' : ''">
           <div class="sn-top">
@@ -435,18 +441,24 @@ onBeforeUnmount(() => {
 .sn-scroll {
   --sn-rows: 4;          /* jumlah sinyal terlihat sebelum harus scroll */
   --sn-row-h: 50px;      /* perkiraan tinggi satu baris sinyal */
+  --sn-explain-extra: 0px; /* tambahan tinggi saat penjelasan AI terbuka */
   border: 1px solid var(--border-default); border-radius: var(--control-radius);
   background: var(--bg-raised); padding: var(--space-2);
+  transition: max-height var(--motion-duration-fast, 0.2s) var(--motion-ease, ease);
 }
 .sn-scroll--more {
   max-height: calc(
     var(--sn-rows) * var(--sn-row-h)
     + (var(--sn-rows) - 1) * var(--space-2)
     + 2 * var(--space-2)
+    + var(--sn-explain-extra)
   );
   overflow-y: auto;
   scrollbar-width: thin; scrollbar-gutter: stable;
 }
+/* Penjelasan AI terbuka → kotak melebar sebesar ruang teks, jadi 4 token tetap
+   tampil dan penjelasannya muat tanpa menghimpit daftar. */
+.sn-scroll--explaining { --sn-explain-extra: 190px; }
 .sn-scroll--more::-webkit-scrollbar { width: 8px; }
 .sn-scroll--more::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 999px; }
 .sn-scroll-hint { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); }
@@ -628,6 +640,8 @@ onBeforeUnmount(() => {
   /* Baris bisa membungkus jadi lebih tinggi di layar kecil → naikkan perkiraan
      tinggi baris agar tetap ~4 sinyal yang terlihat. */
   .sn-scroll { --sn-row-h: 76px; }
+  /* Teks penjelasan membungkus lebih panjang di HP → beri ruang lebih besar. */
+  .sn-scroll--explaining { --sn-explain-extra: 260px; }
 
   .chart__panel {
     top: 12px; left: 10px; right: 10px; transform: none;
