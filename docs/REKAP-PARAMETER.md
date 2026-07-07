@@ -54,7 +54,7 @@ prioritas di atas). **Cetak tebal** = sedang di-override oleh `.sniper-params.js
 |---|---|---|---|---|---|---|
 | `safetyGate` | `SNIPER_SAFETY_GATE` | `true` | — | — | `true` | Wajib lolos DexScreener + RugCheck + Pump.fun sebelum sinyal tampil. |
 | `allowUnknownMcap` | `SNIPER_ALLOW_UNKNOWN_MCAP` | `true` | — | — | `true` | Tampilkan token fresh (Birdeye belum kenal) dengan label `unverified`. |
-| `minMcap` | `SNIPER_MIN_MCAP` | `15000` | `0` | `20000` | **`20000`** | Lantai mcap — buang token mikro/mati (USD). |
+| `minMcap` | `SNIPER_MIN_MCAP` | `20000` | `20000` | `20000` | **`20000`** | Lantai mcap — buang token mikro/mati (USD). Batas minimal dinaikkan ke $20rb. |
 | `maxMcap` | `SNIPER_SIGNAL_MAX_MCAP` | `2000000` | `10000000` | `1500000` | **`1500000`** | Batas atas mcap — kebesaran = terlambat (USD). |
 | `minLiquidity` | `SNIPER_MIN_LIQUIDITY` | `8000` | `1000` | `10000` | **`10000`** | Lantai likuiditas DexScreener (USD). |
 | `minLockedPct` | `SNIPER_MIN_LOCKED_PCT` | `0` | — | `30` | **`30`** | Tolak bila RugCheck kembalikan LP-locked di bawah ini (%). |
