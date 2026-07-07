@@ -3,15 +3,16 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 13:55** · Total **78** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 16:35** · Total **80** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 14 commit
+## 2026-07-07 (Selasa) — 16 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
 - feat(ai): kunci semua model ke Fable 5 + perbaiki mode AI lokal  `0ac485d`
+- feat(sniper): Sniper Live v2 — registry parameter + mesin net-buy + dua aliran (awal/v2)  `097396f`
 
 **🐛 Perbaikan**
 - fix(jurnal): push foreground di post-commit agar andal di Windows  `f8dd08c`
@@ -28,6 +29,7 @@
 - docs(sniper): tambah flowchart alur Sniper Live (Modul C)  `a30f01b`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `6210985`
 - docs(sniper): quote node keputusan gate agar Mermaid parse aman  `7ac1dc8`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `7642cb0`
 
 ## 2026-07-06 (Senin) — 1 commit
 
