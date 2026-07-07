@@ -80,10 +80,16 @@ function analyzeViaLocal(candidates, { claudePath, model }) {
     "--output-format", "json",
     "--permission-mode", "bypassPermissions",
   ];
+  // Mode lokal harus independen dari API key (lihat catatan di ai/local.js): buang
+  // ANTHROPIC_API_KEY dari env anak agar CLI pakai login langganan, bukan gagal
+  // "Invalid API key" saat server punya key .env yang kosong/low-balance.
+  const childEnv = { ...process.env };
+  delete childEnv.ANTHROPIC_API_KEY;
+  delete childEnv.ANTHROPIC_AUTH_TOKEN;
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(bin, args, { windowsHide: true });
+      child = spawn(bin, args, { windowsHide: true, env: childEnv });
     } catch {
       return resolve(null);
     }
