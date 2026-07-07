@@ -3,14 +3,15 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 02:27** · Total **70** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 11:14** · Total **72** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 6 commit
+## 2026-07-07 (Selasa) — 8 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
+- feat(ai): kunci semua model ke Fable 5 + perbaiki mode AI lokal  `0ac485d`
 
 **🐛 Perbaikan**
 - fix(jurnal): push foreground di post-commit agar andal di Windows  `f8dd08c`
@@ -20,6 +21,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `6679ced`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `f0b8689`
 - docs: tambah SNIPER-LIVE-DISKUSI.md (bahan diskusi Modul C)  `5f0df49`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `0628f19`
 
 ## 2026-07-06 (Senin) — 1 commit
 
