@@ -73,9 +73,15 @@ function viaLocal(signal, { claudePath, model }) {
     "--output-format", "json",
     "--permission-mode", "bypassPermissions",
   ];
+  // Mode lokal harus independen dari API key: kalau server punya ANTHROPIC_API_KEY
+  // di env (dari .env), CLI yang di-spawn akan menganggapnya "external API key" dan
+  // gagal "Invalid API key". Buang dari env anak → CLI pakai login langganan.
+  const childEnv = { ...process.env };
+  delete childEnv.ANTHROPIC_API_KEY;
+  delete childEnv.ANTHROPIC_AUTH_TOKEN;
   return new Promise((resolve) => {
     let child;
-    try { child = spawn(bin, args, { windowsHide: true }); }
+    try { child = spawn(bin, args, { windowsHide: true, env: childEnv }); }
     catch { return resolve(null); }
     let out = "";
     let settled = false;
@@ -101,10 +107,12 @@ function viaLocal(signal, { claudePath, model }) {
 export async function explainSignal(signal, { aiMode, aiKey, model, claudePath } = {}) {
   try {
     let text;
-    // Prefer the hosted API when a key is present (user set it on purpose);
-    // otherwise use the local CLI when the app is in local mode.
-    if (aiKey) text = await viaApi(signal, { aiKey, model });
-    else if (aiMode === "local") text = await viaLocal(signal, { claudePath, model });
+    // The user's explicit mode choice wins (sama seperti ai/analyze.js): Local mode
+    // → CLI (langganan, tanpa API key); API mode → Anthropic SDK saat key tersedia.
+    // Jangan "utamakan API kalau ada key" — key sisa (mis. saldo habis) tak boleh
+    // membajak mode lokal yang sudah dipilih user.
+    if (aiMode === "local") text = await viaLocal(signal, { claudePath, model });
+    else if (aiKey) text = await viaApi(signal, { aiKey, model });
     else return { error: "AI belum siap — set ANTHROPIC_API_KEY (mode API) atau pakai mode lokal (CLI claude)." };
 
     if (!text) return { error: "AI tidak mengembalikan jawaban. Cek API key / CLI, lalu coba lagi." };
