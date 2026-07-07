@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-07 12:51** · Total **74** commit dalam **9** hari.
+> Terakhir diperbarui: **2026-07-07 13:03** · Total **76** commit dalam **9** hari.
 
 ---
 
-## 2026-07-07 (Selasa) — 10 commit
+## 2026-07-07 (Selasa) — 12 commit
 
 **✨ Fitur baru / penambahan**
 - feat(jurnal): rekap harian otomatis (git hook + Task Scheduler + auto-push)  `ef8284e`
@@ -24,6 +24,8 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `0628f19`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `6a71758`
 - docs(sniper): tambah flowchart alur Bedah Coin (Modul A)  `5835fff`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `9457cf5`
+- docs(sniper): tambah flowchart alur Sniper Live (Modul C)  `a30f01b`
 
 ## 2026-07-06 (Senin) — 1 commit
 
