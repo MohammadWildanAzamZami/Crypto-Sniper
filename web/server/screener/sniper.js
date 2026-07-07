@@ -483,9 +483,13 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
     }
   }
 
-  // 5) Expire stale signals so the list stays fresh/actionable.
-  const cutoff = now - P.signalTtlMin * 60_000;
-  for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
+  // 5) Time-based expiry is now only a FALLBACK for when hold-tracking is OFF. With
+  // trackHolding on, a signal is removed ONLY by exit (holders < signalMin & sold) —
+  // never by age — so a token stays listed as long as smart money keeps holding it.
+  if (!P.trackHolding) {
+    const cutoff = now - P.signalTtlMin * 60_000;
+    for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
+  }
 
   save(store);
   return { variant, swept: active.length, candidates: candidates.length, newSignals, signals: getSignals(variant).signals };
@@ -499,10 +503,17 @@ export function getSignals(variant = "v2") {
   // langsung menyembunyikan sinyal lama yang mcap-nya di bawah ambang (tanpa nunggu
   // TTL). Hanya menyaring yang mcap-nya diketahui (>0); unverified diurus terpisah.
   const floor = P.minMcap > 0 ? P.minMcap : 0;
-  // C10: rank by composite strength first, then recency as a tiebreak.
+  // Rank by how many smart wallets are on the token — current holders if hold-tracking
+  // is on, else the buy count — then composite strength, then recency as tiebreaks.
+  const smCount = (s) => (s.holders != null ? s.holders : (s.walletCount || 0));
   const list = [...store.signals.values()]
     .filter((s) => !(floor > 0 && s.mcap > 0 && s.mcap < floor))
-    .sort((a, b) => (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
+    .sort((a, b) =>
+      smCount(b) - smCount(a) ||
+      (b.walletCount || 0) - (a.walletCount || 0) ||
+      (b.score || 0) - (a.score || 0) ||
+      b.updatedAt - a.updatedAt
+    );
   return {
     variant,
     count: list.length,
