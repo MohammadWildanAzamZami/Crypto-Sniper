@@ -32,7 +32,7 @@ Sistem yang live:
 | Rust MCP server (`solscan-mcp`) | ✅ Builds & runs | 37 Solscan tools over stdio (original server) |
 | Solscan connectivity | ✅ Verified | `chain_info` public; Pro endpoints need a Pro key |
 | Pro endpoints | ⚠️ Plan-gated | Free key → `401 upgrade your api key level` (handled gracefully) |
-| Web UI (`web/frontend`) | ✅ Builds & runs | Vite + Vue 3, token-driven design system |
+| Web UI (`web/frontend`) | ✅ Builds & runs | Vite + Vue 3, token-driven design system. **2026-07-10:** tema **hitam pekat** (semua latar abu-abu → `#000` via `tokens.css`); panel Solana dibungkus **kotak** (`.sol-box`) sejajar kotak Robinhood (`.rh`); **tombol melayang** kini pemindah view **Solana ⇄ Robinhood** (menggantikan tombol "Kalkulator manual" yang dihapus — `ManualScoringPanel` dihapus permanen) |
 | API proxy (`web/server`) | ✅ Runs | Express, keeps all secrets server-side; serves the frontend build on one port |
 | Tests / CI | ❌ None | See roadmap §6 |
 | Docker | ❌ WIP | README says "available soon" |

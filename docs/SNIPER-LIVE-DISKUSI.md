@@ -218,7 +218,27 @@ Yang tak dikenal Birdeye lolos ke UI **hanya** kalau on-chain safety-nya bersih.
     `/api/sniper/awal/signals`+`/awal/sweep`. `getSignals(variant)` bawa `variant` +
     `editable`. UI `SniperPanel.vue`: **tab "v2 · tajam / Awal · ramai"**, `refresh`/`sweep`
     sadar-variant. Verifikasi live: awal ~17–32 sinyal (longgar) vs v2 0 (preset ketat).
-- ⏳ **Berikutnya:** Tahap 4 (alert Telegram/push C13).
+- ✅ **Rug-check diperkuat — C4 gate lebih dalam** (2026-07-09). `safetyCheck` kini
+  bukan cuma cek flag `rugged` + LP-lock, tapi juga: **mint authority belum renounce**
+  (`rugMintRenounced`), **freeze authority aktif** (`rugNoFreeze`), **risiko "danger"
+  RugCheck** (`rugBlockDanger` — LP unlocked, holder terpusat, honeypot, copycat), dan
+  **LP-lock dipaksa** (`minLockedPct` default 0 → 50). **Fail-open**: token yang RugCheck
+  belum bisa cek → tetap tampil, badge **⚠ rug belum tercek**. Data ditarik di
+  `fetchRugcheckLock` (`mintEnabled`/`freezeEnabled`/`dangerRisks`) → `gemScore.js` →
+  `safetyCheck`. Sinyal bawa `riskUnknown`; UI: badge ⚠ vs 🛡️.
+- ✅ **Wallet dipantau TANPA BATAS** (2026-07-08). `getActiveWallets()` default
+  mengembalikan **semua** wallet watchlist (`SNIPER_WATCH_SIZE=0` = no limit), bukan
+  cuma top-40. Set angka > 0 untuk membatasi lagi. `/api/watchlist` kirim `watchAll`.
+- ✅ **Watchlist diurut "total kelipatan winner" (Σ)** (2026-07-08). `getWatchlist()`
+  urut by Σ `xFromEntry` semua catch (terbesar → terkecil), reputasi jadi tiebreak.
+  Field `winnerScore` + pill **Σ** di UI Watchlist.
+- ✅ **Token `unverified` disembunyikan dari tampilan** (2026-07-07). Filter UI
+  (`visibleSignals`), engine tetap menghasilkannya; chip "N unverified disembunyikan".
+- ✅ **AI "Jelaskan sinyal ini" (Claude)** (2026-07-06). Tombol 🧠 per sinyal →
+  `POST /api/sniper/explain` → `ai/explainSignal.js` (dual-mode API/local) → ringkasan
+  Bahasa Indonesia kenapa jadi sinyal + risikonya.
+- ⏳ **Berikutnya:** Tahap 4 (alert Telegram/push C13). Catatan: real-time via **Helius
+  webhook** sudah masuk (ganti polling 5-menit → push).
 
 ## 6. Catatan implementasi (kalau lanjut)
 

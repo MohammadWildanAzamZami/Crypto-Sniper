@@ -5,7 +5,7 @@ dengan teknologi AI Agent + logic Smart Money Tracking), disusun dari riwayat
 git repo. Setiap hari dikelompokkan jadi: **Ditambahkan**, **Diubah**, dan
 **Dirapikan/Perbaikan**.
 
-Periode: **28 Juni 2026 – 7 Juli 2026** · 77 commit (di luar auto-rekap harian).
+Periode: **28 Juni 2026 – 10 Juli 2026** · 98 commit (di luar auto-rekap harian).
 
 ---
 
@@ -167,6 +167,65 @@ Hari terpadat: dari nol sampai fitur utama jalan (24 commit).
 - Flowchart Mermaid: node keputusan gate dikutip agar aman di-parse GitHub.
 - Jurnal harian: push post-commit dibuat foreground agar andal di Windows.
 
+**Sore–malam 7 Juli (lanjutan):**
+- **Sniper UI:** kotak sinyal **melebar otomatis** saat tombol "Jelaskan" ditekan
+  (4 token tetap terlihat); sinyal **unverified disembunyikan** dari daftar.
+- **Batas minimal market cap $20.000** ditegakkan di Sinyal Sniper Live (kedua
+  aliran v2 & Awal) — default kode + `.env` + gate.
+- Docs: seksi + flowchart **Reputasi Watchlist** dan **kategori Smart Money**
+  (REKAP-PARAMETER & SNIPER-ENGINE).
+
+---
+
+## 📅 Hari 10 — Selasa, 8 Juli 2026 (Sniper: lacak hold/exit smart money)
+
+**Ditambahkan**
+- **Pelacakan hold/exit smart money** di Sniper Live: tiap sweep cek saldo on-chain
+  wallet di balik sinyal → **buang sinyal saat holders < ambang & sudah jual**.
+- Sinyal **diurutkan by jumlah smart wallet** yang masih memegang (paling banyak
+  di atas).
+
+**Diubah**
+- Sinyal **bertahan selama smart money masih memegang** (TTL waktu tak lagi
+  membunuh sinyal yang masih aktif dipegang).
+
+---
+
+## 📅 Hari 11 — Rabu, 9 Juli 2026 (auto-remove tuntas + Robinhood Chain lahir)
+
+**Ditambahkan**
+- 🆕 **Ekosistem Robinhood Chain (EVM)** — versi EVM dari pipeline: discover +
+  screen + Bedah Coin (sumber data GeckoTerminal/Blockscout/GoPlus, tanpa key).
+
+**Perbaikan**
+- **Sinyal v2 hilang otomatis** saat smart money tak lagi hold/akumulasi —
+  TTL dijadikan *backstop* yang selalu aktif (tak nyangkut selamanya).
+- **Hold-check pakai filter `{mint}` + fallback RPC publik** (Helius → publicnode →
+  mainnet-beta): saat Helius RPC kena 429 "max usage reached", cek saldo tetap
+  jalan lewat RPC publik.
+
+**Dirapikan**
+- Tab/tombol **Influencer** disembunyikan dari UI Watchlist (kode tetap utuh).
+
+---
+
+## 📅 Hari 12 — Kamis, 10 Juli 2026 (Robinhood Chain penuh + tema + real-time webhook)
+
+**Ditambahkan**
+- **Robinhood Chain (EVM) LENGKAP:** Watchlist EVM (rekam kandidat Bedah → reputasi
+  → ranking), **Sniper Live EVM** (pipeline penuh), auto-seed watchlist + hold-tracking
+  EVM + **background auto-loop**, UI auto-pilot (strip status), **toggle tampilan
+  Solana ⇄ Robinhood Chain** (tombol melayang).
+- **Sniper Solana real-time via Helius Webhook** — ganti polling 5-menit → **push**:
+  begitu wallet watchlist swap, Helius kirim notifikasi → app langsung sweep
+  (debounced). URL publik auto-deteksi (ngrok/`PUBLIC_URL`); polling tetap sebagai
+  fallback. (Aktivasi penuh menunggu kuota Helius; webhook API kini 429.)
+
+**Diubah**
+- **Tema Robinhood** untuk zona Solana: kanvas hitam + aksen hijau `#00C805`
+  (Pro Radar ungu→hijau, Radar biru→hijau) — seragam dengan panel Robinhood Chain.
+- **GEM Score** & **10x Radar** disembunyikan dari tampilan Solana (dikomentari).
+
 ---
 
 ## 🧾 Ringkasan fitur akhir web
@@ -177,7 +236,8 @@ Hari terpadat: dari nol sampai fitur utama jalan (24 commit).
 | **10x Radar** | Auto-screening token Solana potensi tinggi (funnel cepat ~8 dtk) |
 | **Pro Radar (Fable 5)** | 10x Radar + AI: gerbang kualitas, self-tuning, target win-rate |
 | **Smart Money Tracking** | Top traders (Birdeye) + verifikasi wallet (Helius) + meter |
-| **Sniper / Bedah Coin** | Bongkar early buyers, hold/jual, bundle/bot, Watchlist, Live Monitor (v2: net-buy, dua aliran Awal/v2, parameter live dari Settings) |
+| **Sniper / Bedah Coin** | Bongkar early buyers, hold/jual, bundle/bot, Watchlist, Live Monitor (v2: net-buy, dua aliran Awal/v2, parameter live, floor mcap $20rb, lacak hold/exit, **real-time via Helius webhook**) |
+| **Robinhood Chain (EVM)** | Ekosistem EVM: discover + Bedah Coin + Watchlist + Sniper Live EVM + auto-loop (GeckoTerminal/Blockscout/GoPlus). Toggle tampilan Solana ⇄ Robinhood Chain |
 | **Kalkulator manual** | Modal skoring manual (input DexScreener/RugCheck) |
 | **Chat AI** | Asisten gaya WhatsApp, default mode lokal (tanpa biaya) |
 | **Chat widget** | Bubble chat AI embeddable untuk situs lain |
