@@ -49,30 +49,30 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   position: relative;
   max-width: 82%;
   padding: 6px 9px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-md, 8px);
   font-size: 14px;
   line-height: 19px;
-  color: #e9edf1;
+  color: var(--text-body);
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
   word-wrap: break-word;
   overflow-wrap: anywhere;
 }
-.wa-bubble--out { background: #0057b7; border-top-right-radius: 0; color: #ffffff; }
-.wa-bubble--in  { background: #1e293b; border-top-left-radius: 0; }
+.wa-bubble--out { background: var(--bg-accent); border-top-right-radius: 0; color: var(--text-on-accent); }
+.wa-bubble--in  { background: var(--bg-card); border-top-left-radius: 0; }
 
 /* little tails at the top corner */
 .wa-bubble--out::before {
   content: "";
   position: absolute; top: 0; right: -8px;
   width: 0; height: 0;
-  border-left: 8px solid #0057b7;
+  border-left: 8px solid var(--bg-accent);
   border-bottom: 8px solid transparent;
 }
 .wa-bubble--in::before {
   content: "";
   position: absolute; top: 0; left: -8px;
   width: 0; height: 0;
-  border-right: 8px solid #1e293b;
+  border-right: 8px solid var(--bg-card);
   border-bottom: 8px solid transparent;
 }
 
@@ -81,10 +81,12 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   display: block;
   text-align: right;
   font-size: 11px;
-  color: rgba(233, 237, 241, 0.6);
+  color: var(--text-muted);
   margin-top: 2px;
   line-height: 1;
 }
+/* outgoing bubble is bright accent → time needs a dark tone for contrast */
+.wa-bubble--out .wa-bubble__time { color: rgba(0, 0, 0, 0.55); }
 
 /* ---- markdown inside assistant bubbles (light text on dark) ---- */
 .wa-bubble__text :deep(p) { margin: 0 0 6px; }
@@ -106,7 +108,7 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   margin: 4px 0;
 }
 .wa-bubble__text :deep(pre code) { background: none; padding: 0; word-break: normal; }
-.wa-bubble__text :deep(a) { color: #60a5fa; }
+.wa-bubble__text :deep(a) { color: var(--text-link); }
 .wa-bubble__text :deep(strong) { font-weight: 600; }
 
 /* ---- tool / system pill ---- */
@@ -116,13 +118,14 @@ const html = computed(() => (props.role === "assistant" ? renderMarkdown(props.t
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #9fb3c8;
-  background: rgba(30, 41, 59, 0.9);
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 999px;
   padding: 4px 12px;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
-.wa-sys__pill--err { color: #fca5a5; }
+.wa-sys__pill--err { color: var(--text-error); }
 .wa-sys__spin {
   width: 10px; height: 10px;
   border: 2px solid currentColor; border-top-color: transparent;

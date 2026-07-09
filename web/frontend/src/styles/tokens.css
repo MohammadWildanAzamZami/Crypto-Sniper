@@ -30,25 +30,26 @@
   --line-height-base: 24px;
 
   /* ---- Primitive: color ---- */
-  /* Palette mirrors the standalone screening calculator: dark blue-grey
-     surfaces with a mint-green accent, amber warning, soft-red danger. */
-  --color-text-primary: #e7e9ec;
-  --color-text-secondary: #f3f5f8;
-  --color-text-tertiary: #7cf2b0;
-  --color-text-inverse: #9ff7c6;
+  /* Robinhood-inspired: pure-black canvas, signature bright-green accent, crisp
+     white text, red-orange for losses, gold for caution. Minimal, high-contrast —
+     the recognizable Robinhood look. */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ffffff;
+  --color-text-tertiary: #00c805;   /* Robinhood green — links / accents */
+  --color-text-inverse: #12e400;    /* brighter green — hover */
 
-  --color-surface-base: #0b0d10;
-  --color-surface-muted: #0f1217;
-  --color-surface-raised: #191d24;
-  --color-surface-strong: #13161b;
+  --color-surface-base: #000000;    /* pure black canvas */
+  --color-surface-muted: #0a0a0b;
+  --color-surface-raised: #1c1c1e;  /* cards / raised surfaces */
+  --color-surface-strong: #141416;
 
-  --color-border-default: #262b33;
-  --color-border-muted: #20242b;
+  --color-border-default: #2a2a2d;
+  --color-border-muted: #1f1f22;
 
-  /* Status colors derived to satisfy AA contrast on dark surfaces. */
-  --color-status-error: #f27c7c;
-  --color-status-success: #7cf2b0;
-  --color-status-warning: #f2b774;
+  /* Status — Robinhood palette: green up, red-orange down, gold caution. */
+  --color-status-error: #ff5000;    /* Robinhood loss red-orange */
+  --color-status-success: #00c805;  /* Robinhood green */
+  --color-status-warning: #ffb800;  /* gold */
 
   /* ---- Primitive: spacing ---- */
   --space-1: 4px;
@@ -73,8 +74,8 @@
   --text-heading: var(--color-text-secondary);
   --text-link: var(--color-text-tertiary);
   --text-link-hover: var(--color-text-inverse);
-  --text-muted: #8b93a1;
-  --text-on-accent: #07140d;
+  --text-muted: #9b9ba1;
+  --text-on-accent: #000000;
   --text-error: var(--color-status-error);
   --text-success: var(--color-status-success);
   --text-warning: var(--color-status-warning);
@@ -85,7 +86,7 @@
   --bg-card: var(--color-surface-strong);
   --bg-raised: var(--color-surface-raised);
   --bg-accent: var(--color-text-tertiary);
-  --bg-accent-hover: #6ae0a0;
+  --bg-accent-hover: #12e400;
 
   /* Borders */
   --border-default: var(--color-border-default);

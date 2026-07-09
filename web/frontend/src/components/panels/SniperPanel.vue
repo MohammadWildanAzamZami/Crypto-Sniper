@@ -268,10 +268,15 @@ onBeforeUnmount(() => {
                 title="Data pasar belum terverifikasi — token belum bisa dikenali sumber mana pun (kemungkinan baru launch). Ekstra hati-hati, DYOR."
               >⚠ unverified</span>
               <span
-                v-else-if="s.safetyChecked"
+                v-else-if="s.safetyChecked && !s.riskUnknown"
                 class="sn-safe"
-                title="Lolos gate keamanan: bukan rug/honeypot, likuiditas & mcap di atas batas."
+                title="Lolos gate keamanan: bukan rug/honeypot, mint/freeze authority aman, LP terkunci, likuiditas & mcap di atas batas."
               >🛡️</span>
+              <span
+                v-else-if="s.safetyChecked && s.riskUnknown"
+                class="sn-riskunknown"
+                title="RugCheck belum punya data untuk token ini (kemungkinan baru launch) — cek rug belum bisa dijalankan. Lolos gate lain, tapi rug BELUM diverifikasi. Ekstra hati-hati, DYOR."
+              >🛡️? rug belum tercek</span>
               <span
                 v-if="s.holders != null"
                 class="sn-hold"
@@ -518,6 +523,13 @@ onBeforeUnmount(() => {
 .sn-mcap { color: var(--text-muted); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
 .sn-liq { color: var(--text-muted); opacity: 0.8; }
 .sn-safe { flex: none; font-size: var(--font-size-sm); cursor: help; }
+.sn-riskunknown {
+  flex: none; font-size: var(--font-size-xs); font-weight: 700; cursor: help; white-space: nowrap;
+  color: var(--text-warning, var(--text-error));
+  background: color-mix(in srgb, var(--text-warning, var(--text-error)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-warning, var(--text-error)) 40%, transparent);
+  padding: 1px 6px; border-radius: var(--radius-sm);
+}
 .sn-hold {
   flex: none; font-size: var(--font-size-xs); font-weight: 700; cursor: help; white-space: nowrap;
   padding: 1px 6px; border-radius: var(--radius-sm);
@@ -613,7 +625,7 @@ onBeforeUnmount(() => {
 .chart__head-actions { display: flex; align-items: center; gap: var(--space-4); }
 .chart__open { color: var(--text-success); text-decoration: none; font-size: var(--font-size-sm); white-space: nowrap; }
 .chart__open:hover { text-decoration: underline; }
-.chart__open--axiom { color: var(--text-link, #4d9fff); }
+.chart__open--axiom { color: var(--text-link, #86efb8); }
 .chart__close {
   display: grid; place-items: center;
   width: 30px; height: 30px; flex: none; padding: 0;

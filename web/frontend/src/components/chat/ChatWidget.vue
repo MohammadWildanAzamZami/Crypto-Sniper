@@ -138,7 +138,7 @@ function onResizeKey(e) {
       class="cw__window"
       :style="{ width: W + 'px', height: H + 'px' }"
       role="dialog"
-      aria-label="AI analyst chat"
+      aria-label="AI Asisten"
     >
       <!-- Resize grip (top-left corner) -->
       <button
@@ -156,14 +156,11 @@ function onResizeKey(e) {
         </svg>
       </button>
 
-      <!-- WhatsApp-style contact header -->
+      <!-- Simple header -->
       <div class="cw__bar">
-        <div class="cw__contact">
-          <span class="cw__avatar" aria-hidden="true">🤖</span>
-          <span class="cw__contact-text">
-            <span class="cw__contact-name">Analyst</span>
-            <span class="cw__contact-status">online</span>
-          </span>
+        <div class="cw__title">
+          <span class="cw__title-ic" aria-hidden="true">🤖</span>
+          <span class="cw__title-text">AI Asisten</span>
         </div>
         <div class="cw__bar-actions">
           <button class="cw__btn" type="button" title="Pengaturan" aria-label="Pengaturan" @click="openSettings">⚙</button>
@@ -189,7 +186,7 @@ function onResizeKey(e) {
     type="button"
     :class="{ 'cw__fab--open': open }"
     :aria-expanded="open"
-    :aria-label="open ? 'Close chat assistant' : 'Open chat assistant'"
+    :aria-label="open ? 'Tutup AI Asisten' : 'Buka AI Asisten'"
     @click="toggleOpen"
   >
     <svg v-if="!open" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -214,23 +211,16 @@ function onResizeKey(e) {
   cursor: pointer;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: #0057b7; /* blue */
-  box-shadow: 0 6px 20px rgba(0, 87, 183, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
-  animation: cw-pulse 2.4s ease-out infinite;
+  color: var(--text-on-accent);
+  background: var(--bg-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
-.cw__fab:hover { transform: scale(1.08); background: #004494; }
+.cw__fab:hover { transform: scale(1.06); background: var(--bg-accent-hover); }
 .cw__fab:active { transform: scale(0.96); }
-.cw__fab:focus-visible { outline: 3px solid var(--border-focus, #6ea8fe); outline-offset: 3px; }
-.cw__fab--open { background: var(--bg-raised, #2a2a2a); color: var(--text-body, #eee); animation: none; }
+.cw__fab:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 3px; }
+.cw__fab--open { background: var(--bg-raised); color: var(--text-body); }
 .cw__fab-x { font-size: 18px; line-height: 1; }
-
-@keyframes cw-pulse {
-  0% { box-shadow: 0 6px 20px rgba(0, 87, 183, 0.45), 0 0 0 0 rgba(0, 87, 183, 0.5); }
-  70% { box-shadow: 0 6px 20px rgba(0, 87, 183, 0.45), 0 0 0 16px rgba(0, 87, 183, 0); }
-  100% { box-shadow: 0 6px 20px rgba(0, 87, 183, 0.45), 0 0 0 0 rgba(0, 87, 183, 0); }
-}
 
 /* ---- Floating chat window ---- */
 .cw__window {
@@ -262,47 +252,39 @@ function onResizeKey(e) {
   place-items: center;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   cursor: nwse-resize;
   border-top-left-radius: var(--radius-lg, 14px);
 }
-.cw__resize:hover { color: #fff; }
+.cw__resize:hover { color: var(--text-body); }
 .cw__resize:focus-visible { outline: 2px solid var(--border-focus, #6ea8fe); outline-offset: -2px; }
 
 .cw__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 8px 8px 28px;
-  background: #0057b7; /* blue header */
+  padding: 10px 8px 10px 28px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-default);
 }
-.cw__contact { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cw__avatar {
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  display: grid; place-items: center;
-  font-size: 18px; line-height: 1;
-  flex: none;
-}
-.cw__contact-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.cw__contact-name { font-size: 15px; font-weight: 600; color: #fff; }
-.cw__contact-status { font-size: 12px; color: rgba(255, 255, 255, 0.85); }
+.cw__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cw__title-ic { font-size: 16px; line-height: 1; flex: none; }
+.cw__title-text { font-size: 14px; font-weight: 600; color: var(--text-body); }
 
 .cw__bar-actions { display: flex; gap: 2px; flex: none; }
 .cw__btn {
   width: 30px; height: 30px;
   border: none; background: transparent; cursor: pointer;
-  color: #fff; border-radius: 50%;
+  color: var(--text-muted); border-radius: var(--radius-sm, 6px);
   font-size: 14px; line-height: 1;
 }
-.cw__btn:hover { background: rgba(255, 255, 255, 0.18); }
-.cw__btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.cw__btn:hover { background: var(--bg-card); color: var(--text-body); }
+.cw__btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
 
 .cw__body {
   min-height: 0;
   overflow: hidden;
-  background: #0a0f17;
+  background: var(--bg-page);
 }
 
 /* Open/close animation */

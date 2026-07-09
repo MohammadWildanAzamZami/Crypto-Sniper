@@ -162,6 +162,22 @@ export async function fetchRugcheckLock(tokenAddress) {
     else if (lockedPct >= 50) status = "Partially locked";
     else status = "Unlocked";
 
+    // Anti-rug signals from the same report (used by the sniper safety gate):
+    // mint/freeze authority still enabled = dev can mint supply / freeze your tokens;
+    // dangerRisks = RugCheck's own "danger"-level flags (LP unlocked, holder
+    // concentration, honeypot, copycat, …). Derived from the token authorities AND
+    // the named risks so it's robust to either field being the source of truth.
+    const tk = body.token || {};
+    const isSet = (a) => !!a && a !== "11111111111111111111111111111111";
+    const risks = Array.isArray(body.risks) ? body.risks : [];
+    const riskHas = (re) => risks.some((r) => re.test(String(r.name || "")));
+    const mintEnabled = isSet(tk.mintAuthority) || riskHas(/mint authority/i);
+    const freezeEnabled = isSet(tk.freezeAuthority) || riskHas(/freeze authority/i);
+    const dangerRisks = risks
+      .filter((r) => String(r.level || "").toLowerCase() === "danger")
+      .map((r) => r.name)
+      .filter(Boolean);
+
     return {
       lockedPct: Number(lockedPct.toFixed(1)),
       lockedUsd: Math.round(lockedUsd),
@@ -169,6 +185,9 @@ export async function fetchRugcheckLock(tokenAddress) {
       marketCount: markets.length,
       status,
       rugged: Boolean(body.rugged),
+      mintEnabled,
+      freezeEnabled,
+      dangerRisks,
     };
   } catch {
     return null;

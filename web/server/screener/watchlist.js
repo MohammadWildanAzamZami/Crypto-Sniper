@@ -16,7 +16,11 @@ import { fileURLToPath } from "node:url";
 const FILE_PATH = fileURLToPath(new URL("./.watchlist-state.json", import.meta.url));
 
 // D5 tunables (env-overridable so the user can retune without a code change).
-export const WATCH_SIZE = Number(process.env.SNIPER_WATCH_SIZE || 40);      // active watchlist size
+// WATCH_SIZE = berapa wallet teratas (by reputasi) yang dipantau live. 0 = TANPA
+// BATAS → SEMUA wallet di watchlist dipantau (default sekarang). Set angka > 0 untuk
+// membatasi lagi (mis. hemat panggilan Helius kalau watchlist sudah ratusan wallet).
+export const WATCH_SIZE = Number(process.env.SNIPER_WATCH_SIZE || 0);       // 0 = no limit (monitor all)
+const NO_LIMIT = !(WATCH_SIZE > 0);
 export const POLL_MIN = Number(process.env.SNIPER_POLL_MIN || 5);           // monitor interval (Modul C)
 const WINNER_MIN_X = Number(process.env.SNIPER_WINNER_MIN_X || 10);         // "winner" = launch→now ≥ this
 const MAX_WALLETS = 2000;   // hard cap so the file can't grow unbounded
@@ -94,6 +98,10 @@ export function recordCandidates(report, nowMs) {
   return { recorded, winner: true, launchToNowX: x };
 }
 
+// Total "winner power": sum of every catch's entry→now multiple. This is the
+// ranking metric — from biggest total winners down to smallest.
+const winnerSum = (w) => w.catches.reduce((s, c) => s + (c.xFromEntry || 0), 0);
+
 /** Shape a wallet record for the client (compact, no internal churn). */
 function toPublic(w, rank) {
   return {
@@ -101,22 +109,26 @@ function toPublic(w, rank) {
     rank,
     reputation: w.reputation,
     catches: w.catches.length,
+    winnerScore: Math.round(winnerSum(w) * 10) / 10, // Σ kelipatan semua winner (sort key)
     established: w.established,
-    active: rank <= WATCH_SIZE,
+    active: NO_LIMIT || rank <= WATCH_SIZE,
     bestCatch: w.catches.reduce((best, c) => (!best || (c.xFromEntry || 0) > (best.xFromEntry || 0) ? c : best), null),
     recentCatches: w.catches.slice(-3).reverse().map((c) => ({ symbol: c.symbol, mint: c.mint, xFromEntry: c.xFromEntry })),
     lastSeen: w.lastSeen,
   };
 }
 
-/** The ranked watchlist. Top WATCH_SIZE are flagged active (monitored by Modul C). */
+/** The ranked watchlist — ordered by TOTAL winner multiple (biggest → smallest),
+ * reputasi sebagai tiebreak. Top WATCH_SIZE flagged active (monitored by Modul C). */
 export function getWatchlist({ limit = 200 } = {}) {
-  const ranked = [...wallets.values()].sort((a, b) => b.reputation - a.reputation);
+  const ranked = [...wallets.values()].sort((a, b) => winnerSum(b) - winnerSum(a) || b.reputation - a.reputation);
   const list = ranked.slice(0, limit).map((w, i) => toPublic(w, i + 1));
   return {
     total: wallets.size,
-    active: Math.min(WATCH_SIZE, wallets.size),
-    watchSize: WATCH_SIZE,
+    // No limit → semua wallet aktif dipantau; laporkan sebagai "N / N".
+    active: NO_LIMIT ? wallets.size : Math.min(WATCH_SIZE, wallets.size),
+    watchSize: NO_LIMIT ? wallets.size : WATCH_SIZE,
+    watchAll: NO_LIMIT,
     pollMin: POLL_MIN,
     winnerMinX: WINNER_MIN_X,
     wallets: list,
@@ -131,10 +143,9 @@ export function getWalletMeta(owner) {
   return { reputation: w.reputation, catches: w.catches.length, established: w.established };
 }
 
-/** The active set the live monitor should poll (top WATCH_SIZE by reputation). */
+/** The active set the live monitor should poll. Default (WATCH_SIZE=0) = ALL wallets
+ * in the watchlist; a positive WATCH_SIZE caps it to the top N by reputation. */
 export function getActiveWallets() {
-  return [...wallets.values()]
-    .sort((a, b) => b.reputation - a.reputation)
-    .slice(0, WATCH_SIZE)
-    .map((w) => w.owner);
+  const ranked = [...wallets.values()].sort((a, b) => b.reputation - a.reputation);
+  return (NO_LIMIT ? ranked : ranked.slice(0, WATCH_SIZE)).map((w) => w.owner);
 }

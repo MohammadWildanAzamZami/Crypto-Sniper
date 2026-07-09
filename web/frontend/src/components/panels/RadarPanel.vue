@@ -164,17 +164,17 @@ async function runScan() {
   flex: none;
   padding: 0 var(--space-6);
   height: var(--control-height);
-  border: 1px solid #0057b7;
+  border: 1px solid #00a804;
   border-radius: var(--control-radius);
-  background: #0057b7;
-  color: #fff;
+  background: #00c805;
+  color: #04210a;
   font: inherit;
   font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
-.scanbtn:hover { background: #004494; }
+.scanbtn:hover { background: #00a804; }
 .scanbtn:disabled { opacity: 0.6; cursor: not-allowed; }
-.scanbtn:focus-visible { outline: 2px solid #4d9fff; outline-offset: 2px; }
+.scanbtn:focus-visible { outline: 2px solid #86efb8; outline-offset: 2px; }
 
 .head-actions { display: flex; gap: var(--space-3); flex: none; }
 .closebtn {
@@ -207,7 +207,7 @@ async function runScan() {
   padding: var(--space-5);
   background: var(--bg-raised);
   border: 1px solid var(--border-default);
-  border-left: 3px solid #0057b7;
+  border-left: 3px solid #00a804;
   border-radius: var(--radius-sm);
 }
 .card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
@@ -215,7 +215,7 @@ async function runScan() {
 .card__logo { flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
   display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border-default); }
 .card__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.card__logo-fallback { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: #4d9fff; letter-spacing: 0.3px; }
+.card__logo-fallback { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); color: #86efb8; letter-spacing: 0.3px; }
 .card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .card__line1 { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
 .card__sym { font-weight: var(--font-weight-bold); color: var(--text-heading); font-size: var(--font-size-lg); }
@@ -231,7 +231,7 @@ async function runScan() {
 .card__badges { display: flex; gap: var(--space-2); flex: none; }
 .badge { font-size: var(--font-size-xs); padding: 2px var(--space-3); border-radius: 999px; font-weight: var(--font-weight-medium); }
 .badge--x { background: #16a34a; color: #fff; }
-.badge--gem { background: rgba(0, 87, 183, 0.18); color: #4d9fff; border: 1px solid rgba(0, 87, 183, 0.5); }
+.badge--gem { background: rgba(0, 87, 183, 0.18); color: #86efb8; border: 1px solid rgba(0, 87, 183, 0.5); }
 
 .card__stats { display: flex; gap: var(--space-5); flex-wrap: wrap; font-size: var(--font-size-sm); color: var(--text-body); font-variant-numeric: tabular-nums; }
 

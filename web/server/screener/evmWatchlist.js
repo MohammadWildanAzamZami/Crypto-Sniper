@@ -82,7 +82,7 @@ function toPublic(w, rank) {
     rank,
     reputation: w.reputation,
     catches: w.catches.length,
-    active: rank <= WATCH_SIZE,
+    active: true, // semua wallet terdaftar dipantau (tanpa batas)
     bestCatch: best ? { symbol: best.symbol, token: best.token, mcap: best.mcap, buyIdx: best.buyIdx } : null,
     recentCatches: w.catches.slice(-3).reverse().map((c) => ({ symbol: c.symbol, token: c.token, buyIdx: c.buyIdx })),
     lastSeen: w.lastSeen,
@@ -95,8 +95,9 @@ export function getEvmWatchlist({ limit = 200 } = {}) {
   return {
     chain: "Robinhood Chain",
     total: wallets.size,
-    active: Math.min(WATCH_SIZE, wallets.size),
-    watchSize: WATCH_SIZE,
+    active: wallets.size,        // semua dipantau (tanpa batas)
+    watchSize: wallets.size,
+    monitorAll: true,
     winnerMinMcap: WINNER_MIN_MCAP,
     wallets: ranked.slice(0, limit).map((w, i) => toPublic(w, i + 1)),
   };
@@ -109,10 +110,10 @@ export function getEvmWalletMeta(owner) {
   return { reputation: w.reputation, catches: w.catches.length };
 }
 
-/** Set aktif yang (nanti) dipantau Sniper EVM: top WATCH_SIZE by reputasi. */
+/** Set yang dipantau Sniper EVM: SEMUA wallet terdaftar (tanpa batas), terurut reputasi.
+ * (Dulu di-cap WATCH_SIZE; kini semua watchlist dipantau sesuai permintaan.) */
 export function getActiveEvmWallets() {
   return [...wallets.values()]
     .sort((a, b) => b.reputation - a.reputation)
-    .slice(0, WATCH_SIZE)
     .map((w) => w.owner);
 }

@@ -144,6 +144,9 @@ export function computeGemScore(metrics, holders, nowMs, lock) {
           totalLpUsd: lock.totalLpUsd,
           status: lock.status,
           rugged: lock.rugged,
+          mintEnabled: lock.mintEnabled,
+          freezeEnabled: lock.freezeEnabled,
+          dangerRisks: lock.dangerRisks,
           source: "RugCheck",
         }
       : null,

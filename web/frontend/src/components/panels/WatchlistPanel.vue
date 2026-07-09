@@ -353,7 +353,7 @@ onMounted(load);
 .inf-row { gap: var(--space-3); }
 .inf-star { flex: none; }
 .inf-name { flex: 1 1 auto; min-width: 0; color: var(--text-body); font-weight: 600; font-size: var(--font-size-sm); }
-.inf-handle { color: var(--text-link, #4d9fff); text-decoration: none; font-weight: 400; margin-left: var(--space-2); }
+.inf-handle { color: var(--text-link, #86efb8); text-decoration: none; font-weight: 400; margin-left: var(--space-2); }
 .inf-handle:hover { text-decoration: underline; }
 .inf-spacer { flex: 1 1 auto; }
 .inf-del {

@@ -367,7 +367,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 
       <template v-if="watchlist">
         <p class="rh__meta">
-          <b>{{ watchlist.total }}</b> wallet terekam · <b>{{ watchlist.active }}</b>/{{ watchlist.watchSize }} aktif
+          <b>{{ watchlist.total }}</b> wallet terekam · <b>semua dipantau</b> (tanpa batas)
           · winner = mcap ≥ {{ usd(watchlist.winnerMinMcap) }}
         </p>
         <p v-if="!watchlist.wallets.length" class="rh__hint">
@@ -387,8 +387,8 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         </ul>
       </template>
       <p class="rh__note">
-        Reputasi = jumlah winner ditangkap + seberapa awal beli. Top {{ watchlist ? watchlist.watchSize : 40 }} = set aktif untuk
-        <b>Sniper EVM</b> (langkah #5). Heuristik, DYOR.
+        Reputasi = jumlah winner ditangkap + seberapa awal beli. <b>Semua wallet terdaftar dipantau</b>
+        oleh <b>Sniper EVM</b> (tanpa batas). Heuristik, DYOR.
       </p>
     </div>
 

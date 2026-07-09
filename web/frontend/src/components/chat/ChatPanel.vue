@@ -139,7 +139,7 @@ onMounted(loadStatus);
 </script>
 
 <template>
-  <section class="wa" aria-label="AI analyst">
+  <section class="wa" aria-label="AI Asisten">
     <div class="wa__scroll" ref="scroller">
       <p v-if="status.aiMode === 'api' && !status.aiConfigured" class="wa__notice" role="status">
         Belum ada API key AI. Buka
@@ -175,7 +175,7 @@ onMounted(loadStatus);
   grid-template-rows: 1fr auto;
   height: 100%;
   min-height: 0;
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 .wa__scroll {
@@ -192,13 +192,13 @@ onMounted(loadStatus);
   max-width: 90%;
   padding: 7px 12px;
   font-size: 12px;
-  color: #cdd9e5;
+  color: var(--text-muted);
   text-align: center;
-  background: rgba(0, 87, 183, 0.22);
-  border: 1px solid rgba(0, 87, 183, 0.5);
-  border-radius: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 8px);
 }
-.wa__link { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0; font: inherit; }
+.wa__link { background: none; border: none; color: var(--text-link); cursor: pointer; padding: 0; font: inherit; }
 
 .wa__empty {
   margin: auto;
@@ -207,29 +207,29 @@ onMounted(loadStatus);
   gap: 8px;
   max-width: 88%;
   text-align: center;
-  color: #9fb3c8;
+  color: var(--text-muted);
   font-size: 13px;
 }
 .wa__suggest {
   text-align: left;
-  background: #1e293b;
-  border: 1px solid rgba(96, 165, 250, 0.25);
-  border-radius: 8px;
-  color: #e9edf1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 8px);
+  color: var(--text-body);
   padding: 9px 12px;
   font-size: 12px;
   cursor: pointer;
   word-break: break-all;
 }
-.wa__suggest:hover { background: #24344d; border-color: rgba(96, 165, 250, 0.6); }
+.wa__suggest:hover { background: var(--bg-raised); border-color: var(--text-link); }
 
 .wa__err {
   align-self: center;
   margin: 4px 0;
   padding: 6px 12px;
   background: rgba(220, 38, 38, 0.2);
-  color: #fca5a5;
-  border-radius: 8px;
+  color: var(--text-error);
+  border-radius: var(--radius-md, 8px);
   font-size: 12px;
   max-width: 90%;
 }
@@ -239,16 +239,16 @@ onMounted(loadStatus);
   align-self: flex-start;
   display: inline-flex;
   gap: 4px;
-  background: #1e293b;
+  background: var(--bg-card);
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md, 8px);
   border-top-left-radius: 0;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
   margin: 2px 4px;
 }
 .wa__typing span {
   width: 7px; height: 7px;
-  background: #64748b;
+  background: var(--text-muted);
   border-radius: 50%;
   animation: wa-bounce 1.2s infinite ease-in-out;
 }

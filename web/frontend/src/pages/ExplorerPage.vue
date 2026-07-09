@@ -44,11 +44,13 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
       </p>
     </header>
 
-    <!-- ===== Tampilan Solana (ekosistem Solana) ===== -->
-    <template v-if="view === 'sol'">
+    <!-- ===== Tampilan Solana (ekosistem Solana) — dalam satu kotak, seperti Robinhood ===== -->
+    <section v-if="view === 'sol'" class="sol-box" aria-label="Ekosistem Solana">
+      <!-- GEM Score (ScreenerPanel) & 10x Radar (RadarPanel) disembunyikan di zona Solana
+           atas permintaan. Hidupkan lagi dengan menghapus komentar ini.
       <ScreenerPanel />
-
       <RadarPanel />
+      -->
 
       <ProRadarPanel />
 
@@ -61,7 +63,7 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
       <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
       <ChecklistPanel />
       -->
-    </template>
+    </section>
 
     <!-- ===== Tampilan Robinhood Chain (EVM) ===== -->
     <template v-else>
@@ -116,6 +118,20 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
 .panel { display: grid; gap: var(--space-6); }
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
 .panel__error { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
+
+/* Kotak pembungkus ekosistem Solana — sejajar dengan kotak Robinhood (.rh),
+   aksen hijau. Semua panel Solana di dalamnya. */
+.sol-box {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--text-success) 5%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--text-success) 28%, var(--border-default));
+  border-radius: var(--radius-lg, 16px);
+}
+@media (max-width: 560px) {
+  .sol-box { padding: var(--space-5); }
+}
 
 /* Tombol melayang: pemindah tampilan Solana ⇄ Robinhood Chain */
 .view-fab {
