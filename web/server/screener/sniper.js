@@ -468,12 +468,14 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
       s.holders = holders;
       s.soldOff = sold;
       s.holdersUnknown = unknown;
-      // Remove once the smart money still HOLDING drops below the confluence
-      // threshold AND some have already sold — i.e. fewer than signalMin (2) wallets
-      // still hold and there's been an exit. Requires every position resolved (no
-      // unknown) so a transient RPC blip can't wipe a signal. Covers full-exit too
-      // (holders 0 < signalMin).
-      if (unknown === 0 && sold > 0 && holders < P.signalMin && (s.positions?.length || 0) > 0) {
+      // Remove once smart-money confluence is broken by exits — blip-safe even when
+      // some balances failed to fetch. `sold` counts only CONFIRMED sells (fetch OK,
+      // mint absent); `holders + unknown` assumes every unresolved wallet still holds
+      // (best case), so an RPC blip can never push the count below the threshold and
+      // wrongly wipe a signal. Drop when ≥1 wallet confirmably exited AND even in that
+      // best case fewer than signalMin (2) wallets still hold → confluence gone. Also
+      // covers full exit (holders 0). Works on a flaky network without waiting for TTL.
+      if (sold > 0 && (holders + unknown) < P.signalMin && (s.positions?.length || 0) > 0) {
         signals.delete(mint);
         continue;
       }
@@ -483,13 +485,16 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
     }
   }
 
-  // 5) Time-based expiry is now only a FALLBACK for when hold-tracking is OFF. With
-  // trackHolding on, a signal is removed ONLY by exit (holders < signalMin & sold) —
-  // never by age — so a token stays listed as long as smart money keeps holding it.
-  if (!P.trackHolding) {
-    const cutoff = now - P.signalTtlMin * 60_000;
-    for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
-  }
+  // 5) Time-based expiry — ALWAYS on, as an efficiency backstop so the list never
+  // keeps dead tokens. `updatedAt` is bumped only when smart money is still
+  // confirmably HOLDING (4.5, holders>0) or re-accumulated this sweep, so an
+  // actively-held/accumulated token keeps refreshing and never expires — while a
+  // token whose smart money has exited (or can't be confirmed because RPC blips
+  // left wallets 'unknown', which the immediate-exit prune above can't act on)
+  // stops being refreshed and ages out. This is what removes signals once nobody
+  // is accumulating or holding them anymore, even on a flaky network.
+  const cutoff = now - P.signalTtlMin * 60_000;
+  for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
 
   save(store);
   return { variant, swept: active.length, candidates: candidates.length, newSignals, signals: getSignals(variant).signals };
