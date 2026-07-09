@@ -13,7 +13,7 @@ const BS = "https://robinhoodchain.blockscout.com";
 const NET = "robinhood";
 
 async function jget(url) {
-  try { const r = await fetch(url, { headers: { accept: "application/json" } }); return r && r.ok ? await r.json() : null; }
+  try { const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }); return r && r.ok ? await r.json() : null; }
   catch { return null; }
 }
 

@@ -13,7 +13,7 @@ const NET = "robinhood";
 
 async function jget(url) {
   try {
-    const r = await fetch(url, { headers: { accept: "application/json" } });
+    const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
     if (!r || !r.ok) return null;
     return await r.json();
   } catch { return null; }

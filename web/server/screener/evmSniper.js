@@ -29,6 +29,7 @@ const MAX_MCAP = Number(process.env.RH_SNIPER_MAX_MCAP || 5_000_000);
 const MAX_ENRICH = Number(process.env.RH_SNIPER_MAX_ENRICH || 20);
 const TTL_MIN = Number(process.env.RH_SNIPER_TTL_MIN || 720);
 const SAFETY_GATE = process.env.RH_SNIPER_SAFETY_GATE !== "false";
+const TRACK_HOLDING = process.env.RH_SNIPER_TRACK_HOLDING !== "false"; // default on
 const POOL = 5;
 
 /** @type {Map<string, object>} token → signal */
@@ -43,7 +44,7 @@ function save() {
 }
 
 async function jget(url) {
-  try { const r = await fetch(url, { headers: { accept: "application/json" } }); return r && r.ok ? await r.json() : null; }
+  try { const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }); return r && r.ok ? await r.json() : null; }
   catch { return null; }
 }
 async function mapPool(items, limit, fn) {
@@ -85,6 +86,14 @@ async function recentBuys(wallet, sinceSec) {
     }
   }
   return buys;
+}
+
+// Saldo token wallet SEKARANG (Etherscan-compat). null bila gagal → "unknown", tak
+// pernah memicu penghapusan (fail-safe, seperti hold-tracking Solana).
+async function tokenBalance(token, wallet) {
+  const j = await jget(`${BS}/api?module=account&action=tokenbalance&contractaddress=${token}&address=${wallet}`);
+  if (!j || j.status !== "1" || j.result == null) return null;
+  return Number(j.result); // raw; kita hanya butuh >0
 }
 
 /**
@@ -156,9 +165,34 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
     if (!existing) newSignals++;
   });
 
-  // 5) Kedaluwarsa sinyal lama (TTL) agar daftar tetap segar.
-  const cutoff = now - TTL_MIN * 60_000;
-  for (const [token, s] of signals) if (s.updatedAt < cutoff) signals.delete(token);
+  // 4.5) Hold / exit reconciliation (parity Solana). Cek apakah wallet di balik tiap
+  // sinyal masih memegang token on-chain. Buang sinyal saat wallet yang masih pegang
+  // < SIGNAL_MIN dan sudah ada yang jual; pertahankan (refresh) selama ≥ SIGNAL_MIN
+  // masih pegang. unknown (gagal fetch) tak pernah memicu penghapusan.
+  if (TRACK_HOLDING && signals.size > 0) {
+    for (const [token, s] of signals) {
+      const owners = s.wallets || [];
+      if (!owners.length) continue;
+      const bals = await mapPool(owners, POOL, (o) => tokenBalance(token, o));
+      let holders = 0, sold = 0, unknown = 0;
+      owners.forEach((o, i) => {
+        const b = bals[i];
+        if (b == null) unknown++;
+        else if (b > 0) holders++;
+        else sold++;
+      });
+      s.holders = holders;
+      s.soldOff = sold;
+      if (unknown === 0 && sold > 0 && holders < SIGNAL_MIN) { signals.delete(token); continue; }
+      if (s.updatedAt < now && holders > 0) s.updatedAt = now; // masih dipegang → jaga tetap tampil
+    }
+  }
+
+  // 5) Kedaluwarsa berbasis waktu — FALLBACK saja saat hold-tracking OFF.
+  if (!TRACK_HOLDING) {
+    const cutoff = now - TTL_MIN * 60_000;
+    for (const [token, s] of signals) if (s.updatedAt < cutoff) signals.delete(token);
+  }
 
   save();
   return { chain: "Robinhood Chain", swept: active.length, candidates: candidates.length, newSignals, signals: getEvmSignals().signals };
@@ -166,7 +200,10 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
 
 /** Sinyal live EVM (terkuat dulu), plus konfigurasi untuk UI. */
 export function getEvmSignals() {
-  const list = [...signals.values()].sort((a, b) => (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
+  // Urut: jumlah smart wallet (holders bila di-track, else walletCount) → skor → terbaru.
+  const smCount = (s) => (s.holders != null ? s.holders : (s.walletCount || 0));
+  const list = [...signals.values()].sort((a, b) =>
+    smCount(b) - smCount(a) || (b.walletCount || 0) - (a.walletCount || 0) || (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
   return {
     chain: "Robinhood Chain",
     count: list.length,
@@ -174,6 +211,7 @@ export function getEvmSignals() {
     maxMcap: MAX_MCAP,
     lookbackMin: LOOKBACK_MIN,
     safetyGate: SAFETY_GATE,
+    trackHolding: TRACK_HOLDING,
     signals: list,
   };
 }

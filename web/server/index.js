@@ -12,6 +12,7 @@ import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
 import autopsyRoutes, { sniperSweepOnce } from "./routes/autopsy.js";
+import { startEvmAuto } from "./screener/evmAuto.js";
 import influencerRoutes from "./routes/influencers.js";
 import robinhoodRoutes from "./routes/robinhood.js";
 import proxyRoutes from "./routes/proxy.js";
@@ -73,6 +74,13 @@ const sniperMins = Number(process.env.SNIPER_POLL_MIN || 5);
 if (sniperMins > 0) {
   setInterval(() => sniperSweepOnce().catch(() => {}), sniperMins * 60_000);
   console.log(`[sniper] live monitor tiap ${sniperMins} menit`);
+}
+
+// Robinhood Chain (EVM) auto-loop: auto-seed watchlist dari winner trending → sniper sweep.
+// 0 (RH_TICK_MIN=0) menonaktifkan. Butuh GeckoTerminal + Blockscout (publik, tanpa key).
+if (Number(process.env.RH_TICK_MIN ?? 10) > 0) {
+  const info = startEvmAuto();
+  console.log(`[robinhood] auto-seed + sniper sweep tiap ${info?.tickMin} menit`);
 }
 app.listen(PORT, () => {
   console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);
