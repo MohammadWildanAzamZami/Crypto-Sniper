@@ -1,12 +1,10 @@
 <script setup>
 /**
- * RobinhoodPanel — zona TERPISAH untuk ekosistem Robinhood Chain (EVM L2, mainnet
- * 1 Juli 2026). Menandai batas antara fitur Solana (di atas) dan porting ke
- * Robinhood Chain (EVM permissionless, sedang "meme meta").
- *
- * LANGKAH #1 sudah LIVE: discover pool memecoin trending/fresh via GeckoTerminal
- * (network "robinhood") lewat /api/robinhood/discover. Sisa roadmap (screen/sniper)
- * masih rencana. Tidak ada data palsu — discover memakai data on-chain nyata.
+ * RobinhoodPanel — ekosistem Robinhood Chain (EVM L2, mainnet 1 Juli 2026, permissionless,
+ * "meme meta"). Pipeline lengkap dengan data on-chain NYATA (tanpa data palsu):
+ * Discover (GeckoTerminal) → Screen/GEM (GeckoTerminal + Blockscout) → Bedah Coin
+ * (transfer asc Blockscout) → Watchlist (reputasi) → Sniper Live (konfluensi beli),
+ * plus auto-pilot yang menumbuhkan watchlist otomatis tiap interval.
  */
 import { ref, onMounted } from "vue";
 import { apiUrl } from "../../lib/api.js";
@@ -184,20 +182,6 @@ async function runTick() {
 
 onMounted(() => { loadWatchlist(); loadSniper(); loadAuto(); });
 
-// Rencana tool yang akan di-port ke Robinhood Chain (EVM), dari termudah → tersulit.
-const roadmap = [
-  { icon: "🚀", name: "10x Radar EVM", status: "prototipe",
-    desc: "Discover pool trending/fresh via GeckoTerminal — SUDAH LIVE di bawah. Berikutnya: skor momentum & filter." },
-  { icon: "💎", name: "GEM Score EVM", status: "prototipe",
-    desc: "Skor 0–100 + gate keamanan heuristik (likuiditas, holder, konsentrasi, honeypot) — LIVE via tombol 🔬 di tiap pool. GoPlus/Honeypot.is belum dukung chain ini." },
-  { icon: "🩻", name: "Bedah Coin EVM", status: "prototipe",
-    desc: "Lacak early buyer winner via transfer on-chain (Blockscout asc) + konfirmasi saldo — LIVE di bawah. Menyemai watchlist EVM." },
-  { icon: "👛", name: "Watchlist EVM", status: "prototipe",
-    desc: "Rekam kandidat Bedah → reputasi → ranking wallet. LIVE di bawah. Fondasi Sniper EVM." },
-  { icon: "🎯", name: "Sniper Smart Money EVM", status: "prototipe",
-    desc: "Pantau wallet aktif Watchlist borong token fresh (transfer Blockscout) + gate screen EVM — LIVE di bawah. Butuh watchlist wallet yang aktif trading." },
-];
-
 // Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
 const infra = [
   { k: "Chain", v: "EVM L2 (Arbitrum stack), gas ETH" },
@@ -221,12 +205,12 @@ const docsUrl = "https://docs.robinhood.com/chain/";
           <span class="rh__dot" aria-hidden="true"></span>
           Robinhood Chain
           <span class="rh__tag">EVM · L2</span>
-          <span class="rh__badge">Dalam pembangunan</span>
+          <span class="rh__badge">Live</span>
         </h2>
         <p class="rh__sub">
-          Zona terpisah untuk membangun ekosistem <b>Robinhood Chain</b> (EVM permissionless,
-          mainnet 1 Juli 2026 — sedang "meme meta"). Engine di atas masih <b>100% Solana</b>;
-          bagian ini adalah <b>peta rencana port</b> ke EVM. Belum ada data live.
+          Ekosistem <b>Robinhood Chain</b> (EVM permissionless, mainnet 1 Juli 2026 — "meme meta").
+          Pipeline lengkap dengan data on-chain nyata: <b>Discover → Screen → Bedah → Watchlist → Sniper</b>,
+          plus <b>auto-pilot</b> yang menumbuhkan watchlist otomatis.
         </p>
       </div>
     </div>
@@ -458,22 +442,6 @@ const docsUrl = "https://docs.robinhood.com/chain/";
       </p>
     </div>
 
-    <!-- Roadmap tool yang akan di-port -->
-    <ul class="rh__list">
-      <li v-for="r in roadmap" :key="r.name" class="rh__item">
-        <span class="rh__icon" aria-hidden="true">{{ r.icon }}</span>
-        <div class="rh__body">
-          <div class="rh__line1">
-            <span class="rh__name">{{ r.name }}</span>
-            <span class="rh__st" :class="'rh__st--' + r.status">
-              {{ r.status === "riset" ? "🔎 riset" : "🚧 rencana" }}
-            </span>
-          </div>
-          <p class="rh__desc">{{ r.desc }}</p>
-        </div>
-      </li>
-    </ul>
-
     <!-- Rujukan infrastruktur EVM -->
     <div class="rh__infra">
       <div v-for="i in infra" :key="i.k" class="rh__chip">
@@ -618,21 +586,6 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 }
 .rh__cand-catch { color: var(--text-muted); display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .rh__wl-active { font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
-
-.rh__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-.rh__item {
-  display: flex; gap: var(--space-3); align-items: flex-start;
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-raised); border: 1px solid var(--border-default); border-radius: var(--control-radius);
-}
-.rh__icon { flex: none; font-size: 20px; line-height: 1.3; }
-.rh__body { display: grid; gap: 2px; min-width: 0; }
-.rh__line1 { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.rh__name { font-weight: 700; color: var(--text-heading); }
-.rh__st { font-size: var(--font-size-xs); font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm); white-space: nowrap; }
-.rh__st--rencana { color: var(--text-muted); background: var(--bg-card); border: 1px solid var(--border-default); }
-.rh__st--riset { color: #d97706; background: color-mix(in srgb, #d97706 14%, transparent); border: 1px solid color-mix(in srgb, #d97706 40%, transparent); }
-.rh__desc { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.5; }
 
 .rh__infra { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .rh__chip {
