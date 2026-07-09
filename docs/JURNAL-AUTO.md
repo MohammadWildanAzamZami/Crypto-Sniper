@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-10 01:19** · Total **127** commit dalam **12** hari.
+> Terakhir diperbarui: **2026-07-10 01:45** · Total **129** commit dalam **12** hari.
 
 ---
 
-## 2026-07-10 (Jumat) — 9 commit
+## 2026-07-10 (Jumat) — 11 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking  `cc17367`
@@ -21,6 +21,10 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `428e648`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `3aefda5`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `15dc9e5`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `8234d25`
+
+**♻️ Refactor / rapikan**
+- refactor(robinhood): hapus daftar roadmap "rencana" — semua tool sudah live  `4d31345`
 
 ## 2026-07-09 (Kamis) — 9 commit
 
