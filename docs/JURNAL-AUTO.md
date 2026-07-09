@@ -3,14 +3,18 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-10 00:18** · Total **119** commit dalam **12** hari.
+> Terakhir diperbarui: **2026-07-10 00:31** · Total **121** commit dalam **12** hari.
 
 ---
 
-## 2026-07-10 (Jumat) — 1 commit
+## 2026-07-10 (Jumat) — 3 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking  `cc17367`
+- feat(robinhood): Sniper Live EVM (langkah #5) — pipeline EVM lengkap  `009e206`
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `5ce3f87`
 
 ## 2026-07-09 (Kamis) — 9 commit
 
