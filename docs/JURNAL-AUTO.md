@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-08 20:00** · Total **108** commit dalam **10** hari.
+> Terakhir diperbarui: **2026-07-09 20:00** · Total **109** commit dalam **10** hari.
 
 ---
 
-## 2026-07-08 (Rabu) — 4 commit
+## 2026-07-08 (Rabu) — 5 commit
 
 **✨ Fitur baru / penambahan**
 - feat(sniper): lacak hold/exit smart money — buang sinyal saat holders < signalMin & sudah jual  `f44f933`
@@ -16,6 +16,7 @@
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `bcef67c`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `595d6bb`
+- docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `1dc7a5c`
 
 ## 2026-07-07 (Selasa) — 40 commit
 
