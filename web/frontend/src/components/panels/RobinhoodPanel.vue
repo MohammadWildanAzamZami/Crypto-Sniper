@@ -8,7 +8,7 @@
  * (network "robinhood") lewat /api/robinhood/discover. Sisa roadmap (screen/sniper)
  * masih rencana. Tidak ada data palsu — discover memakai data on-chain nyata.
  */
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { apiUrl } from "../../lib/api.js";
 
 const scan = ref(null);           // { chain, count, pools, minLiquidity, scannedAt }
@@ -96,6 +96,47 @@ async function copyAddr(a) {
   try { await navigator.clipboard.writeText(a); } catch { /* blocked */ }
 }
 
+// Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking.
+const watchlist = ref(null);
+const wlLoading = ref(false);
+const recording = ref(false);
+const recordMsg = ref("");
+async function loadWatchlist() {
+  if (wlLoading.value) return;
+  wlLoading.value = true;
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/watchlist"));
+    if (r.ok) watchlist.value = await r.json();
+  } catch { /* diamkan — panel tetap tampil */ }
+  finally { wlLoading.value = false; }
+}
+async function recordToWatchlist() {
+  const t = bedah.value?.token;
+  if (!t || recording.value) return;
+  recording.value = true;
+  recordMsg.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/watchlist/record"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: t }),
+    });
+    const body = await r.json();
+    if (!r.ok) recordMsg.value = body?.error || `Gagal (${r.status})`;
+    else {
+      recordMsg.value = body.winner
+        ? `✅ ${body.recorded} wallet direkam (winner, mcap ${usd(body.mcapUsd)})`
+        : `⏸️ Tidak direkam — mcap ${usd(body.mcapUsd)} di bawah ambang winner`;
+      if (body.watchlist) watchlist.value = body.watchlist;
+    }
+  } catch {
+    recordMsg.value = "Gangguan jaringan.";
+  } finally {
+    recording.value = false;
+  }
+}
+onMounted(loadWatchlist);
+
 // Rencana tool yang akan di-port ke Robinhood Chain (EVM), dari termudah → tersulit.
 const roadmap = [
   { icon: "🚀", name: "10x Radar EVM", status: "prototipe",
@@ -104,8 +145,10 @@ const roadmap = [
     desc: "Skor 0–100 + gate keamanan heuristik (likuiditas, holder, konsentrasi, honeypot) — LIVE via tombol 🔬 di tiap pool. GoPlus/Honeypot.is belum dukung chain ini." },
   { icon: "🩻", name: "Bedah Coin EVM", status: "prototipe",
     desc: "Lacak early buyer winner via transfer on-chain (Blockscout asc) + konfirmasi saldo — LIVE di bawah. Menyemai watchlist EVM." },
+  { icon: "👛", name: "Watchlist EVM", status: "prototipe",
+    desc: "Rekam kandidat Bedah → reputasi → ranking wallet. LIVE di bawah. Fondasi Sniper EVM." },
   { icon: "🎯", name: "Sniper Smart Money EVM", status: "riset",
-    desc: "Pantau wallet 0x borong token fresh. Tantangan: sumber data 'top trader per-wallet' untuk chain sebaru ini masih perlu dicari." },
+    desc: "Pantau wallet aktif Watchlist borong token fresh (transfer Blockscout) + gate screen EVM. Berikutnya (langkah #5)." },
 ];
 
 // Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
@@ -258,8 +301,48 @@ const docsUrl = "https://docs.robinhood.com/chain/";
             </span>
           </li>
         </ul>
-        <p class="rh__note">{{ bedah.note }} Berikutnya (langkah #4): rekam kandidat ini ke <b>Watchlist EVM</b> → pantau untuk <b>Sniper EVM</b>.</p>
+        <div v-if="bedah.smartCandidates.length" class="rh__bedah-actions">
+          <button class="rh__btn" :disabled="recording" @click="recordToWatchlist">
+            {{ recording ? "Merekam…" : "➕ Rekam ke Watchlist EVM" }}
+          </button>
+          <span v-if="recordMsg" class="rh__rec-msg">{{ recordMsg }}</span>
+        </div>
+        <p class="rh__note">{{ bedah.note }}</p>
       </template>
+    </div>
+
+    <!-- ===== Watchlist EVM: wallet 0x yang menangkap winner (langkah #4) ===== -->
+    <div class="rh__disc">
+      <div class="rh__disc-head">
+        <span class="rh__disc-title">👛 Watchlist EVM <span class="rh__proto">prototipe live</span></span>
+        <button class="rh__pool-btn" type="button" :disabled="wlLoading" @click="loadWatchlist">↻ Segarkan</button>
+      </div>
+
+      <template v-if="watchlist">
+        <p class="rh__meta">
+          <b>{{ watchlist.total }}</b> wallet terekam · <b>{{ watchlist.active }}</b>/{{ watchlist.watchSize }} aktif
+          · winner = mcap ≥ {{ usd(watchlist.winnerMinMcap) }}
+        </p>
+        <p v-if="!watchlist.wallets.length" class="rh__hint">
+          Belum ada wallet. <b>Bedah</b> token winner di atas lalu <b>Rekam ke Watchlist</b> — smart wallet-nya masuk ke sini.
+        </p>
+        <ul v-else class="rh__cands">
+          <li class="rh__cand rh__cand--wl rh__cand--head"><span>#</span><span>wallet</span><span>rep</span><span>winner</span></li>
+          <li v-for="w in watchlist.wallets" :key="w.owner" class="rh__cand rh__cand--wl" :class="w.active ? 'rh__cand--active' : ''">
+            <span class="rh__cand-idx">{{ w.rank }}</span>
+            <button class="rh__cand-addr" type="button" :title="'Salin: ' + w.owner" @click="copyAddr(w.owner)">{{ shortAddr(w.owner) }}</button>
+            <span class="rh__cand-rep">{{ w.reputation }}</span>
+            <span class="rh__cand-catch">
+              🎯 {{ w.catches }}<span v-if="w.bestCatch" class="rh__cand-mut"> · {{ w.bestCatch.symbol }}</span>
+              <span v-if="w.active" class="rh__wl-active">dipantau</span>
+            </span>
+          </li>
+        </ul>
+      </template>
+      <p class="rh__note">
+        Reputasi = jumlah winner ditangkap + seberapa awal beli. Top {{ watchlist ? watchlist.watchSize : 40 }} = set aktif untuk
+        <b>Sniper EVM</b> (langkah #5). Heuristik, DYOR.
+      </p>
     </div>
 
     <!-- Roadmap tool yang akan di-port -->
@@ -397,6 +480,17 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 .rh__cand-amt { color: var(--text-body); }
 .rh__cand-hold { text-align: right; }
 .rh__cand-mut { color: var(--text-muted); }
+.rh__bedah-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.rh__rec-msg { color: var(--text-muted); font-size: var(--font-size-xs); }
+/* Watchlist rows: grid 4 kolom (#, wallet, rep, winner) */
+.rh__cand--wl { grid-template-columns: 34px auto 44px 1fr; }
+.rh__cand--active { border-color: color-mix(in srgb, #00c805 45%, var(--border-default)); }
+.rh__cand-rep {
+  text-align: center; font-weight: 700; color: #00a804;
+  background: color-mix(in srgb, #00c805 12%, transparent); border-radius: var(--radius-sm); padding: 1px 4px;
+}
+.rh__cand-catch { color: var(--text-muted); display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.rh__wl-active { font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
 
 .rh__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .rh__item {

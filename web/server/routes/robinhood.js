@@ -10,6 +10,7 @@ import { Router } from "express";
 import { scanLimit } from "../middleware/limits.js";
 import { screenEvmToken } from "../screener/evmScreen.js";
 import { bedahEvmToken } from "../screener/evmAutopsy.js";
+import { recordEvmCandidates, getEvmWatchlist } from "../screener/evmWatchlist.js";
 
 const router = Router();
 const EVM_ADDR = /^0x[0-9a-fA-F]{40}$/;
@@ -107,6 +108,30 @@ router.get("/robinhood/bedah", scanLimit, async (req, res) => {
     });
     if (out?.error) return res.status(404).json(out);
     res.json(out);
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// GET /api/robinhood/watchlist — watchlist smart-wallet EVM (terurut reputasi).
+router.get("/robinhood/watchlist", (_req, res) => {
+  try {
+    res.json(getEvmWatchlist());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// POST /api/robinhood/watchlist/record { token } — Bedah token (server-side, otoritatif)
+// lalu rekam kandidat smart wallet ke watchlist EVM. Mengembalikan hasil + watchlist baru.
+router.post("/robinhood/watchlist/record", scanLimit, async (req, res) => {
+  const token = String(req.body?.token || "").trim();
+  if (!EVM_ADDR.test(token)) return res.status(400).json({ error: "Parameter 'token' (alamat 0x…) tidak valid." });
+  try {
+    const bedah = await bedahEvmToken(token);
+    if (bedah?.error) return res.status(404).json(bedah);
+    const rec = recordEvmCandidates(bedah, Date.now());
+    res.json({ ...rec, token, name: bedah.name, mcapUsd: bedah.mcapUsd, watchlist: getEvmWatchlist() });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
