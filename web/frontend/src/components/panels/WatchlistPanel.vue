@@ -12,6 +12,9 @@ import { apiUrl } from "../../lib/api.js";
 // Tab: "smart" = self-learning smart-wallet ranking (Modul B); "influencer" =
 // manually tracked influencer wallets (Modul B2).
 const mode = ref("smart");
+// Sembunyikan tombol/tab Influencer (Modul B2) dari UI — sementara. Kode, state,
+// dan endpoint tetap utuh; set true untuk memunculkannya lagi.
+const SHOW_INFLUENCER = false;
 
 const data = ref(null);
 const loading = ref(false);
@@ -117,7 +120,7 @@ onMounted(load);
         <h2 id="watchlist-h">🎯 Watchlist Wallet <span class="tag">Sniper</span></h2>
         <p v-if="mode === 'smart'" class="panel__sub">
           Wallet yang <b>berulang kali menangkap winner lebih awal</b> — direkam otomatis dari Bedah Coin,
-          diperingkat sesuai rekam jejak. Yang teratas = <b>aktif dipantau</b> (untuk monitor live berikutnya).
+          diurutkan dari <b>total kelipatan winner terbesar</b> (Σ) ke terkecil. Semua wallet <b>aktif dipantau</b> monitor live.
         </p>
         <p v-else class="panel__sub">
           Wallet <b>influencer yang kamu masukkan sendiri</b> — dipantau monitor live. <b>Satu</b> influencer beli
@@ -133,13 +136,16 @@ onMounted(load);
       </button>
     </div>
 
-    <!-- Tab switch: smart-wallet ranking (Modul B) vs manual influencers (Modul B2). -->
-    <div class="wl-tabs" role="tablist" aria-label="Mode watchlist">
+    <!-- Tab switch: smart-wallet ranking (Modul B) vs manual influencers (Modul B2).
+         Seluruh bar disembunyikan saat SHOW_INFLUENCER=false — tanpa tab Influencer,
+         hanya "Smart Wallet" yang tersisa jadi tak perlu switcher. -->
+    <div v-if="SHOW_INFLUENCER" class="wl-tabs" role="tablist" aria-label="Mode watchlist">
       <button
         class="wl-tab" :class="mode === 'smart' ? 'wl-tab--on' : ''"
         role="tab" :aria-selected="mode === 'smart'" @click="switchMode('smart')"
       >Smart Wallet</button>
       <button
+        v-if="SHOW_INFLUENCER"
         class="wl-tab" :class="mode === 'influencer' ? 'wl-tab--on' : ''"
         role="tab" :aria-selected="mode === 'influencer'" @click="switchMode('influencer')"
       >⭐ Influencer</button>
@@ -176,6 +182,11 @@ onMounted(load);
             <span class="wl-rep__bar"><span class="wl-rep__fill" :style="{ width: w.reputation + '%' }"></span></span>
             <span class="wl-rep__n">{{ w.reputation }}</span>
           </span>
+          <span
+            v-if="w.winnerScore"
+            class="wl-total"
+            :title="'Total kelipatan semua winner (dari entry) — dasar urutan'"
+          >Σ {{ xFmt(w.winnerScore) }}</span>
           <span class="wl-catches">
             🎯 {{ w.catches }} winner
             <span v-if="w.bestCatch" class="wl-best">· best {{ w.bestCatch.symbol }} {{ xFmt(w.bestCatch.xFromEntry) }}</span>
@@ -411,6 +422,13 @@ onMounted(load);
 .wl-rep__fill { display: block; height: 100%; background: var(--text-success); }
 .wl-rep__n { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-body); min-width: 22px; }
 
+.wl-total {
+  flex: none; font-weight: 700; font-size: var(--font-size-xs); white-space: nowrap; cursor: help;
+  color: var(--text-success); font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--text-success) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-success) 35%, transparent);
+  padding: 1px 7px; border-radius: var(--radius-sm);
+}
 .wl-catches { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
 .wl-best { color: var(--text-success); }
 .wl-flags { display: flex; gap: var(--space-2); flex: none; }
