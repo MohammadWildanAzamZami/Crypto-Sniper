@@ -451,10 +451,12 @@ simpan maks 20 catch terbaru.
 | Winner berbeda ditangkap | `catches × 20` | 60 |
 | Kualitas entry (log-scale) | `log10(max(1, avgX)) × 8` | 25 |
 | Wallet mapan (Helius) | `+15` bila `established` | 15 |
+| Sightings top-trader (Path B) | `sightings × 2` | 10 |
 
 `reputation = round(min(100, Σ))`; `avgX` = rata-rata `xFromEntry` semua catch.
-**Catch count = sinyal utama.** Ranking desc → **top `WATCH_SIZE` (40) = aktif** dipantau
-Modul C.
+**Catch count = sinyal utama** — "sightings" (dari auto-discovery Path B, lihat §Auto-Discovery)
+hanya sinyal cakupan berbobot rendah, tak pernah menggeser wallet catch-driven. Ranking desc →
+**top `WATCH_SIZE` = aktif** dipantau Modul C (`WATCH_SIZE=0` = pantau semua).
 
 ### 🔀 Flowchart — reputasi Watchlist
 
@@ -470,6 +472,26 @@ flowchart TB
   RANK --> ACT["Top WATCH_SIZE (40)<br/>= AKTIF dipantau"]
   ACT --> SNIPE["🎯 Sniper Live (Modul C)<br/>skor sinyal = Σ reputasi wallet (repWeighted)"]
 ```
+
+## 🛰️ Auto-Discovery Watchlist — isi otomatis tanpa Bedah manual
+
+Watchlist (Modul B) kini terisi **otomatis dari on-chain** — tak wajib Bedah manual.
+Satu background loop `screener/discoverWallets.js` (tiap `SNIPER_DISCOVERY_MIN`=20m; juga
+on-demand `GET /api/watchlist/discover`) menjalankan **dua sumber**:
+
+- **A. Auto-Bedah** — `discoverSolanaTokens()` (DexScreener trending) → `runAutopsy()` pada
+  ≤`SNIPER_AUTOPSY_PER_CYCLE` (3) token → `recordCandidates()`. Hanya winner (≥10x) jadi
+  "catch". Kualitas tinggi, reuse mesin Modul A penuh. Bagian paling mahal → cap kecil.
+- **B. Panen top-trader** — `birdeyeTopTraders()` pada ≤`SNIPER_TOPTRADER_TOKENS` (8) token →
+  filter kualitas (PnL > 0, net-buyer, bukan bundler) → `recordTopTraders()`. Bukan "catch"
+  tapi **"sighting"** (bobot rendah, maks +10 reputasi) → wallet yang cuma sering jadi
+  top-trader tetap di peringkat bawah sampai ia juga menangkap winner.
+
+Bounded + throttled (jeda antar-call) → hemat kuota Birdeye free tier. Fail-safe: token gagal
+dilewati, loop lanjut; `getDiscoveryStatus()` simpan ringkasan siklus terakhir. UI WatchlistPanel:
+chip **🛰️ auto-discovery** + tombol **Cari wallet** + badge asal (`bedah` / `top-trader`) per baris.
+Terverifikasi live: 30 discovered → 1 autopsy + 2 top-trader wallet (sighting, rep 2), idempoten
+per mint. Parameter lengkap: [REKAP-PARAMETER.md](REKAP-PARAMETER.md#-parameter-watchlist-modul-b--watchlistjs).
 
 ## 🗓️ Log perkembangan
 
@@ -521,6 +543,17 @@ flowchart TB
   `/api/sniper/awal/*`, tab di `SniperPanel.vue`. Rekap parameter lengkap: lihat
   §"Parameter Sniper Live" di atas. Terverifikasi live (awal ~17–32 sinyal vs v2
   0 pada preset ketat). Commit `097396f`.
+- **2026-07-10** — 🟢 **AUTO-DISCOVERY WATCHLIST (A+B).** Watchlist tak lagi wajib Bedah
+  manual: `screener/discoverWallets.js` mengisi Modul B otomatis dari on-chain — (A)
+  auto-Bedah trending winner (`runAutopsy`+`recordCandidates`) + (B) panen top-trader
+  Birdeye (`birdeyeTopTraders`, diekspor → `recordTopTraders`, reputasi "sightings" bobot
+  rendah). Endpoint `GET /api/watchlist/discover`, interval `SNIPER_DISCOVERY_MIN` (20m),
+  UI chip 🛰️ + tombol "Cari wallet" + badge asal wallet di `WatchlistPanel.vue`. Bounded/
+  throttled (hemat kuota Birdeye), fail-safe. Terverifikasi live: 30 discovered → 1 autopsy
+  + 2 top-trader (sighting rep 2), idempoten per mint. Lihat §Auto-Discovery.
+- **2026-07-10** — 🎨 **UI: chat jadi "AI Asisten" sederhana** (buang gaya WhatsApp biru →
+  design token tema; `ChatWidget/ChatPanel/ChatMessage/ChatComposer.vue`) + **tab Influencer
+  di Watchlist disembunyikan** (flag `SHOW_INFLUENCER`, kode tetap utuh).
 
 ---
 

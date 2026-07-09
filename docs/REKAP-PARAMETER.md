@@ -73,7 +73,29 @@ prioritas di atas). **Cetak tebal** = sedang di-override oleh `.sniper-params.js
 | Key | env seed | Default | .env kita | Override | **Efektif** | Arti |
 |---|---|---|---|---|---|---|
 | `maxEnrich` | `SNIPER_MAX_ENRICH` | `20` | `40` | — | **`40`** | Batas kandidat teratas yang di-enrich Birdeye + gate per sweep. |
-| `signalTtlMin` | `SNIPER_SIGNAL_TTL_MIN` | `360` | `1440` | `240` | **`240`** | Umur sinyal; yang tak diperbarui lebih lama dari ini dihapus (menit). |
+| `signalTtlMin` | `SNIPER_SIGNAL_TTL_MIN` | `360` | `1440` | `240` | **`240`** | Umur sinyal; yang tak diperbarui lebih lama dari ini dihapus (menit). Dgn `trackHolding` on → jadi *backstop*; sinyal aktif-dipegang di-refresh terus. |
+
+### Grup: Posisi (hold / exit) — 2026-07-08
+| Key | env seed | Default | .env kita | Override | **Efektif** | Arti |
+|---|---|---|---|---|---|---|
+| `trackHolding` | `SNIPER_TRACK_HOLDING` | `true` | — | — | `true` | Tiap sweep cek saldo on-chain wallet di balik sinyal → **buang sinyal saat semua smart money sudah jual**; pertahankan selama ≥1 masih memegang. Cek pakai filter `{mint}` + **fallback RPC publik** (Helius → publicnode → mainnet-beta) saat Helius RPC 429. |
+
+### ⚡ Real-time via Helius Webhook — 2026-07-10
+Sniper Live kini utamanya **push**: begitu wallet watchlist swap, Helius kirim
+notifikasi → sweep seketika (debounced), bukan polling 5-menit. Modul:
+`screener/heliusWebhook.js`; `POST /api/sniper/helius-webhook` (terima push, verifikasi
+authHeader), `POST /api/sniper/webhook/sync` (admin, registrasi paksa).
+
+| Env | Default | Arti |
+|---|---|---|
+| `PUBLIC_URL` | — | URL publik callback. Kosong → **auto-deteksi tunnel ngrok** (`:4040`). |
+| `SNIPER_WEBHOOK_SYNC_MIN` | `10` | Sinkron ulang alamat webhook + URL ngrok (menit). |
+| `SNIPER_WEBHOOK_DEBOUNCE_MS` | `6000` | Burst event → 1 sweep, tunda ini dulu. |
+| `SNIPER_WEBHOOK_MIN_GAP_MS` | `25000` | Jarak minimum antar-sweep (anti-hammer Helius). |
+| `SNIPER_WEBHOOK_MAX_ADDR` | `100` | Batas alamat dipantau webhook. |
+
+> Polling `SNIPER_POLL_MIN` (5 menit) tetap jalan sebagai **fallback**. Aktivasi penuh
+> butuh URL publik (ngrok/PUBLIC_URL) **dan** kuota Helius (webhook API bisa 429 di key free).
 
 > **Kesimpulan penting:** override `.sniper-params.json` membuat profil saat ini
 > **cukup ketat** (skor ≥240, LP-locked ≥30%, likuiditas ≥$10rb). Pelonggaran di
@@ -107,9 +129,26 @@ safetyGate false`.
 
 | Key env | Default | Arti |
 |---|---|---|
-| `SNIPER_WATCH_SIZE` | `40` | Berapa wallet teratas (by reputasi) yang **aktif** dipantau Modul C. |
+| `SNIPER_WATCH_SIZE` | `40` | Berapa wallet teratas (by reputasi) yang **aktif** dipantau Modul C (`0` = pantau semua). |
 | `SNIPER_POLL_MIN` | `5` | Interval monitor live (menit). |
 | `SNIPER_WINNER_MIN_X` | `10` | Definisi "winner": token pump ≥ Nx dari launch → wallet-nya direkam. |
+
+### 🛰️ Auto-Discovery — isi watchlist otomatis (`discoverWallets.js`)
+
+Background loop yang mengisi watchlist **tanpa Bedah manual**: **A** auto-Bedah trending winner
+(`runAutopsy`+`recordCandidates`) + **B** panen top-trader Birdeye (`birdeyeTopTraders` → reputasi
+"sightings"). Endpoint on-demand `GET /api/watchlist/discover`.
+
+| Key env | Default | Arti |
+|---|---|---|
+| `SNIPER_DISCOVERY_MIN` | `20` | Interval loop discovery (menit; `0` = mati). |
+| `SNIPER_DISCOVERY_TOKENS` | `30` | Berapa token trending diambil per siklus (DexScreener). |
+| `SNIPER_AUTOPSY_PER_CYCLE` | `3` | Cap auto-Bedah per siklus (paling mahal — paginasi Birdeye). |
+| `SNIPER_TOPTRADER_TOKENS` | `8` | Cap scan top-trader Birdeye per siklus (murah, 1 call/token). |
+| `SNIPER_DISCOVERY_THROTTLE_MS` | `400` | Jeda antar-call Birdeye (hemat kuota free tier). |
+
+Path B hanya merekam wallet berkualitas (PnL > 0, net-buyer, bukan bundler) sebagai **sighting**
+(bukan "catch"), dedup per mint → bobot reputasi rendah (maks +10, lihat tabel di bawah).
 
 ### 🏅 Reputasi Watchlist — `computeReputation()`
 
