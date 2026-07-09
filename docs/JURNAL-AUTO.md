@@ -3,9 +3,17 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-09 20:00** · Total **109** commit dalam **10** hari.
+> Terakhir diperbarui: **2026-07-09 21:33** · Total **111** commit dalam **11** hari.
 
 ---
+
+## 2026-07-09 (Kamis) — 2 commit
+
+**✨ Fitur baru / penambahan**
+- feat(watchlist): sembunyikan tab/tombol Influencer dari UI  `2a53f23`
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `5953dbb`
 
 ## 2026-07-08 (Rabu) — 5 commit
 
