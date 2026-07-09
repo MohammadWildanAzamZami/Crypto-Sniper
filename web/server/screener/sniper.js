@@ -202,37 +202,42 @@ async function tokenSnapshot(mint, key) {
   } catch { return null; }
 }
 
-// SPL token program IDs — classic + Token-2022 (some newer memecoins use it).
-const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-const HELIUS_RPC = (key) => `https://mainnet.helius-rpc.com/?api-key=${key}`;
+// RPC endpoints for the holdings check, tried in order. Helius first (fast, keyed),
+// then PUBLIC Solana RPCs as fallback — critical because the Helius free-tier RPC
+// hits "max usage reached" (429) under sniper load, which would otherwise leave
+// every wallet 'unknown' and block exit-pruning. Public RPCs keep hold-tracking
+// alive so a fully-exited signal still gets removed from the list.
+const HOLDINGS_RPCS = (key) => [
+  key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
+  "https://solana-rpc.publicnode.com",
+  "https://api.mainnet-beta.solana.com",
+].filter(Boolean);
 
-// The set of SPL mints a wallet CURRENTLY holds (uiAmount > 0). Used to tell
-// whether the smart wallets behind a signal still hold the token or have exited.
-// One RPC call per program (classic + Token-2022) so we don't miss holdings.
-// Returns Set<mint>, or null on failure — the caller treats null as "unknown" and
-// never prunes a signal on an unknown, so a transient RPC blip can't wipe signals.
-async function walletHoldings(owner, key) {
-  try {
-    const held = new Set();
-    for (const programId of [TOKEN_PROGRAM, TOKEN_2022_PROGRAM]) {
+// Does `owner` currently hold `mint` (summed uiAmount > 0)? Uses the lightweight
+// {mint} filter — public RPCs allow it, whereas the {programId} "list everything"
+// form is blocked by some (e.g. publicnode). Tries each endpoint until one resolves;
+// returns true/false, or null ONLY when every endpoint failed — the caller treats
+// null as "unknown" and never prunes on unknown, so a blip can't wipe signals.
+async function holdsMint(owner, mint, key) {
+  for (const rpc of HOLDINGS_RPCS(key)) {
+    try {
       const body = { jsonrpc: "2.0", id: 1, method: "getTokenAccountsByOwner",
-        params: [owner, { programId }, { encoding: "jsonParsed" }] };
-      const res = await fetchRetry(HELIUS_RPC(key), {
+        params: [owner, { mint }, { encoding: "jsonParsed" }] };
+      const res = await fetchRetry(rpc, {
         method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res || !res.ok) return null; // fail-safe: unknown, don't prune
-      const accts = (await res.json())?.result?.value;
-      if (!Array.isArray(accts)) return null;
-      for (const a of accts) {
-        const info = a?.account?.data?.parsed?.info;
-        const amt = Number(info?.tokenAmount?.uiAmount) || 0;
-        if (info?.mint && amt > 0) held.add(info.mint);
-      }
-    }
-    return held;
-  } catch { return null; }
+      if (!res || !res.ok) continue;                 // endpoint failed → try next
+      const j = await res.json().catch(() => null);
+      if (!j || j.error) continue;                   // JSON-RPC error (e.g. 429) → next
+      const accts = j.result?.value;
+      if (!Array.isArray(accts)) continue;
+      let bal = 0;
+      for (const a of accts) bal += Number(a?.account?.data?.parsed?.info?.tokenAmount?.uiAmount) || 0;
+      return bal > 0;                                // resolved: holds iff any balance
+    } catch { /* try next endpoint */ }
+  }
+  return null; // all endpoints failed → unknown (fail-safe)
 }
 
 // C4 safety gate. Reuses the canonical screener (screenToken → DexScreener +
@@ -260,17 +265,33 @@ async function safetyCheck(mint, { heliusKey }, P) {
   const ratio = tx > 0 ? buys / tx : 0.5;
 
   const reasons = [];
-  if (lock?.rugged) reasons.push("ditandai rugged (RugCheck)");
+  // Non-RugCheck red lines (DexScreener + Pump.fun) — independent of RugCheck data.
   if (pump?.banned) reasons.push("di-ban Pump.fun");
   if (pump?.nsfw) reasons.push("ditandai NSFW (Pump.fun)");
   if (pump?.hidden) reasons.push("disembunyikan Pump.fun");
   if (liq < P.minLiquidity) reasons.push(`likuiditas $${Math.round(liq).toLocaleString()} di bawah batas`);
   if (mc > 0 && mc < P.minMcap) reasons.push("mcap terlalu mikro");
-  if (typeof lock?.lockedPct === "number" && lock.lockedPct < P.minLockedPct) reasons.push(`LP locked ${lock.lockedPct}% rendah`);
   // Honeypot shape only once there are enough trades to judge (avoids false positives on brand-new tokens).
   if (tx >= 10 && ratio > 0.95) reasons.push("hampir semua beli — indikasi honeypot");
 
-  return { ok: reasons.length === 0, reasons, unscreenable: false, metrics: m };
+  // Anti-rug via RugCheck. FAIL-OPEN: when RugCheck has no data yet (brand-new
+  // token), don't reject on rug rules — flag `riskUnknown` so the UI can warn (⚠).
+  let riskUnknown = false;
+  if (lock) {
+    if (lock.rugged) reasons.push("ditandai rugged (RugCheck)");
+    if (P.rugMintRenounced !== false && lock.mintEnabled) reasons.push("mint authority belum di-renounce (dev bisa cetak supply)");
+    if (P.rugNoFreeze !== false && lock.freezeEnabled) reasons.push("freeze authority aktif (dev bisa bekukan token)");
+    if (P.rugBlockDanger !== false && Array.isArray(lock.dangerRisks) && lock.dangerRisks.length) {
+      reasons.push("RugCheck bahaya: " + lock.dangerRisks.slice(0, 2).join(", "));
+    }
+    if (P.minLockedPct > 0 && typeof lock.lockedPct === "number" && lock.lockedPct < P.minLockedPct) {
+      reasons.push(`LP terkunci ${lock.lockedPct}% < ${P.minLockedPct}%`);
+    }
+  } else {
+    riskUnknown = true; // RugCheck belum punya data → fail-open, tandai ⚠
+  }
+
+  return { ok: reasons.length === 0, reasons, unscreenable: false, riskUnknown, metrics: m };
 }
 
 /**
@@ -433,6 +454,7 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
       liquidityUsd,
       unverified: !known,                    // market data not confirmed → UI warns, DYOR
       safetyChecked: P.safetyGate,           // passed the C4 gate this sweep
+      riskUnknown: P.safetyGate ? !!safety?.riskUnknown : false, // RugCheck belum bisa cek rug → ⚠
       score,
       why,
       walletCount: wallets.size,
@@ -454,16 +476,26 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
   // is holding or accumulating. Fail-safe: a wallet whose balance can't be fetched
   // is "unknown" and never counts toward an exit, so an RPC blip can't wipe signals.
   if (P.trackHolding && signals.size > 0) {
-    const owners = [...new Set([...signals.values()].flatMap((s) => s.wallets || []))];
-    const fetched = await mapPool(owners, POOL, (o) => walletHoldings(o, heliusKey).then((set) => ({ o, set })));
-    const holdMap = new Map(fetched.filter(Boolean).map((x) => [x.o, x.set])); // owner → Set|null
+    // One light {mint} balance check per unique (owner, mint) pair across all signals.
+    const pairs = [];
+    const seenPair = new Set();
+    for (const [mint, s] of signals) {
+      for (const p of s.positions || []) {
+        const pk = p.owner + "|" + mint;
+        if (seenPair.has(pk)) continue;
+        seenPair.add(pk);
+        pairs.push({ owner: p.owner, mint, pk });
+      }
+    }
+    const fetched = await mapPool(pairs, POOL, (pr) => holdsMint(pr.owner, pr.mint, heliusKey).then((h) => ({ pk: pr.pk, h })));
+    const holdMap = new Map(fetched.filter(Boolean).map((x) => [x.pk, x.h])); // "owner|mint" → true|false|null
     for (const [mint, s] of signals) {
       let holders = 0, sold = 0, unknown = 0;
       for (const p of s.positions || []) {
-        const set = holdMap.get(p.owner);
-        if (set == null) { p.holding = null; unknown++; }         // fetch failed → unknown
-        else if (set.has(mint)) { p.holding = true; holders++; }  // still holds
-        else { p.holding = false; sold++; }                       // exited / sold
+        const h = holdMap.get(p.owner + "|" + mint);
+        if (h == null) { p.holding = null; unknown++; }   // fetch failed → unknown
+        else if (h) { p.holding = true; holders++; }      // still holds
+        else { p.holding = false; sold++; }               // exited / sold
       }
       s.holders = holders;
       s.soldOff = sold;
