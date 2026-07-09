@@ -161,7 +161,28 @@ async function sweepSniper() {
   }
 }
 
-onMounted(() => { loadWatchlist(); loadSniper(); });
+// Auto-pilot status (langkah POWER) — background loop auto-seed + sweep.
+const autoStatus = ref(null);
+const ticking = ref(false);
+async function loadAuto() {
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/auto/status"));
+    if (r.ok) { const j = await r.json(); autoStatus.value = j.lastTick; }
+  } catch { /* diamkan */ }
+}
+async function runTick() {
+  if (ticking.value) return;
+  ticking.value = true;
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/auto/tick"), { method: "POST" });
+    const j = await r.json();
+    if (r.ok && j.at) autoStatus.value = j;
+    await Promise.all([loadWatchlist(), loadSniper(), loadAuto()]);
+  } catch { /* diamkan */ }
+  finally { ticking.value = false; }
+}
+
+onMounted(() => { loadWatchlist(); loadSniper(); loadAuto(); });
 
 // Rencana tool yang akan di-port ke Robinhood Chain (EVM), dari termudah → tersulit.
 const roadmap = [
@@ -208,6 +229,22 @@ const docsUrl = "https://docs.robinhood.com/chain/";
           bagian ini adalah <b>peta rencana port</b> ke EVM. Belum ada data live.
         </p>
       </div>
+    </div>
+
+    <!-- ===== Auto-pilot: background loop auto-seed watchlist + sniper sweep ===== -->
+    <div class="rh__auto">
+      <div class="rh__auto-main">
+        <span class="rh__auto-dot" aria-hidden="true"></span>
+        <b>🤖 Auto-pilot</b>
+        <span v-if="autoStatus" class="rh__auto-stat">
+          {{ autoStatus.recorded }} wallet direkam · {{ autoStatus.bedahed }} winner dibedah · {{ autoStatus.swept }} disweep · {{ autoStatus.signalCount }} sinyal
+          <span class="rh__auto-ago">({{ autoStatus.at ? ageOf(new Date(autoStatus.at).toISOString()) + " lalu" : "" }})</span>
+        </span>
+        <span v-else class="rh__auto-stat">menunggu tick pertama…</span>
+      </div>
+      <button class="rh__pool-btn" type="button" :disabled="ticking" @click="runTick">
+        {{ ticking ? "Menjalankan…" : "⚡ Jalankan sekarang" }}
+      </button>
     </div>
 
     <!-- ===== Prototipe LIVE: discover pool via GeckoTerminal ===== -->
@@ -405,6 +442,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
                 <span v-if="s.verdict" class="rh__v" :class="verdictClass(s.verdict)">GEM {{ s.gemScore }} · {{ s.verdict }}</span>
               </div>
               <div class="rh__pool-stats">
+                <span v-if="s.holders != null" class="rh__up">🖐 {{ s.holders }}/{{ s.walletCount }} pegang</span>
                 <span>mcap {{ usd(s.mcap) }}</span>
                 <span v-if="s.liquidityUsd">liq {{ usd(s.liquidityUsd) }}</span>
                 <span>skor {{ s.score }}</span>
@@ -482,6 +520,20 @@ const docsUrl = "https://docs.robinhood.com/chain/";
   font-size: var(--font-size-xs); font-weight: 700; color: var(--text-on-accent, #000);
   background: #00c805; padding: 2px 8px; border-radius: var(--radius-full, 999px);
 }
+
+/* Auto-pilot strip */
+.rh__auto {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, #00c805 8%, var(--bg-raised));
+  border: 1px solid color-mix(in srgb, #00c805 35%, var(--border-default));
+  border-radius: var(--control-radius);
+}
+.rh__auto-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; font-size: var(--font-size-sm); }
+.rh__auto-dot { width: 8px; height: 8px; border-radius: 50%; background: #00c805; box-shadow: 0 0 6px #00c805; flex: none; animation: rh-pulse 2s ease-in-out infinite; }
+@keyframes rh-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.rh__auto-stat { color: var(--text-muted); }
+.rh__auto-ago { color: var(--text-muted); opacity: 0.8; }
 
 /* Discover prototipe live */
 .rh__disc { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--bg-raised); border: 1px solid var(--border-default); border-radius: var(--control-radius); }
