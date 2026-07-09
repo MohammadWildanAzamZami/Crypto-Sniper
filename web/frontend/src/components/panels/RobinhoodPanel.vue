@@ -135,7 +135,33 @@ async function recordToWatchlist() {
     recording.value = false;
   }
 }
-onMounted(loadWatchlist);
+// Sniper EVM (langkah #5) — pantau wallet aktif Watchlist borong token fresh yang sama.
+const sniper = ref(null);
+const sniperSweeping = ref(false);
+const sniperError = ref("");
+async function loadSniper() {
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/sniper/signals"));
+    if (r.ok) sniper.value = await r.json();
+  } catch { /* diamkan */ }
+}
+async function sweepSniper() {
+  if (sniperSweeping.value) return;
+  sniperSweeping.value = true;
+  sniperError.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/sniper/sweep"));
+    const body = await r.json();
+    if (!r.ok) sniperError.value = body?.error || `Sweep gagal (${r.status})`;
+    else sniper.value = body;
+  } catch {
+    sniperError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  } finally {
+    sniperSweeping.value = false;
+  }
+}
+
+onMounted(() => { loadWatchlist(); loadSniper(); });
 
 // Rencana tool yang akan di-port ke Robinhood Chain (EVM), dari termudah → tersulit.
 const roadmap = [
@@ -147,8 +173,8 @@ const roadmap = [
     desc: "Lacak early buyer winner via transfer on-chain (Blockscout asc) + konfirmasi saldo — LIVE di bawah. Menyemai watchlist EVM." },
   { icon: "👛", name: "Watchlist EVM", status: "prototipe",
     desc: "Rekam kandidat Bedah → reputasi → ranking wallet. LIVE di bawah. Fondasi Sniper EVM." },
-  { icon: "🎯", name: "Sniper Smart Money EVM", status: "riset",
-    desc: "Pantau wallet aktif Watchlist borong token fresh (transfer Blockscout) + gate screen EVM. Berikutnya (langkah #5)." },
+  { icon: "🎯", name: "Sniper Smart Money EVM", status: "prototipe",
+    desc: "Pantau wallet aktif Watchlist borong token fresh (transfer Blockscout) + gate screen EVM — LIVE di bawah. Butuh watchlist wallet yang aktif trading." },
 ];
 
 // Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
@@ -342,6 +368,55 @@ const docsUrl = "https://docs.robinhood.com/chain/";
       <p class="rh__note">
         Reputasi = jumlah winner ditangkap + seberapa awal beli. Top {{ watchlist ? watchlist.watchSize : 40 }} = set aktif untuk
         <b>Sniper EVM</b> (langkah #5). Heuristik, DYOR.
+      </p>
+    </div>
+
+    <!-- ===== Sniper Live EVM: konfluensi beli wallet aktif Watchlist (langkah #5) ===== -->
+    <div class="rh__disc">
+      <div class="rh__disc-head">
+        <span class="rh__disc-title">🎯 Sniper Live <span class="rh__proto">prototipe live</span></span>
+        <button class="rh__btn" :disabled="sniperSweeping" @click="sweepSniper">
+          {{ sniperSweeping ? "Menyapu…" : "🔍 Sweep sekarang" }}
+        </button>
+      </div>
+      <p class="rh__hint">
+        Pantau wallet <b>aktif Watchlist EVM</b> → sinyal saat <b>≥{{ sniper ? sniper.signalMin : 2 }} wallet</b> berbeda
+        memborong token fresh yang sama (lolos gate screen EVM). Bangun watchlist dulu via Bedah agar ada yang dipantau.
+      </p>
+
+      <p v-if="sniperError" class="rh__err" role="alert">⚠️ {{ sniperError }}</p>
+
+      <template v-if="sniper">
+        <p class="rh__meta">
+          <b>{{ sniper.count }}</b> sinyal · ≥{{ sniper.signalMin }} wallet sepakat · maks mcap {{ usd(sniper.maxMcap) }}
+          · gate {{ sniper.safetyGate ? "aktif" : "off" }}
+        </p>
+        <p v-if="!sniper.signals.length" class="rh__hint">
+          Belum ada sinyal. Monitor menunggu ≥{{ sniper.signalMin }} wallet Watchlist membeli token fresh yang sama.
+          Makin banyak winner yang di-Bedah → makin banyak &amp; aktif wallet → makin tajam sinyal.
+        </p>
+        <ul v-else class="rh__pools">
+          <li v-for="s in sniper.signals" :key="s.token" class="rh__pool">
+            <div class="rh__pool-row">
+              <div class="rh__pool-main">
+                <span class="rh__cand-idx">{{ s.walletCount }}👛</span>
+                <span class="rh__pool-name">{{ s.symbol || shortAddr(s.token) }}</span>
+                <span v-if="s.isNew" class="rh__pool-fresh">BARU</span>
+                <span v-if="s.verdict" class="rh__v" :class="verdictClass(s.verdict)">GEM {{ s.gemScore }} · {{ s.verdict }}</span>
+              </div>
+              <div class="rh__pool-stats">
+                <span>mcap {{ usd(s.mcap) }}</span>
+                <span v-if="s.liquidityUsd">liq {{ usd(s.liquidityUsd) }}</span>
+                <span>skor {{ s.score }}</span>
+              </div>
+              <a v-if="s.chartUrl" class="rh__pool-link" :href="s.chartUrl" target="_blank" rel="noopener noreferrer">chart ↗</a>
+            </div>
+          </li>
+        </ul>
+      </template>
+      <p class="rh__note">
+        Deteksi beli EVM = wallet menerima token non-base + membayar WETH/USDG di tx yang sama (Blockscout).
+        Kandidat di-gate lewat screen EVM (anti-rug heuristik). Heuristik — DYOR.
       </p>
     </div>
 

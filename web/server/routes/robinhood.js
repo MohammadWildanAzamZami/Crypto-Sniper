@@ -11,6 +11,7 @@ import { scanLimit } from "../middleware/limits.js";
 import { screenEvmToken } from "../screener/evmScreen.js";
 import { bedahEvmToken } from "../screener/evmAutopsy.js";
 import { recordEvmCandidates, getEvmWatchlist } from "../screener/evmWatchlist.js";
+import { runEvmSniperSweep, getEvmSignals } from "../screener/evmSniper.js";
 
 const router = Router();
 const EVM_ADDR = /^0x[0-9a-fA-F]{40}$/;
@@ -132,6 +133,24 @@ router.post("/robinhood/watchlist/record", scanLimit, async (req, res) => {
     if (bedah?.error) return res.status(404).json(bedah);
     const rec = recordEvmCandidates(bedah, Date.now());
     res.json({ ...rec, token, name: bedah.name, mcapUsd: bedah.mcapUsd, watchlist: getEvmWatchlist() });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// GET /api/robinhood/sniper/signals — sinyal Sniper Live EVM saat ini (murah, tanpa sweep).
+router.get("/robinhood/sniper/signals", (_req, res) => {
+  try {
+    res.json(getEvmSignals());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// GET /api/robinhood/sniper/sweep — sweep sekarang: baca beli wallet aktif Watchlist EVM.
+router.get("/robinhood/sniper/sweep", scanLimit, async (_req, res) => {
+  try {
+    res.json(await runEvmSniperSweep({ nowMs: Date.now() }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
