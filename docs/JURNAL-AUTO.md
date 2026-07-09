@@ -3,17 +3,21 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-09 21:33** · Total **111** commit dalam **11** hari.
+> Terakhir diperbarui: **2026-07-09 21:51** · Total **113** commit dalam **11** hari.
 
 ---
 
-## 2026-07-09 (Kamis) — 2 commit
+## 2026-07-09 (Kamis) — 4 commit
 
 **✨ Fitur baru / penambahan**
 - feat(watchlist): sembunyikan tab/tombol Influencer dari UI  `2a53f23`
 
+**🐛 Perbaikan**
+- fix(sniper): sinyal v2 hilang otomatis saat smart money tak lagi hold/akumulasi  `774c3b4`
+
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `5953dbb`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `24c4325`
 
 ## 2026-07-08 (Rabu) — 5 commit
 
