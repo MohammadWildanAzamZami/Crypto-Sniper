@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref } from "vue";
 import AppButton from "../components/ui/AppButton.vue";
 import StatList from "../components/ui/StatList.vue";
 import ScreenerPanel from "../components/panels/ScreenerPanel.vue";
@@ -9,7 +9,6 @@ import AutopsyPanel from "../components/panels/AutopsyPanel.vue";
 import WatchlistPanel from "../components/panels/WatchlistPanel.vue";
 import SniperPanel from "../components/panels/SniperPanel.vue";
 import RobinhoodPanel from "../components/panels/RobinhoodPanel.vue";
-import ManualScoringPanel from "../components/panels/ManualScoringPanel.vue";
 // import ChecklistPanel from "../components/panels/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
 
@@ -29,76 +28,56 @@ const chainStats = computed(() => {
 // Network status disembunyikan sementara — tidak perlu memuat chain-info.
 // onMounted(() => chain.load());
 
-// Kalkulator manual melayang: tampil saat tombol "Kalkulator manual" ditekan.
-const showCalc = ref(false);
-function openCalc() { showCalc.value = true; }
-function closeCalc() { showCalc.value = false; }
-
-function onKeydown(e) {
-  if (e.key === "Escape" && showCalc.value) closeCalc();
-}
-onMounted(() => window.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+// Tampilan aktif: "sol" = ekosistem Solana, "rh" = Robinhood Chain (EVM).
+// Tombol melayang memindah antar keduanya (dulu tombol "Kalkulator manual").
+const view = ref("sol");
+function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
 </script>
 
 <template>
   <main class="page">
     <header class="page__head">
-      <p class="eyebrow">Solana · DexScreener / RugCheck</p>
-      <h1>Screening Memecoin Solana</h1>
+      <p class="eyebrow">{{ view === 'sol' ? 'Solana · DexScreener / RugCheck' : 'Robinhood Chain · EVM' }}</p>
+      <h1>{{ view === 'sol' ? 'Screening Memecoin Solana' : 'Screening Robinhood Chain' }}</h1>
       <p class="page__sub">
         Tool Pencari Memecoin dengan teknologi AI Agent menggunakan logic Smart Money Tracking.
       </p>
     </header>
 
-    <ScreenerPanel />
+    <!-- ===== Tampilan Solana (ekosistem Solana) ===== -->
+    <template v-if="view === 'sol'">
+      <ScreenerPanel />
 
-    <RadarPanel />
+      <RadarPanel />
 
-    <ProRadarPanel />
+      <ProRadarPanel />
 
-    <AutopsyPanel />
+      <AutopsyPanel />
 
-    <WatchlistPanel />
+      <WatchlistPanel />
 
-    <SniperPanel />
+      <SniperPanel />
 
-    <!-- ===== Batas: di atas = ekosistem Solana · di bawah = Robinhood Chain (EVM) ===== -->
-    <div class="page__divider page__divider--rh" role="separator" aria-label="Ekosistem Robinhood Chain">
-      <span class="page__divider-label">⛓️ Ekosistem Robinhood Chain</span>
-    </div>
+      <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
+      <ChecklistPanel />
+      -->
+    </template>
 
-    <RobinhoodPanel />
+    <!-- ===== Tampilan Robinhood Chain (EVM) ===== -->
+    <template v-else>
+      <RobinhoodPanel />
+    </template>
 
-    <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
-    <ChecklistPanel />
-    -->
-
-    <!-- Tombol melayang: tekan untuk membuka Kalkulator manual -->
+    <!-- Tombol melayang: pindah tampilan Solana ⇄ Robinhood Chain -->
     <button
       type="button"
-      class="calc-fab"
-      :aria-expanded="showCalc"
-      aria-haspopup="dialog"
-      @click="openCalc"
+      class="view-fab"
+      :class="view === 'rh' ? 'view-fab--rh' : ''"
+      :title="view === 'sol' ? 'Pindah ke Robinhood Chain' : 'Kembali ke Solana'"
+      @click="toggleView"
     >
-      🧮 Kalkulator manual
+      {{ view === 'sol' ? '⛓️ Ke Robinhood Chain' : '◎ Ke Solana' }}
     </button>
-
-    <!-- Panel Kalkulator manual melayang (drawer) -->
-    <Teleport to="body">
-      <div v-if="showCalc" class="calc-overlay" @click.self="closeCalc">
-        <div class="calc-drawer" role="dialog" aria-modal="true" aria-labelledby="calc-drawer-h">
-          <div class="calc-drawer__head">
-            <h2 id="calc-drawer-h">🧮 Kalkulator manual</h2>
-            <button type="button" class="calc-drawer__close" aria-label="Tutup" @click="closeCalc">✕</button>
-          </div>
-          <div class="calc-drawer__body">
-            <ManualScoringPanel />
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)
     <section class="panel" aria-labelledby="chain-h">
@@ -125,21 +104,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 }
 .page__head { display: grid; gap: var(--space-3); }
 .page__sub { margin: 0; color: var(--text-muted); font-size: var(--font-size-md); }
-.page__divider { height: 1px; background: var(--border-default); margin: var(--space-3) 0; }
-/* Labeled divider yang memisahkan zona Solana (atas) dari Robinhood Chain (bawah). */
-.page__divider--rh {
-  height: auto; background: none; margin: var(--space-4) 0 0;
-  display: flex; align-items: center; gap: var(--space-4);
-}
-.page__divider--rh::before, .page__divider--rh::after {
-  content: ""; flex: 1; height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, #00c805 45%, var(--border-default)), transparent);
-}
-.page__divider-label {
-  flex: none; font-size: var(--font-size-xs); font-weight: var(--font-weight-medium);
-  letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
-  color: #00a804;
-}
 .eyebrow {
   margin: 0;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -153,8 +117,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
 .panel__error { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 
-/* Tombol melayang pembuka Kalkulator manual */
-.calc-fab {
+/* Tombol melayang: pemindah tampilan Solana ⇄ Robinhood Chain */
+.view-fab {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -175,59 +139,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   transition: border-color var(--motion-duration-instant) var(--motion-ease),
     transform var(--motion-duration-instant) var(--motion-ease);
 }
-.calc-fab:hover { border-color: var(--text-success); transform: translateX(-50%) translateY(-1px); }
-.calc-fab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-
-/* Overlay + drawer melayang */
-.calc-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-}
-.calc-drawer {
-  width: min(560px, 100%);
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-base, var(--bg-card));
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-}
-.calc-drawer__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--border-default);
-}
-.calc-drawer__head h2 { margin: 0; font-size: var(--font-size-lg); }
-.calc-drawer__close {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  background: var(--bg-raised);
-  border: 1px solid var(--border-default);
-  border-radius: var(--control-radius);
-  color: var(--text-muted);
-  font: inherit;
-  cursor: pointer;
-}
-.calc-drawer__close:hover { border-color: var(--text-error); color: var(--text-error); }
-.calc-drawer__close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.calc-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-6); }
-
-@media (max-width: 560px) {
-  .calc-overlay { padding: var(--space-4); }
-  .calc-drawer { width: 100%; max-height: 92vh; }
-}
+.view-fab:hover { border-color: var(--text-success); transform: translateX(-50%) translateY(-1px); }
+.view-fab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Di tampilan Robinhood, aksen tombol jadi hijau Robinhood — penanda chain aktif. */
+.view-fab--rh { border-color: color-mix(in srgb, #00c805 55%, var(--border-default)); color: #00a804; }
+.view-fab--rh:hover { border-color: #00c805; }
 </style>
