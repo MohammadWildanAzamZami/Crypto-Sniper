@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-10 01:45** · Total **129** commit dalam **12** hari.
+> Terakhir diperbarui: **2026-07-10 02:01** · Total **131** commit dalam **12** hari.
 
 ---
 
-## 2026-07-10 (Jumat) — 11 commit
+## 2026-07-10 (Jumat) — 13 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking  `cc17367`
@@ -15,6 +15,7 @@
 - feat(robinhood): POWER — auto-seed watchlist + hold-tracking EVM + background auto-loop  `c18be30`
 - feat(robinhood): UI auto-pilot — strip status background loop + indikator holder sinyal  `f0e2e8f`
 - feat(ui): toggle tampilan Solana ⇄ Robinhood Chain (tombol melayang)  `0ac76e1`
+- feat(ui): tema Robinhood untuk zona Solana + sembunyikan GEM Score & 10x Radar  `65ecbd9`
 
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `5ce3f87`
@@ -22,6 +23,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `3aefda5`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `15dc9e5`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `8234d25`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `c85ba27`
 
 **♻️ Refactor / rapikan**
 - refactor(robinhood): hapus daftar roadmap "rencana" — semua tool sudah live  `4d31345`
