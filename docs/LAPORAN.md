@@ -55,6 +55,16 @@ sedang **diakumulasi smart money SEBELUM naik**. Kerjanya sebagai satu loop yang
 | 🔧 **Mode AI lokal andal** | CLI `claude` yang di-spawn tidak lagi mewarisi `ANTHROPIC_API_KEY` dari `.env`, sehingga mode Local **selalu pakai login langganan** (gratis) dan tak lagi gagal *"Invalid API key"* / *"credit balance too low"* saat key API kosong/low-balance. "Jelaskan sinyal" juga tidak lagi memaksa jalur API saat mode Local. |
 | 🔀 **Flowchart alur** | Diagram Mermaid + ASCII untuk **Bedah Coin (§7)** dan **Sniper Live (§8)** ditambahkan (juga di SNIPER-ENGINE.md). |
 
+### 🆕 Pembaruan 8–10 Juli 2026 (hold/exit · floor mcap · real-time · Robinhood Chain · tema)
+
+| Perubahan | Ringkas |
+|-----------|---------|
+| 🧹 **Sinyal auto-hilang saat smart money keluar** | Tiap sweep cek saldo on-chain wallet di balik sinyal → **buang sinyal begitu semua sudah jual**. Cek filter `{mint}` + **fallback RPC publik** saat Helius RPC 429; TTL jadi *backstop*. |
+| 💲 **Batas minimal market cap $20.000** | Ditegakkan di Sinyal Sniper Live (kedua aliran) — token di bawah $20rb dibuang. |
+| ⚡ **Real-time via Helius Webhook** | Ganti polling 5-menit → **push**: wallet watchlist swap → Helius kirim notifikasi → app langsung sweep. URL publik auto-deteksi (ngrok/`PUBLIC_URL`); polling tetap fallback. |
+| ⛓️ **Ekosistem Robinhood Chain (EVM)** | Pipeline kembar EVM (discover + Bedah + Watchlist + Sniper + auto-loop, tanpa key). Toggle **Solana ⇄ Robinhood Chain**. Detail: [ROBINHOOD-CHAIN.md](ROBINHOOD-CHAIN.md). |
+| 🎨 **Tema Robinhood + rapikan zona Solana** | Kanvas hitam + aksen hijau `#00C805`; **GEM Score** & **10x Radar** disembunyikan dari tampilan Solana; sinyal **unverified** disembunyikan; kotak "Jelaskan" **melebar otomatis**. |
+
 ### Pembaruan Pro Radar
 
 Fitur-fitur terbaru di **Pro Radar** (urut dari yang terbaru). Detail teknis
