@@ -16,15 +16,17 @@
 ## 1. TL;DR — current state
 
 The repo grew from "Solscan MCP server + a sample explorer page" into a full
-**Solana memecoin screening platform**. Six systems now live here:
+**memecoin screening platform** — Solana first, kini juga **Robinhood Chain (EVM)**.
+Sistem yang live:
 
 | Area | Status | Notes |
 |------|--------|-------|
 | **GEM Score™ screener** | ✅ Works | 0–100 score, 3 weighted pillars; DexScreener-only works key-less |
 | **10x Radar** (auto-screener) | ✅ Works | discover → screen → filter → Telegram, runs on an interval/Cron |
 | **Pro Radar** (AI-boosted radar) | ✅ Works | 10x funnel + RugCheck/Pump.fun enrich + hard quality gate + **Fable 5** rank + **win-rate self-tuning** + **smart money** (Birdeye+Helius) + inline chart; `GET /api/pro-radar`, degrades gracefully. See §3.4 |
-| **Sniper Engine** (Bedah Coin + Watchlist + Live Monitor) | ✅ Works | Forensic autopsy of a pumped token → early-buyer smart wallets → self-learning watchlist → live monitor raises accumulation signals. **v2 (2026-07-07):** live-editable parameter registry (Settings, no restart), net-buy engine, dual signal streams (Awal/v1 + v2). `GET /api/autopsy`, `/api/watchlist`, `/api/sniper/signals`. Needs Birdeye+Helius. Design in **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**, params in **[REKAP-PARAMETER.md](REKAP-PARAMETER.md)** |
+| **Sniper Engine** (Bedah Coin + Watchlist + Live Monitor) | ✅ Works | Forensic autopsy of a pumped token → early-buyer smart wallets → self-learning watchlist → live monitor raises accumulation signals. **v2 (2026-07-07):** live-editable parameter registry (Settings, no restart), net-buy engine, dual signal streams (Awal/v1 + v2). **2026-07-08/10:** hold/exit tracking (signal auto-removed once smart money fully sold — `{mint}` balance check with public-RPC fallback when Helius RPC 429s), **$20k min-mcap floor** (both streams), and **real-time Helius webhook** (push replaces 5-min polling; auto-detects ngrok/`PUBLIC_URL`; polling stays as fallback). `GET /api/autopsy`, `/api/watchlist`, `/api/sniper/signals`, `POST /api/sniper/helius-webhook`. Needs Birdeye+Helius. Design in **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**, params in **[REKAP-PARAMETER.md](REKAP-PARAMETER.md)** |
 | **AI Analyst chat** | ✅ Works | Claude tool-loop over SSE; API key or local Claude-CLI mode. **Model locked to `claude-fable-5`** (only option in Settings). **Local mode strips `ANTHROPIC_API_KEY` from the spawned CLI's env** (in `local.js`/`explainSignal.js`/`analyze.js`) so it always uses the subscription login — fixes "Invalid API key"/"credit balance too low" when the `.env` key is empty/low-balance |
+| **Robinhood Chain (EVM)** ecosystem | ✅ Works | Pipeline kembar di **Robinhood Chain** (EVM L2, chain 4663): Discover → Screen/GEM → Bedah → Watchlist → Sniper + **auto-pilot** (menumbuhkan watchlist sendiri). Data on-chain nyata via **GeckoTerminal + Blockscout** (tanpa API key); gate keamanan heuristik (GoPlus/Honeypot.is belum dukung chain ini). Zona terpisah, toggle Solana ⇄ Robinhood di UI. `GET/POST /api/robinhood/*`. Detail: **[ROBINHOOD-CHAIN.md](ROBINHOOD-CHAIN.md)** |
 | **Telegram alerts + Trojan link** | ✅ Works | HTML alert + 1-tap buy deep-link (no wallet held) |
 | **Node MCP server** (`web/mcp`) | ✅ Works | 5 screener tools for Claude Desktop, shares the screening core |
 | Rust MCP server (`solscan-mcp`) | ✅ Builds & runs | 37 Solscan tools over stdio (original server) |

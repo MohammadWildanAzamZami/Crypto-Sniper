@@ -210,8 +210,41 @@ web/
 ## 8. Ringkas alur nilai (mental model)
 
 1. **Bedah** token winner → dapat smart wallet.
-2. Smart wallet naik peringkat di **Watchlist** → top-40 aktif.
+2. Smart wallet naik peringkat di **Watchlist** → dipantau live.
 3. **Sniper Live** memantau wallet aktif → sinyal saat mereka borong barengan.
 4. Paralel, **Radar** memindai pasar & **AI** menilai; alert ke **Telegram**.
 5. **Settings** menyetel ketajaman semua ini secara real-time.
 6. Semuanya heuristik — **bukan nasihat keuangan. DYOR.**
+
+---
+
+## 9. ⛓️ Ekosistem Robinhood Chain (EVM) — pipeline kembar
+
+Zona terpisah (tombol melayang **Solana ⇄ Robinhood Chain** di UI) yang mem-port
+pipeline yang sama ke **Robinhood Chain** (EVM L2). Detail penuh:
+[ROBINHOOD-CHAIN.md](ROBINHOOD-CHAIN.md).
+
+```mermaid
+flowchart LR
+  GT["GeckoTerminal"] --> D["🚀 Discover"]
+  D --> S["💎 Screen/GEM\nevmScreen.js"]
+  S --> B["🩻 Bedah\nevmAutopsy.js"]
+  B --> W["👛 Watchlist\nevmWatchlist.js"]
+  W --> SN["🎯 Sniper\nevmSniper.js"]
+  BS["Blockscout"] --> S & B & SN
+  AUTO["🤖 Auto-pilot\nevmAuto.js"] -.-> B & W & SN
+```
+
+| Tool | File | Endpoint |
+|---|---|---|
+| 🚀 Discover | `routes/robinhood.js` | `/api/robinhood/discover` |
+| 💎 Screen / GEM | `screener/evmScreen.js` | `/api/robinhood/screen` |
+| 🩻 Bedah Coin | `screener/evmAutopsy.js` | `/api/robinhood/bedah` |
+| 👛 Watchlist | `screener/evmWatchlist.js` | `/api/robinhood/watchlist` |
+| 🎯 Sniper Live | `screener/evmSniper.js` | `/api/robinhood/sniper/*` |
+| 🤖 Auto-pilot | `screener/evmAuto.js` | `/api/robinhood/auto/*` |
+
+**Beda dari Solana:** sumber data = **GeckoTerminal + Blockscout** (tanpa API key,
+ganti Helius/Birdeye/DexScreener/RugCheck); gate keamanan **heuristik on-chain**
+(GoPlus/Honeypot.is belum dukung chain 4663); watchlist **memantau semua wallet**
+(cap pertumbuhan `RH_WATCHLIST_MAX`). Parameter: [REKAP-PARAMETER.md](REKAP-PARAMETER.md#-parameter-robinhood-chain-evm).

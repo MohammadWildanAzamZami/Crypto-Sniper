@@ -57,7 +57,17 @@ prioritas di atas). **Cetak tebal** = sedang di-override oleh `.sniper-params.js
 | `minMcap` | `SNIPER_MIN_MCAP` | `20000` | `20000` | `20000` | **`20000`** | Lantai mcap — buang token mikro/mati (USD). Batas minimal dinaikkan ke $20rb. |
 | `maxMcap` | `SNIPER_SIGNAL_MAX_MCAP` | `2000000` | `10000000` | `1500000` | **`1500000`** | Batas atas mcap — kebesaran = terlambat (USD). |
 | `minLiquidity` | `SNIPER_MIN_LIQUIDITY` | `8000` | `1000` | `10000` | **`10000`** | Lantai likuiditas DexScreener (USD). |
-| `minLockedPct` | `SNIPER_MIN_LOCKED_PCT` | `0` | — | `30` | **`30`** | Tolak bila RugCheck kembalikan LP-locked di bawah ini (%). |
+| `minLockedPct` | `SNIPER_MIN_LOCKED_PCT` | `50` | — | `30` | **`30`** | Tolak token dengan LP terkunci/burn di bawah ini (%). Fail-open bila RugCheck belum punya datanya. Default dinaikkan 0 → 50. |
+| `rugMintRenounced` | `SNIPER_RUG_MINT_RENOUNCED` | `true` | — | — | `true` | Tolak token yang **mint authority**-nya belum di-renounce (dev bisa cetak supply — rug klasik). Sumber: RugCheck. |
+| `rugNoFreeze` | `SNIPER_RUG_NO_FREEZE` | `true` | — | — | `true` | Tolak token dengan **freeze authority** aktif (dev bisa membekukan token-mu = honeypot). Sumber: RugCheck. |
+| `rugBlockDanger` | `SNIPER_RUG_BLOCK_DANGER` | `true` | — | — | `true` | Tolak bila RugCheck menandai risiko level **"danger"** (LP unlocked, holder terlalu terpusat, honeypot, copycat, dll). Matikan jika terlalu ketat. |
+
+> **Fail-open rug (keputusan 2026-07-09):** token yang RugCheck **belum punya datanya**
+> (baru launch) tetap ditampilkan, ditandai badge **⚠ rug belum tercek** (bukan perisai
+> 🛡️). Empat aturan di atas hanya menolak saat RugCheck memang punya data. Aturan &
+> data RugCheck (`mintEnabled`/`freezeEnabled`/`dangerRisks`) ditarik di
+> `sources.js:fetchRugcheckLock` → diteruskan lewat `gemScore.js` → dipakai di
+> `sniper.js:safetyCheck`.
 
 ### Grup: Mesin
 | Key | env seed | Default | .env kita | Override | **Efektif** | Arti |
@@ -251,6 +261,45 @@ flowchart TB
 > ⚠️ Catatan riwayat: pernah ada bug di `.settings.json` — `heliusKey` tersimpan
 > sebagai `"HELIUS_API_KEY=9bd48c...”` (seluruh baris, bukan value). Ini bikin
 > semua panggilan Helius 401 → Sniper 0 sinyal. Sudah diperbaiki jadi value murni.
+
+---
+
+## ⛓️ Parameter Robinhood Chain (EVM)
+
+> Ekosistem EVM terpisah (lihat [ROBINHOOD-CHAIN.md](ROBINHOOD-CHAIN.md)). Semua env
+> berprefiks `RH_`. Sumber data GeckoTerminal + Blockscout **tanpa API key**.
+
+### Discover & Screen
+| Key env | Default | Arti |
+|---|---|---|
+| `RH_MIN_LIQUIDITY` | `5000` | Lantai likuiditas pool di discover (USD). |
+
+### Watchlist EVM (`evmWatchlist.js`)
+| Key env | Default | Arti |
+|---|---|---|
+| `RH_WINNER_MIN_MCAP` | `100000` | Token dianggap "winner" (kandidat direkam) bila mcap ≥ ini. |
+| `RH_WATCH_SIZE` | — | *(vestigial)* dulu cap wallet aktif; kini **semua wallet dipantau** (tanpa batas). |
+
+### Sniper Live EVM (`evmSniper.js`)
+| Key env | Default | Arti |
+|---|---|---|
+| `RH_SNIPER_SIGNAL_MIN` | `2` | Jumlah wallet berbeda beli token sama agar jadi sinyal. |
+| `RH_SNIPER_LOOKBACK_MIN` | `180` | Jendela lihat-balik beli (menit). |
+| `RH_SNIPER_RECENT_TX` | `50` | Tx terbaru per wallet dibaca dari Blockscout. |
+| `RH_SNIPER_MAX_MCAP` | `5000000` | Batas atas mcap sinyal (USD). |
+| `RH_SNIPER_MAX_ENRICH` | `20` | Kandidat teratas di-enrich + gate per sweep. |
+| `RH_SNIPER_TTL_MIN` | `720` | TTL sinyal (fallback saat hold-tracking off). |
+| `RH_SNIPER_SAFETY_GATE` | `true` | Wajib lolos screen EVM (anti-rug heuristik). |
+| `RH_SNIPER_TRACK_HOLDING` | `true` | Buang sinyal saat holders < signalMin & jual; urut by holder. |
+
+### Auto-pilot (`evmAuto.js`)
+| Key env | Default | Arti |
+|---|---|---|
+| `RH_TICK_MIN` | `10` | Interval loop auto-seed + sweep (menit). `0` = nonaktif. |
+| `RH_SEED_MIN_MCAP` | `250000` | Winner trending di-Bedah untuk seed watchlist bila mcap ≥ ini. |
+| `RH_SEED_MAX_BEDAH` | `4` | Maks token di-Bedah per tick (hemat kuota Blockscout). |
+| `RH_SEED_RESEED_MIN` | `360` | Jangan re-Bedah token sama < ini (menit). |
+| `RH_WATCHLIST_MAX` | `300` | **Cap pertumbuhan** — berhenti tambah wallet baru saat ≥ ini (yang ada tetap dipantau). |
 
 ---
 
