@@ -8,6 +8,7 @@ import ProRadarPanel from "../components/panels/ProRadarPanel.vue";
 import AutopsyPanel from "../components/panels/AutopsyPanel.vue";
 import WatchlistPanel from "../components/panels/WatchlistPanel.vue";
 import SniperPanel from "../components/panels/SniperPanel.vue";
+import RobinhoodPanel from "../components/panels/RobinhoodPanel.vue";
 import ManualScoringPanel from "../components/panels/ManualScoringPanel.vue";
 // import ChecklistPanel from "../components/panels/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
@@ -61,6 +62,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     <WatchlistPanel />
 
     <SniperPanel />
+
+    <!-- ===== Batas: di atas = ekosistem Solana · di bawah = Robinhood Chain (EVM) ===== -->
+    <div class="page__divider page__divider--rh" role="separator" aria-label="Ekosistem Robinhood Chain">
+      <span class="page__divider-label">⛓️ Ekosistem Robinhood Chain</span>
+    </div>
+
+    <RobinhoodPanel />
 
     <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
     <ChecklistPanel />
@@ -118,6 +126,20 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .page__head { display: grid; gap: var(--space-3); }
 .page__sub { margin: 0; color: var(--text-muted); font-size: var(--font-size-md); }
 .page__divider { height: 1px; background: var(--border-default); margin: var(--space-3) 0; }
+/* Labeled divider yang memisahkan zona Solana (atas) dari Robinhood Chain (bawah). */
+.page__divider--rh {
+  height: auto; background: none; margin: var(--space-4) 0 0;
+  display: flex; align-items: center; gap: var(--space-4);
+}
+.page__divider--rh::before, .page__divider--rh::after {
+  content: ""; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, #00c805 45%, var(--border-default)), transparent);
+}
+.page__divider-label {
+  flex: none; font-size: var(--font-size-xs); font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  color: #00a804;
+}
 .eyebrow {
   margin: 0;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;

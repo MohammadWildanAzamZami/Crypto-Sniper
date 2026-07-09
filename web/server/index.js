@@ -13,6 +13,7 @@ import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
 import autopsyRoutes, { sniperSweepOnce } from "./routes/autopsy.js";
 import influencerRoutes from "./routes/influencers.js";
+import robinhoodRoutes from "./routes/robinhood.js";
 import proxyRoutes from "./routes/proxy.js";
 
 const PORT = process.env.PORT || 8787;
@@ -40,6 +41,7 @@ app.use("/api", screenRoutes);
 app.use("/api", radarRoutes);
 app.use("/api", autopsyRoutes);
 app.use("/api", influencerRoutes);
+app.use("/api", robinhoodRoutes);
 app.use("/api", proxyRoutes);
 
 // ---- Serve the built frontend (single-port mode) ----
