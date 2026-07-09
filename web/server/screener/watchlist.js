@@ -54,9 +54,13 @@ function computeReputation(w) {
   const catches = w.catches.length;
   const avgX = catches ? w.catches.reduce((s, c) => s + (c.xFromEntry || 1), 0) / catches : 1;
   let s = 0;
-  s += Math.min(60, catches * 20);                          // distinct winners caught
+  s += Math.min(60, catches * 20);                          // distinct winners caught (dominant)
   s += Math.min(25, Math.log10(Math.max(1, avgX)) * 8);     // entry quality (log scale)
   if (w.established) s += 15;                                // real, aged wallet
+  // Path B "sightings" — recurring quality top-trader appearances. Weak breadth
+  // signal (max +10) so it never outranks a catch-driven wallet; a top-trader that
+  // never catches a winner stays low and won't crowd the active set.
+  s += Math.min(10, (w.sightings?.length || 0) * 2);
   return Math.round(Math.min(100, s));
 }
 
@@ -81,7 +85,7 @@ export function recordCandidates(report, nowMs) {
   for (const c of cands) {
     let w = wallets.get(c.owner);
     if (!w) {
-      w = { owner: c.owner, firstSeen: now, lastSeen: now, established: false, catches: [], reputation: 0 };
+      w = { owner: c.owner, firstSeen: now, lastSeen: now, established: false, catches: [], sightings: [], source: "bedah", reputation: 0 };
       wallets.set(c.owner, w);
     }
     w.lastSeen = now;
@@ -98,6 +102,45 @@ export function recordCandidates(report, nowMs) {
   return { recorded, winner: true, launchToNowX: x };
 }
 
+const MAX_SIGHTINGS = 30;  // keep the most recent N top-trader sightings per wallet
+
+/**
+ * Path B (live discovery): record wallets harvested from a token's Birdeye
+ * top-traders. These are NOT "early buyers of a winner", so they NEVER earn a
+ * "catch" — each recurring appearance is a low-weight "sighting" instead. A wallet
+ * seen as a quality top-trader across many tokens gains reputation slowly but stays
+ * below catch-driven wallets. Idempotent per (wallet, mint). Never throws.
+ * @param {Array<{owner:string}>} traders  quality-filtered top traders
+ * @param {{mint:string, symbol?:string}} token
+ * @returns {{recorded:number, walletsTouched:number}}
+ */
+export function recordTopTraders(traders, { mint, symbol } = {}, nowMs) {
+  const now = nowMs ?? Date.now();
+  if (!Array.isArray(traders) || !mint) return { recorded: 0, walletsTouched: 0 };
+  let recorded = 0;
+  let touched = 0;
+  for (const t of traders) {
+    const owner = t?.owner;
+    if (!owner) continue;
+    let w = wallets.get(owner);
+    if (!w) {
+      w = { owner, firstSeen: now, lastSeen: now, established: false, catches: [], sightings: [], source: "toptrader", reputation: 0 };
+      wallets.set(owner, w);
+    }
+    if (!Array.isArray(w.sightings)) w.sightings = []; // guard older records
+    w.lastSeen = now;
+    touched++;
+    if (!w.sightings.some((s) => s.mint === mint)) {
+      w.sightings.push({ mint, symbol: symbol || "", at: now });
+      if (w.sightings.length > MAX_SIGHTINGS) w.sightings = w.sightings.slice(-MAX_SIGHTINGS);
+      recorded++;
+    }
+    w.reputation = computeReputation(w);
+  }
+  if (recorded > 0) save();
+  return { recorded, walletsTouched: touched };
+}
+
 // Total "winner power": sum of every catch's entry→now multiple. This is the
 // ranking metric — from biggest total winners down to smallest.
 const winnerSum = (w) => w.catches.reduce((s, c) => s + (c.xFromEntry || 0), 0);
@@ -109,6 +152,8 @@ function toPublic(w, rank) {
     rank,
     reputation: w.reputation,
     catches: w.catches.length,
+    sightings: (w.sightings?.length || 0),           // Path B: recurring top-trader appearances
+    source: w.source || "bedah",                     // "bedah" (Modul A) | "toptrader" (Path B)
     winnerScore: Math.round(winnerSum(w) * 10) / 10, // Σ kelipatan semua winner (sort key)
     established: w.established,
     active: NO_LIMIT || rank <= WATCH_SIZE,

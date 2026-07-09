@@ -11,7 +11,8 @@ import settingsRoutes from "./routes/settings.js";
 import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
-import autopsyRoutes, { sniperSweepOnce } from "./routes/autopsy.js";
+import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce } from "./routes/autopsy.js";
+import { startWebhookAutoSync } from "./screener/heliusWebhook.js";
 import { startEvmAuto } from "./screener/evmAuto.js";
 import influencerRoutes from "./routes/influencers.js";
 import robinhoodRoutes from "./routes/robinhood.js";
@@ -68,12 +69,24 @@ if (radarMins > 0) {
   console.log(`[radar] auto-scan tiap ${radarMins} menit`);
 }
 
-// Sniper live monitor (Modul C): sweep the active watchlist for smart-money
-// accumulation on fresh tokens. 0 disables it; needs a Helius key to do anything.
+// Sniper live monitor (Modul C). Primary path is now a HELIUS WEBHOOK: Helius pushes
+// the instant a watched wallet swaps and we sweep immediately (near real-time). The
+// interval below stays on as a SAFETY-NET fallback (covers a missed/unreachable
+// webhook, e.g. no public URL). 0 disables the fallback; webhook needs a public URL.
+startWebhookAutoSync();
 const sniperMins = Number(process.env.SNIPER_POLL_MIN || 5);
 if (sniperMins > 0) {
   setInterval(() => sniperSweepOnce().catch(() => {}), sniperMins * 60_000);
-  console.log(`[sniper] live monitor tiap ${sniperMins} menit`);
+  console.log(`[sniper] live monitor: webhook real-time + fallback polling tiap ${sniperMins} menit`);
+}
+
+// Auto-discovery (Solana): populate the smart-wallet watchlist live from on-chain
+// data — auto-Bedah trending winners + Birdeye top-trader harvest — so Modul B fills
+// itself without manual "Bedah Coin". 0 disables it; needs a Birdeye key.
+const discoveryMins = Number(process.env.SNIPER_DISCOVERY_MIN || 20);
+if (discoveryMins > 0) {
+  setInterval(() => discoverWalletsOnce().catch(() => {}), discoveryMins * 60_000);
+  console.log(`[discovery] auto-isi watchlist tiap ${discoveryMins} menit`);
 }
 
 // Robinhood Chain (EVM) auto-loop: auto-seed watchlist dari winner trending → sniper sweep.

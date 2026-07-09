@@ -157,7 +157,7 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
 }
 .view-fab:hover { border-color: var(--text-success); transform: translateX(-50%) translateY(-1px); }
 .view-fab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-/* Di tampilan Robinhood, aksen tombol jadi hijau Robinhood — penanda chain aktif. */
-.view-fab--rh { border-color: color-mix(in srgb, #00c805 55%, var(--border-default)); color: #00a804; }
+/* Di tampilan Robinhood, border tombol hijau sebagai penanda chain — tulisan tetap putih. */
+.view-fab--rh { border-color: color-mix(in srgb, #00c805 55%, var(--border-default)); color: var(--text-body); }
 .view-fab--rh:hover { border-color: #00c805; }
 </style>

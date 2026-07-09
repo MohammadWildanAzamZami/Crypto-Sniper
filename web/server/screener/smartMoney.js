@@ -40,7 +40,7 @@ async function fetchRetry(url, opts, tries = 3) {
 // Birdeye: the token's top traders in the last 24h, ranked by volume. The API
 // returns USD buy/sell volume, wallet `tags` (whale/bundler/…), and per-trader
 // PnL — all of which we use to tell real smart money from mere high volume.
-async function birdeyeTopTraders(mint, key) {
+export async function birdeyeTopTraders(mint, key) {
   try {
     const url = `${BIRDEYE}/defi/v2/tokens/top_traders?address=${mint}&time_frame=24h&sort_type=desc&sort_by=volume&offset=0&limit=10`;
     const res = await fetchRetry(url, {

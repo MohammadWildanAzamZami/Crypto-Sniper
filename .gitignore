@@ -38,6 +38,9 @@ node_modules/
 **/.evm-sniper-state.json
 **/.evm-watchlist-state.json
 
+# Helius webhook registration (id + auth token) for real-time sniper
+**/.helius-webhook.json
+
 # Build output
 dist/
 build/

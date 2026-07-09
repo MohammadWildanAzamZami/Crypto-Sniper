@@ -7,12 +7,14 @@
 import { Router } from "express";
 import { runAutopsy } from "../screener/autopsy.js";
 import { recordCandidates, getWatchlist } from "../screener/watchlist.js";
+import { runDiscovery, getDiscoveryStatus } from "../screener/discoverWallets.js";
 import { runSniperSweep, getSignals } from "../screener/sniper.js";
 import { getParamDefs, applyParams } from "../screener/sniperParams.js";
 import { explainSignal } from "../ai/explainSignal.js";
 import { getState } from "../ai/settings.js";
 import { scanLimit } from "../middleware/limits.js";
 import { requireAdmin } from "../middleware/guard.js";
+import { debouncedSweep, webhookAuthToken, syncHeliusWebhook } from "../screener/heliusWebhook.js";
 
 const router = Router();
 
@@ -46,7 +48,23 @@ router.get("/autopsy", scanLimit, async (req, res) => {
 
 router.get("/watchlist", (_req, res) => {
   try {
-    res.json(getWatchlist());
+    res.json({ ...getWatchlist(), discovery: getDiscoveryStatus() });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Auto-discovery: populate the watchlist live from on-chain data (no manual Bedah).
+// Also runs on a background interval in index.js. One cycle = auto-Bedah on a few
+// trending winners (A) + Birdeye top-trader harvest (B). Bounded/throttled.
+export async function discoverWalletsOnce() {
+  const st = getState();
+  return runDiscovery({ birdeyeKey: st.birdeyeKey, heliusKey: st.heliusKey, nowMs: Date.now() });
+}
+
+router.get("/watchlist/discover", scanLimit, async (_req, res) => {
+  try {
+    res.json(await discoverWalletsOnce());
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
@@ -118,6 +136,28 @@ router.get("/sniper/sweep", scanLimit, async (_req, res) => {
 router.get("/sniper/awal/sweep", scanLimit, async (_req, res) => {
   try {
     res.json(await sweepVariant("awal"));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Real-time push (Modul C, mode webhook). Helius POSTs here the instant a watched
+// smart-money wallet swaps → we react immediately with a debounced sweep instead of
+// waiting for the interval. Verified via the authHeader Helius echoes back. Responds
+// FAST (Helius retries on non-2xx); the sweep runs asynchronously after.
+router.post("/sniper/helius-webhook", (req, res) => {
+  const expected = webhookAuthToken();
+  const got = (req.get("authorization") || "").trim();
+  if (expected && got !== expected) return res.status(401).json({ ok: false });
+  res.json({ ok: true });                 // ack immediately
+  debouncedSweep(sniperSweepOnce);        // smart money moved → sweep now (coalesced)
+});
+
+// Admin: force (re)registration of the Helius webhook — handy after ngrok restarts
+// (new public URL) or to point it at the current active watchlist on demand.
+router.post("/sniper/webhook/sync", requireAdmin, async (_req, res) => {
+  try {
+    res.json(await syncHeliusWebhook());
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

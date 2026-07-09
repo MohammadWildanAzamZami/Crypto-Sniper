@@ -103,6 +103,9 @@ export function getEvmWatchlist({ limit = 200 } = {}) {
   };
 }
 
+/** Jumlah wallet terdaftar — untuk cap pertumbuhan auto-seed (murah). */
+export function evmWatchlistSize() { return wallets.size; }
+
 /** Reputasi/meta satu wallet (untuk anotasi sinyal Sniper EVM nanti). */
 export function getEvmWalletMeta(owner) {
   const w = wallets.get(String(owner || "").toLowerCase());

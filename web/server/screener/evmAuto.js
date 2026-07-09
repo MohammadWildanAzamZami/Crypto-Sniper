@@ -5,7 +5,7 @@
 // sinyal muncul otomatis tanpa klik. Semua degrade aman; tak pernah melempar ke loop.
 
 import { bedahEvmToken } from "./evmAutopsy.js";
-import { recordEvmCandidates } from "./evmWatchlist.js";
+import { recordEvmCandidates, evmWatchlistSize } from "./evmWatchlist.js";
 import { runEvmSniperSweep, getEvmSignals } from "./evmSniper.js";
 
 const GT = "https://api.geckoterminal.com/api/v2";
@@ -15,6 +15,10 @@ const NET = "robinhood";
 const SEED_MIN_MCAP = Number(process.env.RH_SEED_MIN_MCAP || 250_000);   // winner untuk di-bedah
 const SEED_MAX_BEDAH = Number(process.env.RH_SEED_MAX_BEDAH || 4);       // maks bedah per tick (hemat kuota)
 const SEED_RESEED_MIN = Number(process.env.RH_SEED_RESEED_MIN || 360);   // jangan re-bedah token sama < ini (menit)
+// Batas pertumbuhan: berhenti MENAMBAH wallet baru saat watchlist ≥ ini, supaya sweep
+// (yang memantau SEMUA wallet) tak makin lama tanpa henti. Wallet yang sudah ada tetap
+// dipantau — cap ini hanya menghentikan pertumbuhan, bukan memangkas.
+const WATCHLIST_MAX = Number(process.env.RH_WATCHLIST_MAX || 300);
 
 // Token yang sudah di-seed baru-baru ini (hindari re-bedah tiap tick).
 const seededAt = new Map(); // token → ms
@@ -50,6 +54,11 @@ async function trendingWinners() {
  */
 export async function autoSeedWatchlist({ nowMs } = {}) {
   const now = nowMs ?? Date.now();
+  // Cap pertumbuhan: kalau watchlist sudah penuh, jangan seed lagi (tetap pantau yang ada).
+  const size = evmWatchlistSize();
+  if (size >= WATCHLIST_MAX) {
+    return { winnersSeen: 0, bedahed: 0, recorded: 0, tokens: [], capped: true, size };
+  }
   const winners = await trendingWinners();
   let bedahed = 0, recorded = 0;
   const tokens = [];
@@ -90,6 +99,9 @@ export async function robinhoodTick({ nowMs } = {}) {
       seededWinners: seed?.winnersSeen ?? 0,
       bedahed: seed?.bedahed ?? 0,
       recorded: seed?.recorded ?? 0,
+      capped: Boolean(seed?.capped),
+      watchlistSize: evmWatchlistSize(),
+      watchlistMax: WATCHLIST_MAX,
       swept: sweep?.swept ?? 0,
       candidates: sweep?.candidates ?? 0,
       newSignals: sweep?.newSignals ?? 0,

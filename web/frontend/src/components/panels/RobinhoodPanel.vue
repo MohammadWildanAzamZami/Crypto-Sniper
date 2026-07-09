@@ -221,7 +221,9 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         <span class="rh__auto-dot" aria-hidden="true"></span>
         <b>🤖 Auto-pilot</b>
         <span v-if="autoStatus" class="rh__auto-stat">
-          {{ autoStatus.recorded }} wallet direkam · {{ autoStatus.bedahed }} winner dibedah · {{ autoStatus.swept }} disweep · {{ autoStatus.signalCount }} sinyal
+          <template v-if="autoStatus.watchlistSize != null">watchlist {{ autoStatus.watchlistSize }}<span v-if="autoStatus.watchlistMax">/{{ autoStatus.watchlistMax }}</span> · </template>
+          {{ autoStatus.swept }} disweep · {{ autoStatus.signalCount }} sinyal
+          <span v-if="autoStatus.capped" class="rh__auto-cap" title="Watchlist penuh — berhenti tumbuh, semua tetap dipantau">🔒 penuh</span>
           <span class="rh__auto-ago">({{ autoStatus.at ? ageOf(new Date(autoStatus.at).toISOString()) + " lalu" : "" }})</span>
         </span>
         <span v-else class="rh__auto-stat">menunggu tick pertama…</span>
@@ -502,6 +504,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 @keyframes rh-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 .rh__auto-stat { color: var(--text-muted); }
 .rh__auto-ago { color: var(--text-muted); opacity: 0.8; }
+.rh__auto-cap { color: #d97706; font-weight: 700; }
 
 /* Discover prototipe live */
 .rh__disc { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--bg-raised); border: 1px solid var(--border-default); border-radius: var(--control-radius); }

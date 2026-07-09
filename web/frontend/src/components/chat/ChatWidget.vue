@@ -233,7 +233,7 @@ function onResizeKey(e) {
   max-height: calc(100vh - 110px);
   display: grid;
   grid-template-rows: auto 1fr;
-  background: var(--bg-subtle, #1a1a1a);
+  background: var(--bg-subtle, #000000);
   border: 1px solid var(--border-default, #333);
   border-radius: var(--radius-lg, 14px);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);

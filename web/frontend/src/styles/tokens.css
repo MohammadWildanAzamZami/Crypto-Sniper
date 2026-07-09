@@ -39,9 +39,9 @@
   --color-text-inverse: #12e400;    /* brighter green — hover */
 
   --color-surface-base: #000000;    /* pure black canvas */
-  --color-surface-muted: #0a0a0b;
-  --color-surface-raised: #1c1c1e;  /* cards / raised surfaces */
-  --color-surface-strong: #141416;
+  --color-surface-muted: #000000;   /* semua latar abu-abu → hitam */
+  --color-surface-raised: #000000;  /* cards / raised surfaces — hitam */
+  --color-surface-strong: #000000;
 
   --color-border-default: #2a2a2d;
   --color-border-muted: #1f1f22;

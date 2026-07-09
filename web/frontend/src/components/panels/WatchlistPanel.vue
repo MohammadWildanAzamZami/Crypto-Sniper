@@ -18,6 +18,7 @@ const SHOW_INFLUENCER = false;
 
 const data = ref(null);
 const loading = ref(false);
+const discovering = ref(false); // on-demand auto-discovery sweep in progress
 const error = ref("");
 const copied = ref("");
 
@@ -54,6 +55,24 @@ async function load() {
     loading.value = false;
   }
 }
+// Trigger one on-chain discovery cycle (auto-Bedah + top-trader harvest), then
+// reload the watchlist so any newly-found wallets show up immediately.
+async function discover() {
+  if (discovering.value) return;
+  discovering.value = true;
+  error.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/watchlist/discover"));
+    const body = await r.json();
+    if (!r.ok) error.value = body?.error || `Pencarian gagal (${r.status})`;
+    else await load();
+  } catch {
+    error.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  } finally {
+    discovering.value = false;
+  }
+}
+
 // ---- Influencer tab (Modul B2) --------------------------------------------
 async function loadInfluencers() {
   if (infLoading.value) return;
@@ -127,13 +146,24 @@ onMounted(load);
           token fresh sudah cukup memunculkan sinyal (tak perlu menunggu ≥2 wallet). Heuristik, bukan nasihat keuangan.
         </p>
       </div>
-      <button
-        class="scanbtn"
-        :disabled="mode === 'smart' ? loading : infLoading"
-        @click="mode === 'smart' ? load() : loadInfluencers()"
-      >
-        {{ (mode === 'smart' ? loading : infLoading) ? "Memuat…" : "↻ Segarkan" }}
-      </button>
+      <div class="wl-head-actions">
+        <button
+          v-if="mode === 'smart'"
+          class="scanbtn scanbtn--ghost"
+          :disabled="discovering"
+          title="Cari smart money baru dari on-chain sekarang (auto-Bedah + top-trader) tanpa Bedah manual"
+          @click="discover"
+        >
+          {{ discovering ? "🛰️ Mencari…" : "🛰️ Cari wallet" }}
+        </button>
+        <button
+          class="scanbtn"
+          :disabled="mode === 'smart' ? loading : infLoading"
+          @click="mode === 'smart' ? load() : loadInfluencers()"
+        >
+          {{ (mode === 'smart' ? loading : infLoading) ? "Memuat…" : "↻ Segarkan" }}
+        </button>
+      </div>
     </div>
 
     <!-- Tab switch: smart-wallet ranking (Modul B) vs manual influencers (Modul B2).
@@ -162,12 +192,18 @@ onMounted(load);
         <div class="wl-chip wl-chip--ok"><b>{{ data.active }}</b> / {{ data.watchSize }} aktif dipantau</div>
         <div class="wl-chip">cek tiap <b>{{ data.pollMin }}m</b></div>
         <div class="wl-chip">winner = <b>≥{{ data.winnerMinX }}x</b></div>
+        <div
+          v-if="data.discovery"
+          class="wl-chip wl-chip--auto"
+          :title="'Auto-discovery on-chain: Bedah ' + (data.discovery.winnersRecorded||0) + ' winner + panen ' + (data.discovery.walletsAdded||0) + ' top-trader (siklus terakhir). Isi watchlist tanpa Bedah manual.'"
+        >🛰️ auto-discovery{{ discovering ? " …" : "" }}</div>
       </div>
 
       <!-- Empty state -->
       <p v-if="!data.wallets.length" class="wl-empty">
-        Belum ada wallet. Buka <b>🔬 Bedah Coin</b> dan bedah beberapa token yang sudah pump besar (≥{{ data.winnerMinX }}x) —
-        smart wallet-nya akan otomatis masuk ke sini.
+        Belum ada wallet. Tekan <b>🛰️ Cari wallet</b> untuk memancing smart money langsung dari on-chain
+        (auto-Bedah + top-trader) — atau buka <b>🔬 Bedah Coin</b> dan bedah token yang sudah pump besar
+        (≥{{ data.winnerMinX }}x). Watchlist juga terisi otomatis di background tiap beberapa menit.
       </p>
 
       <!-- Ranked list — scroll box, ~4 wallet terlihat default -->
@@ -192,6 +228,10 @@ onMounted(load);
             <span v-if="w.bestCatch" class="wl-best">· best {{ w.bestCatch.symbol }} {{ xFmt(w.bestCatch.xFromEntry) }}</span>
           </span>
           <span class="wl-flags">
+            <span
+              class="wl-badge wl-badge--src"
+              :title="w.source === 'toptrader' ? 'Ditemukan dari top-trader token trending (Path B) — ' + (w.sightings||0) + ' kemunculan' : 'Ditemukan dari Bedah Coin winner (Modul A)'"
+            >{{ w.source === 'toptrader' ? 'top-trader' : 'bedah' }}</span>
             <span v-if="w.established" class="wl-badge wl-badge--ok">mapan</span>
             <span v-if="w.active" class="wl-badge wl-badge--active">dipantau</span>
           </span>
@@ -438,6 +478,17 @@ onMounted(load);
 }
 .wl-badge--ok { color: var(--text-success); border-color: var(--text-success); }
 .wl-badge--active { color: var(--text-on-accent); background: var(--bg-accent); border-color: transparent; }
+.wl-badge--src { color: var(--text-muted); border-style: dashed; cursor: help; }
+
+/* Auto-discovery: head action buttons + status chip */
+.wl-head-actions { display: flex; gap: var(--space-3); flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.scanbtn--ghost { background: transparent; color: var(--text-muted); }
+.scanbtn--ghost:hover:not(:disabled) { color: var(--text-body); border-color: var(--text-success); }
+.wl-chip--auto {
+  color: var(--text-success); cursor: help;
+  border-color: color-mix(in srgb, var(--text-success) 40%, var(--border-default));
+  background: color-mix(in srgb, var(--text-success) 12%, transparent);
+}
 
 .wl-note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
