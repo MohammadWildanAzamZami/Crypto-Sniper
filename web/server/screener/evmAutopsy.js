@@ -12,10 +12,35 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const BS = "https://robinhoodchain.blockscout.com";
 const NET = "robinhood";
 
-async function jget(url) {
-  try { const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }); return r && r.ok ? await r.json() : null; }
-  catch { return null; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// GET JSON dengan RETRY pada 429/5xx/timeout. Blockscout publik sering membalas
+// kosong/limit saat dipanggil beruntun dalam satu Bedah — tanpa retry, satu blip
+// membuat seluruh Bedah gagal ("tak ada histori transfer" yang menyesatkan).
+// Mengembalikan { ok, data, status }:
+//   ok:true  → sukses (data = JSON; boleh saja kosong — pemanggil yang menilai)
+//   ok:false → gagal permanen setelah retry; status: 'ratelimit'|'server'|'http'|'network'
+async function jfetch(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
+      if (r.status === 429 || r.status >= 500) {
+        if (i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+        return { ok: false, status: r.status === 429 ? "ratelimit" : "server" };
+      }
+      if (!r.ok) return { ok: false, status: "http" };
+      return { ok: true, data: await r.json() };
+    } catch {
+      // AbortError (timeout) / gangguan jaringan → coba lagi, lalu menyerah.
+      if (i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return { ok: false, status: "network" };
+    }
+  }
+  return { ok: false, status: "network" };
 }
+
+// Backward-compatible: data-atau-null (dipakai topPool/tokenMeta/tokenBalance).
+async function jget(url) { const r = await jfetch(url); return r.ok ? r.data : null; }
 
 // Pool likuiditas-terbesar + harga/mcap kini + identitas.
 async function topPool(token) {
@@ -39,18 +64,26 @@ async function tokenMeta(token) {
   return { decimals: t && t.decimals != null ? Number(t.decimals) : 18, symbol: t?.symbol || "", name: t?.name || "" };
 }
 
-// Transfer token PALING AWAL (ascending), sampai maxRows.
+// Transfer token PALING AWAL (ascending), sampai maxRows. Mengembalikan
+// { rows, failed, reason }: `failed:true` bila panggilan HALAMAN PERTAMA gagal
+// transien (limit/timeout/5xx) setelah retry — supaya pemanggil bisa membedakan
+// "Blockscout sibuk, coba lagi" dari "token ini memang tanpa transfer". Kegagalan
+// di halaman berikutnya berhenti mulus (kita sudah punya sebagian data).
 async function earliestTransfers(token, maxRows) {
   const out = [];
   const offset = 100;
   for (let page = 1; out.length < maxRows && page <= Math.ceil(maxRows / offset) + 1; page++) {
-    const j = await jget(`${BS}/api?module=account&action=tokentx&contractaddress=${token}&sort=asc&page=${page}&offset=${offset}`);
-    const rows = j?.result;
+    const r = await jfetch(`${BS}/api?module=account&action=tokentx&contractaddress=${token}&sort=asc&page=${page}&offset=${offset}`);
+    if (!r.ok) {
+      if (page === 1) return { rows: [], failed: true, reason: r.status };
+      break;
+    }
+    const rows = r.data?.result;
     if (!Array.isArray(rows) || !rows.length) break;
     out.push(...rows);
     if (rows.length < offset) break;
   }
-  return out.slice(0, maxRows);
+  return { rows: out.slice(0, maxRows), failed: false };
 }
 
 // Saldo token wallet SEKARANG (Etherscan-compat). null bila gagal (fail-safe).
@@ -81,8 +114,12 @@ export async function bedahEvmToken(token, opts = {}) {
 
   const [pool, meta] = await Promise.all([topPool(addr), tokenMeta(addr)]);
   if (!pool || !pool.poolAddress) return { error: "pool token tak ditemukan di GeckoTerminal" };
-  const transfers = await earliestTransfers(addr, maxTransfers);
-  if (!transfers.length) return { error: "tak ada histori transfer di Blockscout" };
+  const { rows: transfers, failed, reason } = await earliestTransfers(addr, maxTransfers);
+  if (failed) {
+    const why = reason === "ratelimit" ? "kena rate-limit" : reason === "network" ? "timeout/jaringan" : "error sementara";
+    return { error: `Blockscout sedang sibuk (${why}) — gagal ambil histori transfer. Coba Bedah lagi sebentar lagi.`, retryable: true };
+  }
+  if (!transfers.length) return { error: "Token ini benar-benar tak punya histori transfer di Blockscout (mungkin terlalu baru / belum terindeks)." };
 
   const poolAddr = pool.poolAddress;
   const dec = meta.decimals || 18;

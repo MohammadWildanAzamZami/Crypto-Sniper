@@ -108,7 +108,9 @@ router.get("/robinhood/bedah", scanLimit, async (req, res) => {
     const out = await bedahEvmToken(token, {
       maxTransfers: Number(req.query.max) > 0 ? Math.min(600, Number(req.query.max)) : undefined,
     });
-    if (out?.error) return res.status(404).json(out);
+    // Kegagalan transien (Blockscout sibuk/limit) → 503 "coba lagi", bukan 404
+    // (yang menyiratkan token benar-benar tak ada). Frontend bisa tawarkan retry.
+    if (out?.error) return res.status(out.retryable ? 503 : 404).json(out);
     res.json(out);
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });

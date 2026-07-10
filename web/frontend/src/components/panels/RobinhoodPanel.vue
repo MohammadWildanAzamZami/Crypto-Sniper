@@ -70,19 +70,21 @@ const bedahToken = ref("");
 const bedah = ref(null);
 const bedahLoading = ref(false);
 const bedahError = ref("");
+const bedahRetryable = ref(false); // error transien (Blockscout sibuk) → tawarkan "Coba lagi"
 const shortAddr = (a) => (a ? a.slice(0, 6) + "…" + a.slice(-4) : "—");
 async function runBedah(tokenArg) {
   const t = String(tokenArg || bedahToken.value || "").trim();
-  if (!/^0x[0-9a-fA-F]{40}$/.test(t)) { bedahError.value = "Alamat token 0x… tidak valid."; return; }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(t)) { bedahError.value = "Alamat token 0x… tidak valid."; bedahRetryable.value = false; return; }
   bedahToken.value = t;
   if (bedahLoading.value) return;
   bedahLoading.value = true;
   bedahError.value = "";
+  bedahRetryable.value = false;
   bedah.value = null;
   try {
     const r = await fetch(apiUrl("/api/robinhood/bedah?token=" + t));
     const body = await r.json();
-    if (!r.ok) bedahError.value = body?.error || `Bedah gagal (${r.status})`;
+    if (!r.ok) { bedahError.value = body?.error || `Bedah gagal (${r.status})`; bedahRetryable.value = !!body?.retryable; }
     else bedah.value = body;
   } catch {
     bedahError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
@@ -325,7 +327,12 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         </button>
       </div>
 
-      <p v-if="bedahError" class="rh__err" role="alert">⚠️ {{ bedahError }}</p>
+      <p v-if="bedahError" class="rh__err" role="alert">
+        ⚠️ {{ bedahError }}
+        <button v-if="bedahRetryable" class="rh__btn rh__btn--retry" :disabled="bedahLoading" @click="runBedah()">
+          {{ bedahLoading ? "Mencoba…" : "🔄 Coba lagi" }}
+        </button>
+      </p>
 
       <template v-if="bedah">
         <p class="rh__meta">
@@ -520,6 +527,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 .rh__btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .rh__btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .rh__err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
+.rh__btn--retry { margin-left: var(--space-3); padding: 2px 10px; vertical-align: middle; }
 .rh__hint { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
 .rh__meta { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
 .rh__pools { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); max-height: 340px; overflow-y: auto; scrollbar-width: thin; }

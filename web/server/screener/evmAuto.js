@@ -23,9 +23,22 @@ const WATCHLIST_MAX = Number(process.env.RH_WATCHLIST_MAX || 300);
 // Token yang sudah di-seed baru-baru ini (hindari re-bedah tiap tick).
 const seededAt = new Map(); // token → ms
 
-async function jget(url) {
-  try { const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }); return r && r.ok ? await r.json() : null; }
-  catch { return null; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// GET JSON dengan retry pada 429/5xx/timeout (auto-pilot menembak Blockscout tiap
+// tick; retry mencegah blip transien menggagalkan seed/sweep). Null = gagal permanen.
+async function jget(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
+      if ((r.status === 429 || r.status >= 500) && i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return r && r.ok ? await r.json() : null;
+    } catch {
+      if (i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return null;
+    }
+  }
+  return null;
 }
 
 function tokenAddr(id) { if (!id) return null; const i = id.indexOf("_"); return i >= 0 ? id.slice(i + 1) : id; }

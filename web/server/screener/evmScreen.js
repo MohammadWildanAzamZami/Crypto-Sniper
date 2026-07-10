@@ -11,12 +11,24 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const BS = "https://robinhoodchain.blockscout.com/api/v2";
 const NET = "robinhood";
 
-async function jget(url) {
-  try {
-    const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
-    if (!r || !r.ok) return null;
-    return await r.json();
-  } catch { return null; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// GET JSON dengan retry pada 429/5xx/timeout — GeckoTerminal/Blockscout publik
+// sering limit saat dipanggil beruntun; retry mencegah satu blip meng-null-kan
+// metrik. Tetap null pada kegagalan permanen (pemanggil sudah degrade dengan aman).
+async function jget(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
+      if ((r.status === 429 || r.status >= 500) && i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      if (!r || !r.ok) return null;
+      return await r.json();
+    } catch {
+      if (i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return null;
+    }
+  }
+  return null;
 }
 
 // GeckoTerminal: metrik pasar dari pool likuiditas-terbesar milik token.

@@ -43,9 +43,22 @@ function save() {
   catch { /* read-only FS */ }
 }
 
-async function jget(url) {
-  try { const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) }); return r && r.ok ? await r.json() : null; }
-  catch { return null; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// GET JSON dengan retry pada 429/5xx/timeout (Blockscout publik sering limit saat
+// sweep menembak banyak wallet beruntun). Null pada kegagalan permanen (fail-safe).
+async function jget(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
+      if ((r.status === 429 || r.status >= 500) && i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return r && r.ok ? await r.json() : null;
+    } catch {
+      if (i < tries - 1) { await sleep(600 * (i + 1)); continue; }
+      return null;
+    }
+  }
+  return null;
 }
 async function mapPool(items, limit, fn) {
   const out = []; let i = 0;
