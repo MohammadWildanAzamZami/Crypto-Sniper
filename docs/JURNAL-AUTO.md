@@ -3,11 +3,16 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-10 21:39** · Total **148** commit dalam **12** hari.
+> Terakhir diperbarui: **2026-07-11 00:40** · Total **150** commit dalam **13** hari.
 
 ---
 
-## 2026-07-10 (Jumat) — 30 commit
+## 2026-07-11 (Sabtu) — 1 commit
+
+**✨ Fitur baru / penambahan**
+- feat(sniper): grup Discovery editable di Settings + rapikan teks watchlist  `6a9a5a4`
+
+## 2026-07-10 (Jumat) — 31 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking  `cc17367`
@@ -43,6 +48,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `210eef4`
 - docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `2203096`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `ed6ac82`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `f15e0d2`
 
 **♻️ Refactor / rapikan**
 - refactor(robinhood): hapus daftar roadmap "rencana" — semua tool sudah live  `4d31345`
