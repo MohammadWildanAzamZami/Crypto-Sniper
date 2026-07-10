@@ -316,8 +316,9 @@ onMounted(() => { load(); loadSniper(); });
           <span class="pill pill--ok">v2</span>
         </div>
         <p class="hint">
-          Ambang &amp; tunable mesin <b>Sinyal Sniper Live</b>. Perubahan berlaku di
-          <b>sweep berikutnya</b> tanpa restart. Env <code>SNIPER_*</code> jadi nilai default.
+          Ambang &amp; tunable mesin <b>Sinyal Sniper Live</b> + grup <b>Discovery</b>
+          (cari &amp; pantau smart wallet otomatis). Perubahan berlaku di
+          <b>sweep/siklus berikutnya</b> tanpa restart. Env <code>SNIPER_*</code> jadi nilai default.
         </p>
 
         <div v-for="g in sniperGroups" :key="g" class="pgroup">

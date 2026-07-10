@@ -139,7 +139,7 @@ onMounted(load);
         <h2 id="watchlist-h">🎯 Watchlist Wallet <span class="tag">Sniper</span></h2>
         <p v-if="mode === 'smart'" class="panel__sub">
           Wallet yang <b>berulang kali menangkap winner lebih awal</b> — direkam otomatis dari Bedah Coin,
-          diurutkan dari <b>total kelipatan winner terbesar</b> (Σ) ke terkecil. Semua wallet <b>aktif dipantau</b> monitor live.
+          diurutkan dari <b>total kelipatan winner terbesar</b> (Σ) ke terkecil. Wallet teratas (by reputasi) <b>aktif dipantau</b> monitor live.
         </p>
         <p v-else class="panel__sub">
           Wallet <b>influencer yang kamu masukkan sendiri</b> — dipantau monitor live. <b>Satu</b> influencer beli
@@ -243,8 +243,9 @@ onMounted(load);
       </p>
 
       <p class="wl-note">
-        ⏳ Monitor live (alert saat wallet ini mulai borong token baru) belum aktif — itu tahap berikutnya (Modul C).
-        Track record heuristik, bukan nasihat keuangan.
+        📡 Monitor live (Modul C) memantau wallet aktif tiap <b>{{ data.pollMin }}m</b> dan memunculkan sinyal saat mereka
+        mulai borong token baru — lihat panel <b>🎯 Sinyal Sniper Live</b>. Mode real-time (push detik via webhook Helius)
+        aktif jika <code>PUBLIC_URL</code>/ngrok diset. Track record heuristik, bukan nasihat keuangan.
       </p>
     </template>
     </template>

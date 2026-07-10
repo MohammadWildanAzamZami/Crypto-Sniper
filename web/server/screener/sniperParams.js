@@ -95,6 +95,28 @@ export const PARAM_DEFS = [
   { key: "signalTtlMin", env: "SNIPER_SIGNAL_TTL_MIN", type: "int", def: 360, min: 10, max: 2880, step: 10,
     group: "Mesin", label: "Umur sinyal / TTL (menit)",
     hint: "Sinyal yang tak terbarui lebih lama dari ini dihapus agar daftar tetap segar." },
+
+  // ── Discovery (cari smart wallet otomatis — Modul A/B) ────────────────────
+  // Dibaca saat runtime oleh discoverWallets.js + watchlist.js, jadi ubahan dari
+  // Settings UI berlaku di siklus/panggilan berikutnya tanpa restart.
+  { key: "discoveryTokens", env: "SNIPER_DISCOVERY_TOKENS", type: "int", def: 30, min: 5, max: 100, step: 5,
+    group: "Discovery", label: "Token tren / siklus",
+    hint: "Berapa mint trending ditarik tiap siklus discovery sebagai bahan auto-Bedah + panen top-trader." },
+  { key: "autopsyPerCycle", env: "SNIPER_AUTOPSY_PER_CYCLE", type: "int", def: 3, min: 0, max: 20, step: 1,
+    group: "Discovery", label: "Auto-Bedah / siklus",
+    hint: "Batas token yang di-Bedah forensik penuh tiap siklus (mahal — paged Birdeye). Hanya winner yang lolos jadi 'catch'." },
+  { key: "topTraderTokens", env: "SNIPER_TOPTRADER_TOKENS", type: "int", def: 8, min: 0, max: 50, step: 1,
+    group: "Discovery", label: "Scan top-trader / siklus",
+    hint: "Batas token yang dipanen top-trader-nya tiap siklus (murah, 1 call/mint). Wallet berkualitas (profit + net-buyer + bukan bundler) direkam sebagai 'sighting'." },
+  { key: "discoveryThrottleMs", env: "SNIPER_DISCOVERY_THROTTLE_MS", type: "int", def: 400, min: 0, max: 5000, step: 50,
+    group: "Discovery", label: "Jeda antar-call (ms)",
+    hint: "Jeda antar panggilan Birdeye saat discovery agar tier gratis tak ke-burst." },
+  { key: "watchSize", env: "SNIPER_WATCH_SIZE", type: "int", def: 0, min: 0, max: 2000, step: 10,
+    group: "Discovery", label: "Wallet dipantau (0 = semua)",
+    hint: "Berapa wallet teratas (by reputasi) yang dipantau monitor live. 0 = pantau SEMUA. Webhook Helius tetap dibatasi ~100 alamat." },
+  { key: "winnerMinX", env: "SNIPER_WINNER_MIN_X", type: "int", def: 10, min: 2, max: 100, step: 1,
+    group: "Discovery", label: "Ambang winner (x)",
+    hint: "Token dianggap 'winner' (pembeli awalnya dapat 'catch') jika sudah pump ≥ ini dari launch. Naikkan untuk hanya belajar dari runner besar." },
 ];
 
 const DEF_BY_KEY = new Map(PARAM_DEFS.map((d) => [d.key, d]));

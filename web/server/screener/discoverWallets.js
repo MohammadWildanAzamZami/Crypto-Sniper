@@ -16,11 +16,12 @@ import { discoverSolanaTokens } from "./discover.js";
 import { runAutopsy } from "./autopsy.js";
 import { birdeyeTopTraders } from "./smartMoney.js";
 import { recordCandidates, recordTopTraders } from "./watchlist.js";
+import { getParams } from "./sniperParams.js";
 
-const DISCOVERY_TOKENS = Number(process.env.SNIPER_DISCOVERY_TOKENS || 30);     // trending mints pulled / cycle
-const AUTOPSY_PER_CYCLE = Number(process.env.SNIPER_AUTOPSY_PER_CYCLE || 3);    // cap auto-Bedah / cycle (expensive)
-const TOPTRADER_TOKENS = Number(process.env.SNIPER_TOPTRADER_TOKENS || 8);      // cap top-trader scans / cycle
-const THROTTLE_MS = Number(process.env.SNIPER_DISCOVERY_THROTTLE_MS || 400);    // pause between Birdeye calls
+// All four discovery tunables now live in the runtime param registry
+// (sniperParams.js, group "Discovery") and are read via getParams() at the START of
+// each cycle — so an edit from the Settings UI takes effect on the next cycle with
+// no restart. Env vars (SNIPER_DISCOVERY_*) still seed the defaults.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -42,6 +43,13 @@ export async function runDiscovery({ birdeyeKey, heliusKey, nowMs } = {}) {
   if (!birdeyeKey) return { disabled: true, reason: "Birdeye key belum diset", ...getDiscoveryStatus() };
   if (running) return { skipped: true, reason: "discovery masih berjalan", ...getDiscoveryStatus() };
   running = true;
+
+  // Read the tunables once per cycle (runtime — reflects any Settings UI change).
+  const P = getParams();
+  const DISCOVERY_TOKENS = P.discoveryTokens;   // trending mints pulled / cycle
+  const AUTOPSY_PER_CYCLE = P.autopsyPerCycle;  // cap auto-Bedah / cycle (expensive)
+  const TOPTRADER_TOKENS = P.topTraderTokens;   // cap top-trader scans / cycle
+  const THROTTLE_MS = P.discoveryThrottleMs;    // pause between Birdeye calls
 
   const summary = { at: now, discovered: 0, autopsied: 0, winnersRecorded: 0, tradersScanned: 0, walletsAdded: 0 };
   try {

@@ -12,17 +12,19 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { getParams } from "./sniperParams.js";
 
 const FILE_PATH = fileURLToPath(new URL("./.watchlist-state.json", import.meta.url));
 
-// D5 tunables (env-overridable so the user can retune without a code change).
-// WATCH_SIZE = berapa wallet teratas (by reputasi) yang dipantau live. 0 = TANPA
-// BATAS → SEMUA wallet di watchlist dipantau (default sekarang). Set angka > 0 untuk
-// membatasi lagi (mis. hemat panggilan Helius kalau watchlist sudah ratusan wallet).
-export const WATCH_SIZE = Number(process.env.SNIPER_WATCH_SIZE || 0);       // 0 = no limit (monitor all)
-const NO_LIMIT = !(WATCH_SIZE > 0);
+// D5 tunables. watchSize + winnerMinX now live in the runtime param registry
+// (sniperParams.js, group "Discovery") and are read via getParams() at CALL time, so
+// a Settings-UI change takes effect immediately (next call) with no restart. Env
+// (SNIPER_WATCH_SIZE / SNIPER_WINNER_MIN_X) still seed the defaults.
+//   watchSize = berapa wallet teratas (by reputasi) yang dipantau live. 0 = TANPA
+//   BATAS → SEMUA wallet di watchlist dipantau.
+// POLL_MIN stays a boot-time const: the monitor interval is scheduled once at startup
+// (index.js), so changing it needs a restart — not a runtime knob.
 export const POLL_MIN = Number(process.env.SNIPER_POLL_MIN || 5);           // monitor interval (Modul C)
-const WINNER_MIN_X = Number(process.env.SNIPER_WINNER_MIN_X || 10);         // "winner" = launch→now ≥ this
 const MAX_WALLETS = 2000;   // hard cap so the file can't grow unbounded
 const MAX_CATCHES = 20;     // keep the most recent N catches per wallet
 
@@ -73,9 +75,10 @@ function computeReputation(w) {
  */
 export function recordCandidates(report, nowMs) {
   const now = nowMs ?? Date.now();
+  const winnerMinX = getParams().winnerMinX;   // runtime (Settings UI) — "winner" threshold
   const x = report?.token?.launchToNowX ?? null;
   const cands = Array.isArray(report?.smartWalletCandidates) ? report.smartWalletCandidates : [];
-  if (!x || x < WINNER_MIN_X || cands.length === 0) {
+  if (!x || x < winnerMinX || cands.length === 0) {
     return { recorded: 0, winner: false, launchToNowX: x };
   }
 
@@ -145,8 +148,10 @@ export function recordTopTraders(traders, { mint, symbol } = {}, nowMs) {
 // ranking metric — from biggest total winners down to smallest.
 const winnerSum = (w) => w.catches.reduce((s, c) => s + (c.xFromEntry || 0), 0);
 
-/** Shape a wallet record for the client (compact, no internal churn). */
-function toPublic(w, rank) {
+/** Shape a wallet record for the client (compact, no internal churn).
+ * `watchSize`/`noLimit` are passed in (resolved once by the caller) so every row in
+ * a listing agrees on the same active cut. */
+function toPublic(w, rank, watchSize, noLimit) {
   return {
     owner: w.owner,
     rank,
@@ -156,7 +161,7 @@ function toPublic(w, rank) {
     source: w.source || "bedah",                     // "bedah" (Modul A) | "toptrader" (Path B)
     winnerScore: Math.round(winnerSum(w) * 10) / 10, // Σ kelipatan semua winner (sort key)
     established: w.established,
-    active: NO_LIMIT || rank <= WATCH_SIZE,
+    active: noLimit || rank <= watchSize,
     bestCatch: w.catches.reduce((best, c) => (!best || (c.xFromEntry || 0) > (best.xFromEntry || 0) ? c : best), null),
     recentCatches: w.catches.slice(-3).reverse().map((c) => ({ symbol: c.symbol, mint: c.mint, xFromEntry: c.xFromEntry })),
     lastSeen: w.lastSeen,
@@ -166,16 +171,19 @@ function toPublic(w, rank) {
 /** The ranked watchlist — ordered by TOTAL winner multiple (biggest → smallest),
  * reputasi sebagai tiebreak. Top WATCH_SIZE flagged active (monitored by Modul C). */
 export function getWatchlist({ limit = 200 } = {}) {
+  const P = getParams();
+  const watchSize = P.watchSize;
+  const noLimit = !(watchSize > 0);
   const ranked = [...wallets.values()].sort((a, b) => winnerSum(b) - winnerSum(a) || b.reputation - a.reputation);
-  const list = ranked.slice(0, limit).map((w, i) => toPublic(w, i + 1));
+  const list = ranked.slice(0, limit).map((w, i) => toPublic(w, i + 1, watchSize, noLimit));
   return {
     total: wallets.size,
     // No limit → semua wallet aktif dipantau; laporkan sebagai "N / N".
-    active: NO_LIMIT ? wallets.size : Math.min(WATCH_SIZE, wallets.size),
-    watchSize: NO_LIMIT ? wallets.size : WATCH_SIZE,
-    watchAll: NO_LIMIT,
+    active: noLimit ? wallets.size : Math.min(watchSize, wallets.size),
+    watchSize: noLimit ? wallets.size : watchSize,
+    watchAll: noLimit,
     pollMin: POLL_MIN,
-    winnerMinX: WINNER_MIN_X,
+    winnerMinX: P.winnerMinX,
     wallets: list,
   };
 }
@@ -191,6 +199,8 @@ export function getWalletMeta(owner) {
 /** The active set the live monitor should poll. Default (WATCH_SIZE=0) = ALL wallets
  * in the watchlist; a positive WATCH_SIZE caps it to the top N by reputation. */
 export function getActiveWallets() {
+  const watchSize = getParams().watchSize;
+  const noLimit = !(watchSize > 0);
   const ranked = [...wallets.values()].sort((a, b) => b.reputation - a.reputation);
-  return (NO_LIMIT ? ranked : ranked.slice(0, WATCH_SIZE)).map((w) => w.owner);
+  return (noLimit ? ranked : ranked.slice(0, watchSize)).map((w) => w.owner);
 }
