@@ -16,6 +16,17 @@
 
 const BIRDEYE = "https://public-api.birdeye.so";
 const HELIUS = "https://api.helius.xyz";
+const DEXSCREENER_TOKEN = "https://api.dexscreener.com/latest/dex/tokens";
+
+// Canonical quote mints (SOL/USDC/USDT). A pair quoted in one of these has a
+// reliable USD price; exotic token-token pairs on DexScreener sometimes report a
+// wildly wrong priceUsd (e.g. Bonk/MET showing 5000× the real price), so we price
+// off canonical pairs and only fall back to a Birdeye spot price otherwise.
+const CANON_QUOTES = new Set([
+  "So11111111111111111111111111111111111111112", // wSOL
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+]);
 
 // D6: two "early" tiers by market cap at time of the wallet's first buy.
 const ULTRA_EARLY_MCAP = 50_000;   // ultra-early hunters — sharpest, riskiest
@@ -56,22 +67,100 @@ const bHeaders = (key) => ({ "X-API-KEY": key, "x-chain": "solana", accept: "app
 
 // Current price + market cap + identity. supply is implied (mcap / price) so we
 // can reconstruct the market cap at any past trade from its USD price alone.
+//
+// Primary source is Birdeye token_overview, but that is Birdeye's single most
+// COMPUTE-UNIT-EXPENSIVE endpoint: once the account's CU budget is spent it 400s
+// with "Compute units usage limit exceeded" for EVERY token, which used to surface
+// as a bogus "token not found". So we fall back to DexScreener (free, key-less, no
+// CU) for price + market cap → implied supply. The forensic trade history still
+// comes from Birdeye's cheaper txs/token endpoint, so autopsy keeps working even
+// when token_overview is quota-blocked. Returns { ..., source } for observability.
 async function tokenOverview(mint, key) {
+  // 1) Birdeye token_overview — richest data when the CU budget allows it.
   try {
     const res = await fetchRetry(`${BIRDEYE}/defi/token_overview?address=${mint}`, { headers: bHeaders(key) });
-    if (!res || !res.ok) return null;
-    const d = (await res.json())?.data;
-    if (!d) return null;
-    const price = Number(d.price) || 0;
-    const marketCap = Number(d.marketCap ?? d.mc) || 0;
-    const supply = price > 0 && marketCap > 0 ? marketCap / price : Number(d.circulatingSupply) || 0;
-    return {
-      symbol: d.symbol || "", name: d.name || "", logoUrl: d.logoURI || null,
-      decimals: Number(d.decimals) || 0, price, marketCap, supply,
-    };
+    if (res && res.ok) {
+      const d = (await res.json())?.data;
+      if (d) {
+        const price = Number(d.price) || 0;
+        const marketCap = Number(d.marketCap ?? d.mc) || 0;
+        const supply = price > 0 && marketCap > 0 ? marketCap / price : Number(d.circulatingSupply) || 0;
+        if (price > 0 && supply > 0) {
+          return {
+            symbol: d.symbol || "", name: d.name || "", logoUrl: d.logoURI || null,
+            decimals: Number(d.decimals) || 0, price, marketCap, supply, source: "birdeye",
+          };
+        }
+      }
+    }
+  } catch { /* fall through to DexScreener */ }
+
+  // 2) DexScreener fallback — free & CU-free. Covers quota exhaustion (Birdeye 400
+  //    "Compute units usage limit exceeded") and any token_overview outage.
+  try {
+    const ds = await dexOverview(mint, key);
+    if (ds && ds.price > 0 && ds.supply > 0) return ds;
+  } catch { /* both sources failed */ }
+
+  return null;
+}
+
+// Birdeye spot price via the CHEAP /defi/price endpoint (stays 200 even when the
+// expensive token_overview is CU-blocked). Returns 0 on any failure.
+async function birdeyePrice(mint, key) {
+  try {
+    const res = await fetchRetry(`${BIRDEYE}/defi/price?address=${mint}`, { headers: bHeaders(key) });
+    if (!res || !res.ok) return 0;
+    return Number((await res.json())?.data?.value) || 0;
   } catch {
-    return null;
+    return 0;
   }
+}
+
+// DexScreener-based overview. Guards against two DexScreener data traps:
+//   1) pairs where our mint is the QUOTE (price/mcap would be the other token's);
+//   2) exotic token-token pairs reporting a wildly wrong priceUsd.
+// So: keep only pairs where our mint is the BASE, then price off the deepest
+// canonical-quote (SOL/USDC/USDT) pair. If none exists, take a Birdeye spot price
+// and multiply by supply (= mcap/price ratio, which is stable even on a mispriced
+// pair). Returns { symbol, name, logoUrl, price, marketCap, supply, source }.
+async function dexOverview(mint, birdeyeKey) {
+  const res = await fetchRetry(`${DEXSCREENER_TOKEN}/${mint}`, {});
+  if (!res || !res.ok) return null;
+  const body = await res.json();
+  const base = (body.pairs || []).filter(
+    (p) => p.chainId === "solana" && p.baseToken?.address === mint
+  );
+  if (base.length === 0) return null;
+  base.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+
+  const deepest = base[0];
+  const meta = {
+    symbol: deepest.baseToken?.symbol || "",
+    name: deepest.baseToken?.name || "",
+    logoUrl: deepest.info?.imageUrl || null,
+    decimals: 0,
+  };
+  // Supply is the mcap/price ratio — stable across pairs even when a pair misprices
+  // the token, so we can trust it from the deepest pair regardless of quote.
+  const supply = (() => {
+    const p = Number(deepest.priceUsd) || 0;
+    const mc = Number(deepest.marketCap ?? deepest.fdv) || 0;
+    return p > 0 && mc > 0 ? mc / p : 0;
+  })();
+  if (supply <= 0) return null;
+
+  // Trust price from the deepest canonical-quote pair; else a Birdeye spot price.
+  const canon = base.find((p) => CANON_QUOTES.has(p.quoteToken?.address || ""));
+  let price = canon ? Number(canon.priceUsd) || 0 : 0;
+  let source = canon ? "dexscreener" : "";
+  if (price <= 0) {
+    price = await birdeyePrice(mint, birdeyeKey);
+    source = price > 0 ? "dexscreener+birdeye-price" : "";
+  }
+  if (price <= 0) return null;
+
+  return { ...meta, price, marketCap: price * supply, supply, source };
 }
 
 // One page of the token's trades, oldest first.
@@ -157,7 +246,7 @@ export async function runAutopsy(mint, { birdeyeKey, heliusKey, nowMs } = {}) {
 
   const ov = await tokenOverview(mint, birdeyeKey);
   if (!ov || ov.supply <= 0 || ov.price <= 0) {
-    return { error: "Token tidak ditemukan / data harga & market cap Birdeye tidak lengkap." };
+    return { error: "Token tidak ditemukan di Birdeye maupun DexScreener — cek alamat mint (harus token Solana yang sudah listing di DEX)." };
   }
 
   // 1) Page oldest→newest, collecting trades until mcap crosses the EARLY line.

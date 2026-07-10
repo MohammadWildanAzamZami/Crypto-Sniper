@@ -8,20 +8,36 @@ const SOLSCAN_PRO = "https://pro-api.solscan.io/v2.0";
 const RUGCHECK_REPORT = "https://api.rugcheck.xyz/v1/tokens";
 const PUMPFUN_COIN = "https://frontend-api-v3.pump.fun/coins";
 
+// Canonical quote mints (SOL/USDC/USDT). A pair quoted in one of these prices the
+// token reliably in USD; exotic token-token pairs on DexScreener occasionally
+// report a wildly wrong priceUsd (e.g. Bonk/MET showing ~5000× the real price),
+// so we price off a canonical pair whenever one exists.
+const CANON_QUOTES = new Set([
+  "So11111111111111111111111111111111111111112", // wSOL
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+]);
+
 /**
- * Fetch all DEX pairs for a token mint and return the most relevant Solana pair
- * (highest USD liquidity). Returns null if the token is not listed anywhere.
+ * Fetch all DEX pairs for a token mint and return the most relevant Solana pair.
+ * Only pairs where this mint is the BASE token are considered — otherwise the
+ * priceUsd/marketCap would describe the OTHER side of the pair. Among those, a
+ * canonical-quote (SOL/USDC/USDT) pair is preferred for trustworthy pricing,
+ * falling back to the deepest-liquidity pair. Returns null if the token is not
+ * listed as a base token on any Solana DEX.
  */
 export async function fetchDexScreener(tokenAddress) {
   const res = await fetch(`${DEXSCREENER_TOKEN}/${tokenAddress}`);
   if (!res.ok) throw new Error(`DexScreener responded ${res.status}`);
   const body = await res.json();
-  const pairs = (body.pairs || []).filter((p) => p.chainId === "solana");
+  const pairs = (body.pairs || []).filter(
+    (p) => p.chainId === "solana" && p.baseToken?.address === tokenAddress
+  );
   if (pairs.length === 0) return null;
 
-  // Pick the deepest-liquidity pair as the canonical market for scoring.
+  // Prefer a canonical-quote pair (reliable USD price); else the deepest market.
   pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
-  const best = pairs[0];
+  const best = pairs.find((p) => CANON_QUOTES.has(p.quoteToken?.address || "")) || pairs[0];
 
   return {
     address: tokenAddress,
