@@ -30,6 +30,9 @@ node_modules/
 # Sniper Engine v2 runtime parameter overrides (Settings UI)
 .sniper-params.json
 **/.sniper-params.json
+# Sniper Engine PnL track record (Modul C — graded signal outcomes)
+.sniper-track.json
+**/.sniper-track.json
 # Influencer watchlist (Modul B2)
 .influencers-state.json
 **/.influencers-state.json

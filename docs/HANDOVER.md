@@ -229,6 +229,17 @@ and the calibration log live in **[SNIPER-ENGINE.md](SNIPER-ENGINE.md)**.
   wallets are buying the same still-small token (mcap < `SNIPER_SIGNAL_MAX_MCAP`,
   2M). Signals dedupe + expire (TTL); Birdeye enrichment is bounded/parallel
   (cap 20 candidates → ~11 s/sweep). Persists to `screener/.sniper-state.json`.
+- **PnL track (`screener/sniperTrack.js`, `GET /api/sniper/track`).** Mirrors Pro
+  Radar's `learn.js`: each raised signal is snapshotted at its **entry** (mcap/price
+  at first detection — "the moment the tool signalled") into a gitignored
+  `.sniper-track.json`, then graded a few hours later (`SNIPER_GRADE_AFTER_MIN`,
+  default 180) against the live DexScreener price → **win** (≥+50%) / **loss**
+  (≤−25%) / **rug** (≤10% of entry or delisted) / **flat**, plus `multiple` and a
+  `peakMultiple` (best price seen while live). The record survives signal expiry/exit,
+  so realized sniper PnL is captured automatically. Idempotent per (variant, mint);
+  fresh-entry guard skips stale re-surfaces so entry is never mislabeled. Recording +
+  bounded grading run inside each sweep; the endpoint is read-only. Per-variant
+  (v2/awal) + overall win-rate & avg return. Does NOT tune anything — measurement only.
 
 All degrade safely (no key → feature off; failures → null, never throw). Signal
 quality rises as the watchlist accumulates more diverse winners — early on it can

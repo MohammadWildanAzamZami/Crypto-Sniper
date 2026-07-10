@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { getActiveWallets, getWalletMeta, POLL_MIN } from "./watchlist.js";
 import { screenToken } from "./screen.js";
 import { getParams } from "./sniperParams.js";
+import { recordSignals, gradeMatured } from "./sniperTrack.js";
 
 const HELIUS = "https://api.helius.xyz";
 const BIRDEYE = "https://public-api.birdeye.so";
@@ -529,7 +530,17 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
   for (const [mint, s] of signals) if (s.updatedAt < cutoff) signals.delete(mint);
 
   save(store);
-  return { variant, swept: active.length, candidates: candidates.length, newSignals, signals: getSignals(variant).signals };
+
+  // Persistent PnL track (like Pro Radar's learn.js): snapshot each freshly-raised
+  // signal's entry once, then grade matured records against the live price — so the
+  // sniper's realized PnL survives signal expiry/exit. Must never break a sweep.
+  const surfaced = getSignals(variant).signals;
+  try {
+    recordSignals(surfaced, variant, now);
+    await gradeMatured(now);
+  } catch { /* tracking is best-effort — a sweep never fails because of it */ }
+
+  return { variant, swept: active.length, candidates: candidates.length, newSignals, signals: surfaced };
 }
 
 /** Current live signals (freshest first), plus config for the UI. */

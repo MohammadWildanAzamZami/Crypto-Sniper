@@ -9,6 +9,7 @@ import { runAutopsy } from "../screener/autopsy.js";
 import { recordCandidates, getWatchlist } from "../screener/watchlist.js";
 import { runDiscovery, getDiscoveryStatus } from "../screener/discoverWallets.js";
 import { runSniperSweep, getSignals } from "../screener/sniper.js";
+import { getSniperTrack } from "../screener/sniperTrack.js";
 import { getParamDefs, applyParams } from "../screener/sniperParams.js";
 import { explainSignal } from "../ai/explainSignal.js";
 import { getState } from "../ai/settings.js";
@@ -85,6 +86,18 @@ router.get("/sniper/signals", (_req, res) => {
 router.get("/sniper/awal/signals", (_req, res) => {
   try {
     res.json(getSignals("awal"));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Sniper PnL track record. Every raised signal is snapshotted at entry and graded a
+// few hours later against the live price (win/loss/rug/flat + return% + peak) — so
+// "when the sniper signalled, PnL = ?" is answered from real outcomes, not a guess.
+// Read-only; grading runs inside the background sweep. Mirrors /api/pro-radar/track.
+router.get("/sniper/track", (_req, res) => {
+  try {
+    res.json(getSniperTrack());
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

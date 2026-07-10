@@ -40,6 +40,25 @@ function setVariant(v) {
 const money = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
 const xFmt = (n) => (typeof n === "number" && n > 0 ? (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(n >= 10 ? 0 : 1)) + "×" : "—");
 const pnlClass = (x) => (!x ? "" : x >= 1 ? "pos__pnl--up" : "pos__pnl--down");
+// Percent formatter for the PnL track strip (values already in percent units).
+const fmtPct = (v) => (v == null ? "—" : (v > 0 ? "+" : "") + v + "%");
+const pctClass = (v) => (v == null ? "" : v >= 0 ? "sn-track__up" : "sn-track__down");
+
+// Persistent PnL track record — real outcomes of past signals (entry snapshotted at
+// signal → graded vs live price a few hours later). Read-only; grading runs server-side
+// inside each sweep. `curTrack` = the stats for the currently-selected stream.
+const track = ref(null);
+const curTrack = computed(() => {
+  const t = track.value;
+  if (!t) return null;
+  return variant.value === "awal" ? t.awal : t.v2;
+});
+async function fetchTrack() {
+  try {
+    const r = await fetch(apiUrl("/api/sniper/track"));
+    if (r.ok) track.value = await r.json();
+  } catch { /* keep last track; a blip shouldn't clear the strip */ }
+}
 const shortMint = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "—");
 const dexUrl = (mint) => `https://dexscreener.com/solana/${mint}`;
 // Embedded DexScreener chart for a mint (resolves to the token's top pair).
@@ -130,7 +149,7 @@ async function sweep() {
     const r = await fetch(apiUrl(sniperBase() + "/sweep"));
     const body = await r.json();
     if (!r.ok) error.value = body?.error || `Sweep gagal (${r.status})`;
-    else data.value = { ...body, signalMin: body.signalMin, count: body.signals.length };
+    else { data.value = { ...body, signalMin: body.signalMin, count: body.signals.length }; fetchTrack(); }
   } catch {
     error.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
   } finally {
@@ -144,7 +163,8 @@ function onKeydown(e) {
 
 onMounted(() => {
   refresh();
-  timer = setInterval(refresh, 60_000); // keep signals fresh while the panel is open
+  fetchTrack();
+  timer = setInterval(() => { refresh(); fetchTrack(); }, 60_000); // keep signals + PnL track fresh
   window.addEventListener("keydown", onKeydown);
 });
 onBeforeUnmount(() => {
@@ -212,6 +232,33 @@ onBeforeUnmount(() => {
           class="sn-chip"
           title="Hanya net-buy: wallet yang beli lalu jual di window sama tidak dihitung."
         >net-buy</div>
+      </div>
+
+      <!-- PnL track: real outcomes of past signals (entry at signal → graded vs live). -->
+      <div v-if="curTrack" class="sn-track">
+        <div class="sn-track__line">
+          <span class="sn-track__tag">📊 Rekam PnL</span>
+          <template v-if="curTrack.graded">
+            <span class="sn-track__stat">
+              Win rate
+              <b :class="curTrack.winRate >= 0.5 ? 'sn-track__up' : curTrack.winRate <= 0.2 ? 'sn-track__down' : ''">
+                {{ Math.round((curTrack.winRate || 0) * 100) }}%
+              </b>
+              <span class="sn-track__note">({{ curTrack.wins }}W · {{ curTrack.losses }}L · {{ curTrack.rugs }} rug dari {{ curTrack.graded }} dinilai)</span>
+            </span>
+            <span class="sn-track__stat">Avg <b :class="pctClass(curTrack.avgReturnPct)">{{ fmtPct(curTrack.avgReturnPct) }}</b></span>
+            <span v-if="curTrack.avgPeakReturnPct != null" class="sn-track__stat sn-track__note">peak avg {{ fmtPct(curTrack.avgPeakReturnPct) }}</span>
+            <span v-if="curTrack.best" class="sn-track__stat">
+              Terbaik <b class="sn-track__up">{{ curTrack.best.symbol || '—' }} {{ curTrack.best.multiple ? xFmt(curTrack.best.multiple) : fmtPct(Math.round(curTrack.best.returnPct * 100)) }}</b>
+            </span>
+            <span v-if="curTrack.open" class="sn-track__note">· {{ curTrack.open }} dilacak</span>
+          </template>
+          <span v-else class="sn-track__note">
+            Belum ada sinyal matang untuk dinilai<template v-if="curTrack.open"> ({{ curTrack.open }} sedang dilacak)</template> —
+            PnL terekam otomatis ~{{ track.gradeAfterMin }} mnt setelah sinyal muncul.
+          </span>
+        </div>
+        <p class="sn-track__foot">Entry di-snapshot saat tool memberi sinyal, dinilai vs harga live. Bukti, bukan nasihat keuangan.</p>
       </div>
 
       <p v-if="!visibleSignals.length" class="sn-empty">
@@ -466,6 +513,26 @@ onBeforeUnmount(() => {
 }
 
 .sn-empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.6; }
+
+/* PnL track strip — real graded outcomes of past signals. */
+.sn-track {
+  border: 1px solid var(--border-default); border-radius: var(--control-radius);
+  background: var(--bg-raised); padding: var(--space-3) var(--space-4);
+  display: grid; gap: var(--space-2);
+}
+.sn-track__line { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; font-size: var(--font-size-sm); color: var(--text-muted); }
+.sn-track__tag {
+  font-weight: var(--font-weight-medium); color: var(--text-body);
+  padding: 2px 8px; border-radius: var(--radius-full, 999px);
+  background: color-mix(in srgb, var(--text-accent, var(--text-success)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-accent, var(--text-success)) 40%, var(--border-default));
+}
+.sn-track__stat { color: var(--text-body); }
+.sn-track__stat b { font-variant-numeric: tabular-nums; }
+.sn-track__note { color: var(--text-muted); font-size: var(--font-size-xs); }
+.sn-track__up { color: var(--text-success); }
+.sn-track__down { color: var(--text-error); }
+.sn-track__foot { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
 /* Scroll box: tampilkan tepat 4 sinyal default, sisanya di-scroll di dalam kotak.
    Tinggi dihitung dari (jumlah baris × tinggi baris) + gap + padding kotak, jadi
