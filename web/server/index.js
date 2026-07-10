@@ -12,6 +12,7 @@ import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
 import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce } from "./routes/autopsy.js";
+import { sniperLiveMaintenance } from "./screener/sniper.js";
 import { startWebhookAutoSync } from "./screener/heliusWebhook.js";
 import { startEvmAuto } from "./screener/evmAuto.js";
 import influencerRoutes from "./routes/influencers.js";
@@ -69,16 +70,24 @@ if (radarMins > 0) {
   console.log(`[radar] auto-scan tiap ${radarMins} menit`);
 }
 
-// Sniper live monitor (Modul C). Primary path is now a HELIUS WEBHOOK: Helius pushes
-// the instant a watched wallet swaps and we sweep immediately (near real-time). The
-// interval below stays on as a SAFETY-NET fallback (covers a missed/unreachable
-// webhook, e.g. no public URL). 0 disables the fallback; webhook needs a public URL.
+// Sniper live monitor (Modul C). PRIMARY path is now EVENT-DRIVEN: the Helius webhook
+// pushes each watched wallet's swap and we consume the payload directly (ingestWebhookTxs)
+// — a signal appears seconds after the buy with ZERO /transactions polling.
 startWebhookAutoSync();
-const sniperMins = Number(process.env.SNIPER_POLL_MIN || 5);
-if (sniperMins > 0) {
-  setInterval(() => sniperSweepOnce().catch(() => {}), sniperMins * 60_000);
-  console.log(`[sniper] live monitor: webhook real-time + fallback polling tiap ${sniperMins} menit`);
+// Cheap upkeep (NO Helius): age out the live window, expire stale signals (TTL), grade
+// PnL vs DexScreener — so signals still expire / PnL still closes between webhook bursts.
+const sniperMaintMin = Number(process.env.SNIPER_MAINT_MIN || 5);
+if (sniperMaintMin > 0) {
+  setInterval(() => sniperLiveMaintenance().catch(() => {}), sniperMaintMin * 60_000);
 }
+// Optional FULL Helius poll as a safety-net (covers a missed/unreachable webhook).
+// OFF by default (SNIPER_FALLBACK_POLL_MIN=0) — the point of going event-driven is to
+// stop burning Helius credits. Set >0 (e.g. 30) to re-enable interval polling.
+const sniperFallbackMin = Number(process.env.SNIPER_FALLBACK_POLL_MIN || 0);
+if (sniperFallbackMin > 0) {
+  setInterval(() => sniperSweepOnce().catch(() => {}), sniperFallbackMin * 60_000);
+}
+console.log(`[sniper] event-driven (webhook) + maintenance ${sniperMaintMin}m; fallback poll ${sniperFallbackMin ? sniperFallbackMin + "m" : "off"}`);
 
 // Auto-discovery (Solana): populate the smart-wallet watchlist live from on-chain
 // data — auto-Bedah trending winners + Birdeye top-trader harvest — so Modul B fills

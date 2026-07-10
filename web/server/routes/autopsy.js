@@ -8,14 +8,14 @@ import { Router } from "express";
 import { runAutopsy } from "../screener/autopsy.js";
 import { recordCandidates, getWatchlist } from "../screener/watchlist.js";
 import { runDiscovery, getDiscoveryStatus } from "../screener/discoverWallets.js";
-import { runSniperSweep, getSignals } from "../screener/sniper.js";
+import { runSniperSweep, getSignals, ingestWebhookTxs } from "../screener/sniper.js";
 import { getSniperTrack } from "../screener/sniperTrack.js";
 import { getParamDefs, applyParams } from "../screener/sniperParams.js";
 import { explainSignal } from "../ai/explainSignal.js";
 import { getState } from "../ai/settings.js";
 import { scanLimit } from "../middleware/limits.js";
 import { requireAdmin } from "../middleware/guard.js";
-import { debouncedSweep, webhookAuthToken, syncHeliusWebhook } from "../screener/heliusWebhook.js";
+import { webhookAuthToken, syncHeliusWebhook } from "../screener/heliusWebhook.js";
 
 const router = Router();
 
@@ -154,16 +154,21 @@ router.get("/sniper/awal/sweep", scanLimit, async (_req, res) => {
   }
 });
 
-// Real-time push (Modul C, mode webhook). Helius POSTs here the instant a watched
-// smart-money wallet swaps → we react immediately with a debounced sweep instead of
-// waiting for the interval. Verified via the authHeader Helius echoes back. Responds
-// FAST (Helius retries on non-2xx); the sweep runs asynchronously after.
+// Real-time push (Modul C, PRIMARY path — event-driven). Helius POSTs the enhanced
+// SWAP transaction(s) the instant a watched smart-money wallet swaps. We consume the
+// PAYLOAD directly (accumulate buys per token, raise a signal when ≥ signalMin wallets
+// converge on one small token) instead of re-polling every wallet — so a signal
+// appears seconds after the buy with ZERO /transactions polling. Verified via the
+// authHeader Helius echoes back. Acks FAST (Helius retries on non-2xx); ingest runs
+// asynchronously after the ack.
 router.post("/sniper/helius-webhook", (req, res) => {
   const expected = webhookAuthToken();
   const got = (req.get("authorization") || "").trim();
   if (expected && got !== expected) return res.status(401).json({ ok: false });
   res.json({ ok: true });                 // ack immediately
-  debouncedSweep(sniperSweepOnce);        // smart money moved → sweep now (coalesced)
+  const txs = Array.isArray(req.body) ? req.body : (req.body ? [req.body] : []);
+  const st = getState();
+  ingestWebhookTxs(txs, { heliusKey: st.heliusKey, birdeyeKey: st.birdeyeKey }).catch(() => {});
 });
 
 // Admin: force (re)registration of the Helius webhook — handy after ngrok restarts
