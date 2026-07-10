@@ -3,14 +3,18 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-11 00:40** · Total **150** commit dalam **13** hari.
+> Terakhir diperbarui: **2026-07-11 00:40** · Total **152** commit dalam **13** hari.
 
 ---
 
-## 2026-07-11 (Sabtu) — 1 commit
+## 2026-07-11 (Sabtu) — 3 commit
 
 **✨ Fitur baru / penambahan**
 - feat(sniper): grup Discovery editable di Settings + rapikan teks watchlist  `6a9a5a4`
+- feat(sniper): Modul C event-driven — konsumsi payload webhook Helius, stop polling  `93201ca`
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `0db82f4`
 
 ## 2026-07-10 (Jumat) — 31 commit
 
