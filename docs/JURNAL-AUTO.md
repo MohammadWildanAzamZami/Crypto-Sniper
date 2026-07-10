@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-10 03:18** · Total **141** commit dalam **12** hari.
+> Terakhir diperbarui: **2026-07-10 19:39** · Total **143** commit dalam **12** hari.
 
 ---
 
-## 2026-07-10 (Jumat) — 23 commit
+## 2026-07-10 (Jumat) — 25 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking  `cc17367`
@@ -17,6 +17,7 @@
 - feat(ui): toggle tampilan Solana ⇄ Robinhood Chain (tombol melayang)  `0ac76e1`
 - feat(ui): tema Robinhood untuk zona Solana + sembunyikan GEM Score & 10x Radar  `65ecbd9`
 - feat(sniper): real-time via Helius webhook (ganti polling 5-menit → push)  `4198970`
+- feat(sniper): grading PnL persisten sinyal live + panel UI + backtest doc  `0c8591e`
 
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `5ce3f87`
@@ -34,6 +35,7 @@
 - docs: rekam perubahan sniper (rug-check diperkuat) + UI (view toggle, tema hitam)  `5a56a95`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `d638d34`
 - docs(laporan): pembaruan 8–10 Juli (hold/exit, floor mcap, real-time webhook, Robinhood Chain, tema)  `b2a53aa`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `c0de00d`
 
 **♻️ Refactor / rapikan**
 - refactor(robinhood): hapus daftar roadmap "rencana" — semua tool sudah live  `4d31345`
