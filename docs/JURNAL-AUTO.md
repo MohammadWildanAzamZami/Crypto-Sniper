@@ -3,14 +3,15 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-12 22:40** · Total **159** commit dalam **14** hari.
+> Terakhir diperbarui: **2026-07-12 22:41** · Total **161** commit dalam **14** hari.
 
 ---
 
-## 2026-07-12 (Minggu) — 6 commit
+## 2026-07-12 (Minggu) — 8 commit
 
 **✨ Fitur baru / penambahan**
 - feat(evm-sniper): purge on-demand sinyal yang smart money-nya sudah keluar  `287bc4f`
+- feat(sniper): log transaksi wallet terpantau + filter minCatches watchlist  `c23def6`
 
 **🐛 Perbaikan**
 - fix(evm-sniper): deteksi beli via tx self-init (txlist) + grace period hold-culling  `9095e44`
@@ -20,6 +21,7 @@
 - docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `8e8da1f`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `833d101`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `5ab6959`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `fefe60a`
 
 ## 2026-07-11 (Sabtu) — 4 commit
 
