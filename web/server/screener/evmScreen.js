@@ -50,7 +50,10 @@ async function gtMetrics(token) {
     liquidityUsd: Math.round(Number(a.reserve_in_usd) || 0),
     volume24h: Math.round(Number(a.volume_usd?.h24) || 0),
     fdvUsd: Math.round(Number(a.fdv_usd) || 0),
-    mcapUsd: Math.round(Number(a.market_cap_usd) || 0),
+    // market_cap_usd hanya terisi bila circulating supply terverifikasi CoinGecko —
+    // hampir selalu null untuk memecoin baru. Fallback ke FDV (≈ mcap saat semua
+    // supply beredar), pola sama dengan evmAuto.js.
+    mcapUsd: Math.round(Number(a.market_cap_usd) || Number(a.fdv_usd) || 0),
     change24h: a.price_change_percentage ? Number(a.price_change_percentage.h24) : null,
     createdAt: a.pool_created_at || null,
     buys24h: Number(tx.buys) || 0,

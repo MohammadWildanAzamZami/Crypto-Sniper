@@ -6,7 +6,7 @@
  * (transfer asc Blockscout) → Watchlist (reputasi) → Sniper Live (konfluensi beli),
  * plus auto-pilot yang menumbuhkan watchlist otomatis tiap interval.
  */
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { apiUrl } from "../../lib/api.js";
 
 const scan = ref(null);           // { chain, count, pools, minLiquidity, scannedAt }
@@ -92,8 +92,15 @@ async function runBedah(tokenArg) {
     bedahLoading.value = false;
   }
 }
+const copied = ref("");
+let copiedTimer = null;
 async function copyAddr(a) {
-  try { await navigator.clipboard.writeText(a); } catch { /* blocked */ }
+  try {
+    await navigator.clipboard.writeText(a);
+    copied.value = a;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { copied.value = ""; }, 1500);
+  } catch { /* blocked */ }
 }
 
 // Watchlist EVM (langkah #4) — rekam kandidat Bedah → reputasi → ranking.
@@ -161,6 +168,19 @@ async function sweepSniper() {
   }
 }
 
+// Chart melayang untuk sinyal sniper — embed GeckoTerminal (chartUrl dari server
+// sudah berformat ?embed=1). Satu chart terbuka pada satu waktu; Esc menutup.
+const openChart = ref("");
+function toggleChart(s) {
+  openChart.value = openChart.value === s.token ? "" : s.token;
+}
+// Link keluar ke halaman pool GeckoTerminal asli (tanpa query embed).
+const geckoPoolUrl = (s) => (s.chartUrl ? s.chartUrl.split("?")[0] : "");
+const blockscoutTokenUrl = (s) => `https://robinhoodchain.blockscout.com/token/${s.token}`;
+function onKeydown(e) {
+  if (e.key === "Escape" && openChart.value) openChart.value = "";
+}
+
 // Auto-pilot status (langkah POWER) — background loop auto-seed + sweep.
 const autoStatus = ref(null);
 const ticking = ref(false);
@@ -182,7 +202,11 @@ async function runTick() {
   finally { ticking.value = false; }
 }
 
-onMounted(() => { loadWatchlist(); loadSniper(); loadAuto(); });
+onMounted(() => {
+  loadWatchlist(); loadSniper(); loadAuto();
+  window.addEventListener("keydown", onKeydown);
+});
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 // Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
 const infra = [
@@ -430,7 +454,12 @@ const docsUrl = "https://docs.robinhood.com/chain/";
             <div class="rh__pool-row">
               <div class="rh__pool-main">
                 <span class="rh__cand-idx">{{ s.walletCount }}👛</span>
-                <span class="rh__pool-name">{{ s.symbol || shortAddr(s.token) }}</span>
+                <button
+                  class="rh__pool-name rh__pool-name--copy"
+                  type="button"
+                  :title="'Klik untuk salin alamat token: ' + s.token"
+                  @click="copyAddr(s.token)"
+                >{{ copied === s.token ? "✓ tersalin" : (s.symbol || shortAddr(s.token)) }}</button>
                 <span v-if="s.isNew" class="rh__pool-fresh">BARU</span>
                 <span v-if="s.verdict" class="rh__v" :class="verdictClass(s.verdict)">GEM {{ s.gemScore }} · {{ s.verdict }}</span>
               </div>
@@ -440,8 +469,48 @@ const docsUrl = "https://docs.robinhood.com/chain/";
                 <span v-if="s.liquidityUsd">liq {{ usd(s.liquidityUsd) }}</span>
                 <span>skor {{ s.score }}</span>
               </div>
-              <a v-if="s.chartUrl" class="rh__pool-link" :href="s.chartUrl" target="_blank" rel="noopener noreferrer">chart ↗</a>
+              <button
+                v-if="s.chartUrl"
+                type="button"
+                class="rh__pool-btn"
+                :aria-expanded="openChart === s.token"
+                :title="'Lihat chart live ' + (s.symbol || shortAddr(s.token))"
+                @click="toggleChart(s)"
+              >{{ openChart === s.token ? "📊 tutup" : "📈 chart" }}</button>
             </div>
+
+            <!-- Chart GeckoTerminal: overlay melayang (teleport ke body agar tak
+                 terpotong stacking context / overflow panel mana pun). -->
+            <Teleport to="body">
+            <div v-if="openChart === s.token" class="rhchart">
+              <div class="rhchart__backdrop" aria-hidden="true" @click="toggleChart(s)"></div>
+              <div class="rhchart__panel" role="dialog" aria-modal="true" :aria-label="'Chart ' + (s.symbol || shortAddr(s.token))">
+                <div class="rhchart__head">
+                  <span class="rhchart__title">
+                    {{ s.symbol || shortAddr(s.token) }} chart
+                    <span class="rh__tag">Robinhood Chain</span>
+                  </span>
+                  <div class="rhchart__actions">
+                    <a class="rhchart__open" :href="geckoPoolUrl(s)" target="_blank" rel="noopener noreferrer">GeckoTerminal ↗</a>
+                    <a class="rhchart__open" :href="blockscoutTokenUrl(s)" target="_blank" rel="noopener noreferrer">Blockscout ↗</a>
+                    <button type="button" class="rhchart__close" aria-label="Tutup chart" @click="toggleChart(s)">✕</button>
+                  </div>
+                </div>
+                <div class="rhchart__frame">
+                  <iframe
+                    :src="s.chartUrl"
+                    :title="`Chart harga ${s.symbol || shortAddr(s.token)} di GeckoTerminal`"
+                    loading="lazy"
+                    allow="clipboard-write"
+                    referrerpolicy="no-referrer"
+                  />
+                </div>
+                <p class="rh__note">
+                  Chart live pool likuiditas-terbesar token ini (GeckoTerminal). Heuristik — bukan nasihat keuangan. DYOR.
+                </p>
+              </div>
+            </div>
+            </Teleport>
           </li>
         </ul>
       </template>
@@ -539,6 +608,14 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 .rh__pool-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .rh__pool-main { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .rh__pool-name { font-weight: 700; color: var(--text-body); }
+/* Nama token sebagai tombol salin alamat — klik nama → alamat token ke clipboard. */
+.rh__pool-name--copy {
+  font: inherit; font-weight: 700; padding: 0; background: none; border: 0;
+  cursor: pointer; text-align: left;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.rh__pool-name--copy:hover { color: #00a804; }
+.rh__pool-name--copy:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 .rh__pool-fresh { font-size: var(--font-size-xs); font-weight: 700; color: #00a804; }
 .rh__pool-stats { display: flex; gap: var(--space-4); flex: 1; flex-wrap: wrap; color: var(--text-muted); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .rh__up { color: var(--text-success); }
@@ -615,7 +692,54 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 
 .rh__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
+/* Chart GeckoTerminal — overlay melayang (modal terpusat), gaya sama dengan
+   chart sniper Solana tapi ber-aksen hijau Robinhood. */
+.rhchart { display: contents; }
+.rhchart__backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(2px);
+}
+.rhchart__panel {
+  position: fixed; z-index: 201;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 2 * var(--space-6)));
+  max-height: 88vh; overflow: auto;
+  display: grid; gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--bg-raised);
+  border: 1px solid color-mix(in srgb, #00c805 30%, var(--border-default));
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.rhchart__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.rhchart__title { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-heading); font-weight: var(--font-weight-medium); }
+.rhchart__actions { display: flex; align-items: center; gap: var(--space-4); }
+.rhchart__open { color: #00a804; text-decoration: none; font-size: var(--font-size-sm); white-space: nowrap; }
+.rhchart__open:hover { text-decoration: underline; }
+.rhchart__open:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.rhchart__close {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; flex: none; padding: 0;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--bg-card); color: var(--text-body); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.rhchart__close:hover { border-color: var(--text-error); color: var(--text-error); }
+.rhchart__close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.rhchart__frame {
+  position: relative; width: 100%;
+  aspect-ratio: 16 / 10; max-height: 460px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--bg-card);
+}
+.rhchart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
 @media (max-width: 560px) {
   .rh { padding: var(--space-5); }
+
+  .rhchart__panel {
+    top: 12px; left: 10px; right: 10px; transform: none;
+    width: auto; max-height: 86vh; padding: var(--space-4);
+  }
+  .rhchart__frame { aspect-ratio: auto; height: 62vh; max-height: none; }
 }
 </style>

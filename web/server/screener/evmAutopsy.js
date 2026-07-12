@@ -53,7 +53,8 @@ async function topPool(token) {
   return {
     poolAddress: (a.address || "").toLowerCase(),
     priceUsd: Number(a.base_token_price_usd) || 0,
-    mcapUsd: Math.round(Number(a.market_cap_usd) || 0),
+    // Fallback FDV: market_cap_usd null untuk mayoritas memecoin (lihat evmScreen.js).
+    mcapUsd: Math.round(Number(a.market_cap_usd) || Number(a.fdv_usd) || 0),
     name: a.name || "",
     createdAt: a.pool_created_at || null,
   };
