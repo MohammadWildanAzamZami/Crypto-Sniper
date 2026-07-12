@@ -8,10 +8,11 @@
 
 import { Router } from "express";
 import { scanLimit } from "../middleware/limits.js";
+import { requireAdmin } from "../middleware/guard.js";
 import { screenEvmToken } from "../screener/evmScreen.js";
 import { bedahEvmToken } from "../screener/evmAutopsy.js";
 import { recordEvmCandidates, getEvmWatchlist } from "../screener/evmWatchlist.js";
-import { runEvmSniperSweep, getEvmSignals } from "../screener/evmSniper.js";
+import { runEvmSniperSweep, getEvmSignals, purgeEvmSignals } from "../screener/evmSniper.js";
 import { autoSeedWatchlist, robinhoodTick, getLastTick } from "../screener/evmAuto.js";
 
 const router = Router();
@@ -168,6 +169,16 @@ router.post("/robinhood/auto/tick", scanLimit, async (_req, res) => {
 router.get("/robinhood/sniper/signals", (_req, res) => {
   try {
     res.json(getEvmSignals());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// POST /api/robinhood/sniper/purge — hapus sinyal yang smart money-nya sudah tidak ada:
+// cek saldo on-chain semua wallet tiap sinyal (abaikan grace), buang bila semua sudah jual.
+router.post("/robinhood/sniper/purge", requireAdmin, scanLimit, async (_req, res) => {
+  try {
+    res.json(await purgeEvmSignals({ nowMs: Date.now() }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

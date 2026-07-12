@@ -249,6 +249,40 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
   return { chain: "Robinhood Chain", swept: active.length, candidates: candidates.length, newSignals, signals: getEvmSignals().signals };
 }
 
+/**
+ * Purge on-demand: cek saldo on-chain SEMUA sinyal (abaikan grace) dan hapus token
+ * yang smart money-nya sudah tidak ada — semua wallet di balik sinyal terkonfirmasi
+ * jual (saldo 0, tanpa "unknown"). unknown (gagal fetch) tak pernah memicu hapus,
+ * sejajar fail-safe hold-tracking sweep. Dipanggil dari endpoint admin.
+ */
+export async function purgeEvmSignals({ nowMs } = {}) {
+  const now = nowMs ?? Date.now();
+  const removed = [];
+  const kept = [];
+  for (const [token, s] of signals) {
+    const owners = s.wallets || [];
+    if (!owners.length) continue;
+    const bals = await mapPool(owners, POOL, (o) => tokenBalance(token, o));
+    let holders = 0, sold = 0, unknown = 0;
+    bals.forEach((b) => {
+      if (b == null) unknown++;
+      else if (b > 0) holders++;
+      else sold++;
+    });
+    s.holders = holders;
+    s.soldOff = sold;
+    s.updatedAt = now;
+    if (unknown === 0 && holders === 0) {
+      signals.delete(token);
+      removed.push({ token, symbol: s.symbol, soldOff: sold });
+    } else {
+      kept.push({ token, symbol: s.symbol, holders, soldOff: sold, unknown });
+    }
+  }
+  save();
+  return { chain: "Robinhood Chain", checked: removed.length + kept.length, removed, kept };
+}
+
 /** Sinyal live EVM (terkuat dulu), plus konfigurasi untuk UI. */
 export function getEvmSignals() {
   // Urut: jumlah smart wallet (holders bila di-track, else walletCount) → skor → terbaru.
