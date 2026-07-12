@@ -4,9 +4,14 @@
 // saat ≥ signalMin wallet berbeda membeli token fresh yang SAMA — "smart money sedang
 // akumulasi sebelum pump". Kandidat di-gate lewat screen EVM (anti-rug heuristik).
 //
-// Deteksi beli (EVM): kelompokkan tokentx per hash. Sebuah BELI = wallet MENERIMA token
-// non-base DAN MENGIRIM base (WETH/USDG) di tx yang sama (bukan airdrop/kiriman).
-// Semua degrade ke null/[]; sweep tak pernah melempar. Heuristik — bukan nasihat keuangan.
+// Deteksi beli (EVM): di Robinhood Chain, beli dibayar ETH native/WETH LEWAT ROUTER DEX,
+// jadi dari sudut pandang tokentx pembeli HANYA muncul "IN <memecoin>" — leg WETH ada di
+// router↔pool, bukan di wallet. Maka syarat lama "wallet mengirim WETH/USDG di tx yang sama"
+// TAK PERNAH terpenuhi (itu sebab Sniper selalu kosong). Deteksi yang benar: BELI = tx yang
+// DIINISIASI wallet (txlist: tx.from == wallet) di mana wallet MENERIMA token non-base yang
+// tak ia kirim balik. tx.from == wallet inilah yang memisahkan beli-via-router dari airdrop/
+// distribusi (yang diinisiasi executor lain). Semua degrade ke null/[]; sweep tak pernah
+// melempar. Heuristik — bukan nasihat keuangan.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -30,6 +35,11 @@ const MAX_ENRICH = Number(process.env.RH_SNIPER_MAX_ENRICH || 20);
 const TTL_MIN = Number(process.env.RH_SNIPER_TTL_MIN || 720);
 const SAFETY_GATE = process.env.RH_SNIPER_SAFETY_GATE !== "false";
 const TRACK_HOLDING = process.env.RH_SNIPER_TRACK_HOLDING !== "false"; // default on
+// Grace period: sinyal yang BARU terdeteksi kebal dari culling hold-reconciliation
+// selama ini. Tanpa ini, wallet watchlist (scalper cepat) sering sudah jual saat sweep
+// mengecek saldo → sinyal terhapus di sweep yang SAMA saat ia dibuat → panel selalu
+// kosong. Grace memberi sinyal fresh waktu tampil dulu; culling tetap jalan setelah matang.
+const HOLD_GRACE_MIN = Number(process.env.RH_SNIPER_HOLD_GRACE_MIN || 45);
 const POOL = 5;
 
 /** @type {Map<string, object>} token → signal */
@@ -69,14 +79,30 @@ async function mapPool(items, limit, fn) {
   return out;
 }
 
-// Beli terbaru sebuah wallet dalam window: token non-base yang diterima dalam tx di mana
-// wallet juga mengirim base (bayar). Return [{ token, at }].
+// Hash tx yang DIINISIASI wallet (tx.from == wallet) dalam window — dari txlist. Dipakai
+// untuk memisahkan beli-via-router (wallet→router) dari airdrop/distribusi (diinisiasi
+// executor lain, tak muncul sebagai self-init). Gagal fetch → Set kosong = konservatif:
+// lebih baik lewatkan beli (false negative) daripada tampilkan airdrop sebagai "smart money
+// beli" (false positive yang menyesatkan sniper).
+async function selfInitiatedHashes(w, sinceSec) {
+  const j = await jget(`${BS}/api?module=account&action=txlist&address=${w}&sort=desc&page=1&offset=${RECENT_TX}`);
+  const rows = j?.result;
+  const set = new Set();
+  if (!Array.isArray(rows)) return set;
+  for (const t of rows) {
+    if ((Number(t.timeStamp) || 0) < sinceSec) continue;
+    if ((t.from || "").toLowerCase() === w) set.add(t.hash);
+  }
+  return set;
+}
+
+// Beli terbaru sebuah wallet dalam window. Return [{ token, at }].
 async function recentBuys(wallet, sinceSec) {
   const w = wallet.toLowerCase();
   const j = await jget(`${BS}/api?module=account&action=tokentx&address=${w}&sort=desc&page=1&offset=${RECENT_TX}`);
   const rows = j?.result;
   if (!Array.isArray(rows) || !rows.length) return [];
-  // Kelompokkan per tx: token masuk vs keluar.
+  // Kelompokkan per tx: token masuk vs keluar (dari sudut pandang wallet).
   const byTx = new Map();
   for (const t of rows) {
     const at = Number(t.timeStamp) || 0;
@@ -89,14 +115,21 @@ async function recentBuys(wallet, sinceSec) {
     if (to === w) g.in.add(mint);
     if (from === w) g.out.add(mint);
   }
+  // Kandidat = tx di mana wallet MENERIMA ≥1 token non-base yang tak ia kirim balik (bukan
+  // jual). Leg pembayaran (ETH native/WETH) tak muncul di tokentx pembeli → tidak dituntut.
+  const candidates = [];
+  for (const [hash, g] of byTx) {
+    const gems = [...g.in].filter((m) => m && !BASE_TOKENS.has(m) && !g.out.has(m));
+    if (gems.length) candidates.push({ hash, gems, at: g.at });
+  }
+  if (!candidates.length) return [];
+  // Saring airdrop: hanya hitung tx yang diinisiasi wallet sendiri. (txlist hanya di-fetch
+  // untuk wallet yang memang punya kandidat — minoritas aktif — jadi beban API tetap rendah.)
+  const selfInit = await selfInitiatedHashes(w, sinceSec);
   const buys = [];
-  for (const g of byTx.values()) {
-    const paidBase = [...g.out].some((m) => BASE_TOKENS.has(m)); // wallet membayar WETH/USDG
-    if (!paidBase) continue;
-    for (const m of g.in) {
-      if (!m || BASE_TOKENS.has(m)) continue;                    // yang diterima = gem yang dibeli
-      buys.push({ token: m, at: g.at * 1000 });
-    }
+  for (const c of candidates) {
+    if (!selfInit.has(c.hash)) continue;         // diterima tapi bukan wallet yang inisiasi → airdrop
+    for (const m of c.gems) buys.push({ token: m, at: c.at * 1000 });
   }
   return buys;
 }
@@ -183,9 +216,14 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
   // < SIGNAL_MIN dan sudah ada yang jual; pertahankan (refresh) selama ≥ SIGNAL_MIN
   // masih pegang. unknown (gagal fetch) tak pernah memicu penghapusan.
   if (TRACK_HOLDING && signals.size > 0) {
+    const graceCutoff = now - HOLD_GRACE_MIN * 60_000;
     for (const [token, s] of signals) {
       const owners = s.wallets || [];
       if (!owners.length) continue;
+      // Grace: jangan rekonsiliasi/hapus sinyal yang masih fresh — beri waktu tampil
+      // dulu. Scalper watchlist sering sudah jual saat dicek; tanpa grace sinyal mati
+      // di sweep yang sama saat dibuat. Setelah > HOLD_GRACE_MIN baru dieligibel culling.
+      if ((s.firstDetectedAt || now) > graceCutoff) continue;
       const bals = await mapPool(owners, POOL, (o) => tokenBalance(token, o));
       let holders = 0, sold = 0, unknown = 0;
       owners.forEach((o, i) => {
@@ -225,6 +263,7 @@ export function getEvmSignals() {
     lookbackMin: LOOKBACK_MIN,
     safetyGate: SAFETY_GATE,
     trackHolding: TRACK_HOLDING,
+    holdGraceMin: HOLD_GRACE_MIN,
     signals: list,
   };
 }
