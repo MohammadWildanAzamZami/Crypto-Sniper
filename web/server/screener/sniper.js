@@ -15,6 +15,7 @@ import { getActiveWallets, getWalletMeta, POLL_MIN } from "./watchlist.js";
 import { screenToken } from "./screen.js";
 import { getParams } from "./sniperParams.js";
 import { recordSignals, gradeMatured } from "./sniperTrack.js";
+import { recordTxs } from "./txLog.js";
 
 const HELIUS = "https://api.helius.xyz";
 const BIRDEYE = "https://public-api.birdeye.so";
@@ -502,10 +503,14 @@ export async function ingestWebhookTxs(txs, { heliusKey, birdeyeKey } = {}) {
   const sinceSec = Math.floor(now / 1000) - liveLookbackMin() * 60;
 
   const touched = new Set();
+  const logged = []; // every monitored-wallet swap this batch → persistent tx log
   let ingested = 0;
   for (const tx of txs) {
     for (const owner of ownersInTx(tx, active)) {
       for (const s of parseTxSwaps(tx, owner, sp, P)) {
+        // Log the raw swap regardless of the signal lookback window — the tx log is
+        // a full history, not just the accumulation window used for confluence.
+        logged.push({ owner, sig: tx.signature || null, mint: s.mint, side: s.side, at: s.at, tokens: s.tokens, priceUsd: s.priceUsd, sizeUsd: s.sizeUsd });
         if (s.at < sinceSec) continue;
         applyLiveSwap(owner, s);
         touched.add(s.mint);
@@ -513,6 +518,8 @@ export async function ingestWebhookTxs(txs, { heliusKey, birdeyeKey } = {}) {
       }
     }
   }
+  // Persist the batch before signal evaluation — never let a store hiccup break ingest.
+  try { recordTxs(logged); } catch { /* best-effort */ }
   pruneLive(sinceSec);
 
   let evaluated = 0, newSignals = 0;

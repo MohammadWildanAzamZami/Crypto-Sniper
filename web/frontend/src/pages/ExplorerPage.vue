@@ -8,6 +8,7 @@ import ProRadarPanel from "../components/panels/ProRadarPanel.vue";
 import AutopsyPanel from "../components/panels/AutopsyPanel.vue";
 import WatchlistPanel from "../components/panels/WatchlistPanel.vue";
 import SniperPanel from "../components/panels/SniperPanel.vue";
+import TxLogPanel from "../components/panels/TxLogPanel.vue";
 import RobinhoodPanel from "../components/panels/RobinhoodPanel.vue";
 // import ChecklistPanel from "../components/panels/ChecklistPanel.vue"; // disembunyikan sementara
 import { useResource } from "../composables/useSolscan.js";
@@ -60,6 +61,8 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
 
       <SniperPanel />
 
+      <TxLogPanel />
+
       <!-- Checklist screening manual disembunyikan sementara (jangan tampilkan dulu)
       <ChecklistPanel />
       -->
@@ -78,7 +81,7 @@ function toggleView() { view.value = view.value === "sol" ? "rh" : "sol"; }
       :title="view === 'sol' ? 'Pindah ke Robinhood Chain' : 'Kembali ke Solana'"
       @click="toggleView"
     >
-      {{ view === 'sol' ? '⛓️ Ke Robinhood Chain' : '◎ Ke Solana' }}
+      {{ view === 'sol' ? '◎ Ke Robinhood Chain' : '◎ Ke Solana Chain' }}
     </button>
 
     <!-- Network status disembunyikan sementara (jangan tampilkan dulu)

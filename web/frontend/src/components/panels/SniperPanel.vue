@@ -216,7 +216,6 @@ onBeforeUnmount(() => {
         >⚠ <b>{{ hiddenUnverified }}</b> unverified disembunyikan</div>
         <div class="sn-chip">≥<b>{{ data.signalMin }}</b> wallet sepakat</div>
         <div class="sn-chip">maks mcap <b>{{ money(data.maxMcap) }}</b></div>
-        <div class="sn-chip">auto tiap <b>{{ data.pollMin }}m</b></div>
         <div
           v-if="data.safetyGate"
           class="sn-chip sn-chip--safe"
@@ -307,7 +306,12 @@ onBeforeUnmount(() => {
                 class="sn-score"
                 :title="'Skor kekuatan sinyal' + (s.why && s.why.length ? ':\n· ' + s.why.join('\n· ') : '')"
               >🔥 {{ s.score }}</span>
-              <span class="sn-sym">{{ s.symbol || shortMint(s.mint) }}</span>
+              <button
+                class="sn-sym sn-sym--copy"
+                type="button"
+                :title="'Klik untuk salin alamat token: ' + s.mint"
+                @click="copy(s.mint)"
+              >{{ copied === s.mint ? "✓ tersalin" : (s.symbol || shortMint(s.mint)) }}</button>
               <span v-if="s.isNew" class="sn-badge">BARU</span>
               <span
                 v-if="s.unverified"
@@ -587,6 +591,14 @@ onBeforeUnmount(() => {
   padding: 2px 8px; border-radius: var(--radius-sm);
 }
 .sn-sym { font-weight: 700; color: var(--text-body); }
+/* Nama token sebagai tombol salin alamat — klik nama → mint ke clipboard. */
+.sn-sym--copy {
+  font: inherit; font-weight: 700; padding: 0; background: none; border: 0;
+  cursor: pointer; text-align: left;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.sn-sym--copy:hover { color: var(--text-success); }
+.sn-sym--copy:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 .sn-mcap { color: var(--text-muted); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
 .sn-liq { color: var(--text-muted); opacity: 0.8; }
 .sn-safe { flex: none; font-size: var(--font-size-sm); cursor: help; }

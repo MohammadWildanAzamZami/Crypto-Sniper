@@ -174,16 +174,24 @@ export function getWatchlist({ limit = 200 } = {}) {
   const P = getParams();
   const watchSize = P.watchSize;
   const noLimit = !(watchSize > 0);
-  const ranked = [...wallets.values()].sort((a, b) => winnerSum(b) - winnerSum(a) || b.reputation - a.reputation);
+  // Winner berulang di token BERBEDA: hanya tampilkan wallet dengan ≥ minCatches
+  // token winner berbeda (catches.length). 0 = tampilkan semua.
+  const minCatches = P.minCatches || 0;
+  const pool = minCatches > 0
+    ? [...wallets.values()].filter((w) => w.catches.length >= minCatches)
+    : [...wallets.values()];
+  const ranked = pool.sort((a, b) => winnerSum(b) - winnerSum(a) || b.reputation - a.reputation);
   const list = ranked.slice(0, limit).map((w, i) => toPublic(w, i + 1, watchSize, noLimit));
+  const shown = pool.length;
   return {
-    total: wallets.size,
-    // No limit → semua wallet aktif dipantau; laporkan sebagai "N / N".
-    active: noLimit ? wallets.size : Math.min(watchSize, wallets.size),
-    watchSize: noLimit ? wallets.size : watchSize,
+    total: shown,
+    // No limit → semua wallet (lolos filter) aktif dipantau; laporkan sebagai "N / N".
+    active: noLimit ? shown : Math.min(watchSize, shown),
+    watchSize: noLimit ? shown : watchSize,
     watchAll: noLimit,
     pollMin: POLL_MIN,
     winnerMinX: P.winnerMinX,
+    minCatches,
     wallets: list,
   };
 }

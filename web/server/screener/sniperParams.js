@@ -117,6 +117,9 @@ export const PARAM_DEFS = [
   { key: "winnerMinX", env: "SNIPER_WINNER_MIN_X", type: "int", def: 10, min: 2, max: 100, step: 1,
     group: "Discovery", label: "Ambang winner (x)",
     hint: "Token dianggap 'winner' (pembeli awalnya dapat 'catch') jika sudah pump ≥ ini dari launch. Naikkan untuk hanya belajar dari runner besar." },
+  { key: "minCatches", env: "SNIPER_MIN_CATCHES", type: "int", def: 0, min: 0, max: 100, step: 1,
+    group: "Discovery", label: "Minimal token winner berbeda",
+    hint: "Hanya tampilkan wallet yang jadi winner di ≥ ini token BERBEDA (bukan kelipatan dalam 1 token). 0 = tampilkan semua. Contoh: 11 = hanya wallet dengan track record menang di lebih dari 10 token berbeda." },
 ];
 
 const DEF_BY_KEY = new Map(PARAM_DEFS.map((d) => [d.key, d]));

@@ -33,6 +33,9 @@ node_modules/
 # Sniper Engine PnL track record (Modul C — graded signal outcomes)
 .sniper-track.json
 **/.sniper-track.json
+# Sniper Engine transaction log (Modul C — every monitored-wallet swap, rolling)
+.sniper-txs.json
+**/.sniper-txs.json
 # Influencer watchlist (Modul B2)
 .influencers-state.json
 **/.influencers-state.json

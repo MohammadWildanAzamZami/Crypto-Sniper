@@ -190,7 +190,6 @@ onMounted(load);
       <div class="wl-summary">
         <div class="wl-chip"><b>{{ data.total }}</b> wallet terekam</div>
         <div class="wl-chip wl-chip--ok"><b>{{ data.active }}</b> / {{ data.watchSize }} aktif dipantau</div>
-        <div class="wl-chip">cek tiap <b>{{ data.pollMin }}m</b></div>
         <div class="wl-chip">winner = <b>≥{{ data.winnerMinX }}x</b></div>
         <div
           v-if="data.discovery"
@@ -243,9 +242,9 @@ onMounted(load);
       </p>
 
       <p class="wl-note">
-        📡 Monitor live (Modul C) memantau wallet aktif tiap <b>{{ data.pollMin }}m</b> dan memunculkan sinyal saat mereka
-        mulai borong token baru — lihat panel <b>🎯 Sinyal Sniper Live</b>. Mode real-time (push detik via webhook Helius)
-        aktif jika <code>PUBLIC_URL</code>/ngrok diset. Track record heuristik, bukan nasihat keuangan.
+        📡 Monitor live (Modul C) memantau wallet aktif secara real-time (push detik via webhook Helius) dan memunculkan
+        sinyal saat mereka mulai borong token baru — lihat panel <b>🎯 Sinyal Sniper Live</b>. Mode real-time aktif jika
+        <code>PUBLIC_URL</code>/ngrok diset. Track record heuristik, bukan nasihat keuangan.
       </p>
     </template>
     </template>
