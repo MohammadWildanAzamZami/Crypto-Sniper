@@ -183,11 +183,12 @@ function onKeydown(e) {
 
 // Auto-pilot status (langkah POWER) — background loop auto-seed + sweep.
 const autoStatus = ref(null);
+const rtStatus = ref(null); // watcher real-time server (eth_getLogs)
 const ticking = ref(false);
 async function loadAuto() {
   try {
     const r = await fetch(apiUrl("/api/robinhood/auto/status"));
-    if (r.ok) { const j = await r.json(); autoStatus.value = j.lastTick; }
+    if (r.ok) { const j = await r.json(); autoStatus.value = j.lastTick; rtStatus.value = j.realtime || null; }
   } catch { /* diamkan */ }
 }
 async function runTick() {
@@ -202,11 +203,20 @@ async function runTick() {
   finally { ticking.value = false; }
 }
 
+// Server memantau beli smart money real-time (watcher eth_getLogs); panel ikut
+// menyegarkan sinyal tiap 15 dtk — di-skip saat tab tersembunyi agar hemat.
+let refreshTimer = null;
 onMounted(() => {
   loadWatchlist(); loadSniper(); loadAuto();
+  refreshTimer = setInterval(() => {
+    if (!document.hidden) { loadSniper(); loadAuto(); }
+  }, 15_000);
   window.addEventListener("keydown", onKeydown);
 });
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer);
+  window.removeEventListener("keydown", onKeydown);
+});
 
 // Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
 const infra = [
@@ -444,6 +454,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         <p class="rh__meta">
           <b>{{ sniper.count }}</b> sinyal · ≥{{ sniper.signalMin }} wallet sepakat · maks mcap {{ usd(sniper.maxMcap) }}
           · gate {{ sniper.safetyGate ? "aktif" : "off" }}
+          <template v-if="rtStatus"> · ⚡ real-time (cek tiap {{ rtStatus.pollSec }} dtk)</template>
         </p>
         <p v-if="!sniper.signals.length" class="rh__hint">
           Belum ada sinyal. Monitor menunggu ≥{{ sniper.signalMin }} wallet Watchlist membeli token fresh yang sama.

@@ -14,6 +14,7 @@ import { bedahEvmToken } from "../screener/evmAutopsy.js";
 import { recordEvmCandidates, getEvmWatchlist } from "../screener/evmWatchlist.js";
 import { runEvmSniperSweep, getEvmSignals, purgeEvmSignals } from "../screener/evmSniper.js";
 import { autoSeedWatchlist, robinhoodTick, getLastTick } from "../screener/evmAuto.js";
+import { getEvmRealtimeStatus } from "../screener/evmRealtime.js";
 
 const router = Router();
 const EVM_ADDR = /^0x[0-9a-fA-F]{40}$/;
@@ -142,9 +143,9 @@ router.post("/robinhood/watchlist/record", scanLimit, async (req, res) => {
   }
 });
 
-// GET /api/robinhood/auto/status — status tick otomatis terakhir (untuk UI).
+// GET /api/robinhood/auto/status — status tick otomatis terakhir + watcher real-time (untuk UI).
 router.get("/robinhood/auto/status", (_req, res) => {
-  res.json({ lastTick: getLastTick() });
+  res.json({ lastTick: getLastTick(), realtime: getEvmRealtimeStatus() });
 });
 
 // POST /api/robinhood/auto/seed — auto-seed watchlist sekarang (bedah winner trending).

@@ -11,10 +11,11 @@ import settingsRoutes from "./routes/settings.js";
 import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
-import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce } from "./routes/autopsy.js";
+import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce, walletIntelTickOnce } from "./routes/autopsy.js";
 import { sniperLiveMaintenance } from "./screener/sniper.js";
 import { startWebhookAutoSync } from "./screener/heliusWebhook.js";
 import { startEvmAuto } from "./screener/evmAuto.js";
+import { startEvmRealtime } from "./screener/evmRealtime.js";
 import influencerRoutes from "./routes/influencers.js";
 import robinhoodRoutes from "./routes/robinhood.js";
 import proxyRoutes from "./routes/proxy.js";
@@ -98,11 +99,27 @@ if (discoveryMins > 0) {
   console.log(`[discovery] auto-isi watchlist tiap ${discoveryMins} menit`);
 }
 
+// Wallet Intelligence v2: putaran antrean pipeline (vet → audit akurasi →
+// klasifikasi), berjatah auditMaxPerTick per putaran — audit mahal tidak pernah
+// jalan massal/di jalur sweep. 0 menonaktifkan; butuh Helius key agar bermakna.
+const wiTickMin = Number(process.env.WI_TICK_MIN || 10);
+if (wiTickMin > 0) {
+  setInterval(() => walletIntelTickOnce().catch(() => {}), wiTickMin * 60_000);
+  console.log(`[wallet-intel] antrean vet+audit tiap ${wiTickMin} menit`);
+}
+
 // Robinhood Chain (EVM) auto-loop: auto-seed watchlist dari winner trending → sniper sweep.
 // 0 (RH_TICK_MIN=0) menonaktifkan. Butuh GeckoTerminal + Blockscout (publik, tanpa key).
 if (Number(process.env.RH_TICK_MIN ?? 10) > 0) {
   const info = startEvmAuto();
   console.log(`[robinhood] auto-seed + sniper sweep tiap ${info?.tickMin} menit`);
+}
+// Watcher REAL-TIME Sniper EVM: poll eth_getLogs tiap RH_RT_POLL_SEC detik; beli smart
+// money → sinyal naik ke Sniper Live saat itu juga (tick di atas jadi seeding + rekonsiliasi).
+// RH_RT=false menonaktifkan.
+if (process.env.RH_RT !== "false") {
+  const rt = startEvmRealtime();
+  console.log(`[robinhood] watcher real-time sniper tiap ${rt?.pollSec} detik`);
 }
 app.listen(PORT, () => {
   console.log(`[solscan-proxy] listening on http://localhost:${PORT}`);

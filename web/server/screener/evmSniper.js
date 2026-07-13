@@ -25,10 +25,13 @@ const FILE_PATH = fileURLToPath(new URL("./.evm-sniper-state.json", import.meta.
 const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
 const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 const BASE_TOKENS = new Set([WETH, USDG]);
+export { BASE_TOKENS as EVM_BASE_TOKENS };
 
-// Tunables (env-overridable).
-const SIGNAL_MIN = Number(process.env.RH_SNIPER_SIGNAL_MIN || 2);
-const LOOKBACK_MIN = Number(process.env.RH_SNIPER_LOOKBACK_MIN || 180);
+// Tunables (env-overridable). SIGNAL_MIN/LOOKBACK_MIN juga dipakai watcher real-time.
+export const EVM_SIGNAL_MIN = Number(process.env.RH_SNIPER_SIGNAL_MIN || 2);
+export const EVM_LOOKBACK_MIN = Number(process.env.RH_SNIPER_LOOKBACK_MIN || 180);
+const SIGNAL_MIN = EVM_SIGNAL_MIN;
+const LOOKBACK_MIN = EVM_LOOKBACK_MIN;
 const RECENT_TX = Number(process.env.RH_SNIPER_RECENT_TX || 50);
 const MAX_MCAP = Number(process.env.RH_SNIPER_MAX_MCAP || 5_000_000);
 const MAX_ENRICH = Number(process.env.RH_SNIPER_MAX_ENRICH || 20);
@@ -142,6 +145,61 @@ async function tokenBalance(token, wallet) {
   return Number(j.result); // raw; kita hanya butuh >0
 }
 
+// Gate + skor + tulis/refresh sinyal untuk SATU kandidat. Dipakai sweep (batch) dan
+// jalur real-time (per-event). scr = hasil screenEvmToken (pemanggil yang fetch).
+// Return { isNew } bila sinyal ditulis, null bila terganjal gate.
+function applyCandidate(token, ownersSet, lastAt, scr, now) {
+  if (!scr || scr.error) return null;
+  if (SAFETY_GATE && !scr.safety?.ok) return null;              // buang rug/high-risk
+  const mcap = scr.metrics?.mcapUsd || 0;
+  if (mcap > 0 && mcap > MAX_MCAP) return null;                 // kebesaran = terlambat
+  // Skor = Σ reputasi wallet (dari Watchlist EVM) + skor screen sebagai bumbu.
+  const owners = [...ownersSet];
+  const repSum = owners.reduce((s, o) => s + (getEvmWalletMeta(o).reputation || 0), 0);
+  const score = Math.round(repSum + (scr.score || 0) * 0.5);
+  const existing = signals.get(token);
+  signals.set(token, {
+    token,
+    symbol: scr.symbol || scr.name || "",
+    name: scr.name || "",
+    chain: "Robinhood Chain",
+    mcap,
+    priceUsd: scr.metrics?.priceUsd || 0,
+    liquidityUsd: scr.metrics?.liquidityUsd || 0,
+    gemScore: scr.score ?? null,
+    verdict: scr.verdict ?? null,
+    safetyRisk: scr.safety?.risk ?? null,
+    walletCount: owners.length,
+    wallets: owners,
+    score,
+    chartUrl: scr.metrics?.chartUrl || null,
+    lastBuyAt: lastAt,
+    firstDetectedAt: existing?.firstDetectedAt || now,
+    updatedAt: now,
+    isNew: !existing,
+  });
+  return { isNew: !existing };
+}
+
+/**
+ * Naikkan sinyal SEKARANG dari deteksi beli real-time (watcher eth_getLogs), tanpa
+ * menunggu sweep. Owners digabung dengan wallet sinyal yang sudah ada supaya konfluensi
+ * lintas-jalur (sweep + real-time) saling menambah, bukan menimpa. Screen hanya
+ * dipanggil bila konfluensi tercapai — murah saat masih 1 wallet.
+ */
+export async function raiseEvmSignalNow(token, owners, lastAtMs, { nowMs } = {}) {
+  const now = nowMs ?? Date.now();
+  const t = String(token || "").toLowerCase();
+  const set = new Set((owners || []).map((o) => String(o).toLowerCase()));
+  for (const o of signals.get(t)?.wallets || []) set.add(o);
+  if (set.size < SIGNAL_MIN) return { raised: false, reason: "kurang-konfluensi", wallets: set.size };
+  const scr = await screenEvmToken(t).catch(() => null);
+  const r = applyCandidate(t, set, lastAtMs || now, scr, now);
+  if (!r) return { raised: false, reason: "gate", wallets: set.size };
+  save();
+  return { raised: true, isNew: r.isNew, wallets: set.size };
+}
+
 /**
  * Satu sweep monitor Sniper EVM. Baca beli wallet aktif Watchlist, kelompokkan per token,
  * naikkan sinyal saat ≥ SIGNAL_MIN wallet berbeda membeli token fresh yang sama & lolos gate.
@@ -178,37 +236,8 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
   let newSignals = 0;
   const screens = await mapPool(candidates, POOL, ([token]) => screenEvmToken(token).catch(() => null));
   candidates.forEach(([token, g], i) => {
-    const scr = screens[i];
-    if (!scr || scr.error) return;
-    if (SAFETY_GATE && !scr.safety?.ok) return;                 // buang rug/high-risk
-    const mcap = scr.metrics?.mcapUsd || 0;
-    if (mcap > 0 && mcap > MAX_MCAP) return;                    // kebesaran = terlambat
-    // Skor = Σ reputasi wallet (dari Watchlist EVM) + skor screen sebagai bumbu.
-    const owners = [...g.wallets];
-    const repSum = owners.reduce((s, o) => s + (getEvmWalletMeta(o).reputation || 0), 0);
-    const score = Math.round(repSum + (scr.score || 0) * 0.5);
-    const existing = signals.get(token);
-    signals.set(token, {
-      token,
-      symbol: scr.symbol || scr.name || "",
-      name: scr.name || "",
-      chain: "Robinhood Chain",
-      mcap,
-      priceUsd: scr.metrics?.priceUsd || 0,
-      liquidityUsd: scr.metrics?.liquidityUsd || 0,
-      gemScore: scr.score ?? null,
-      verdict: scr.verdict ?? null,
-      safetyRisk: scr.safety?.risk ?? null,
-      walletCount: g.wallets.size,
-      wallets: owners,
-      score,
-      chartUrl: scr.metrics?.chartUrl || null,
-      lastBuyAt: g.lastAt,
-      firstDetectedAt: existing?.firstDetectedAt || now,
-      updatedAt: now,
-      isNew: !existing,
-    });
-    if (!existing) newSignals++;
+    const r = applyCandidate(token, g.wallets, g.lastAt, screens[i], now);
+    if (r?.isNew) newSignals++;
   });
 
   // 4.5) Hold / exit reconciliation (parity Solana). Cek apakah wallet di balik tiap
@@ -285,10 +314,12 @@ export async function purgeEvmSignals({ nowMs } = {}) {
 
 /** Sinyal live EVM (terkuat dulu), plus konfigurasi untuk UI. */
 export function getEvmSignals() {
-  // Urut: jumlah smart wallet (holders bila di-track, else walletCount) → skor → terbaru.
+  // Urut: GEM score (yang belum di-screen di bawah) → jumlah smart wallet
+  // (holders bila di-track, else walletCount) → skor → terbaru.
+  const gem = (s) => (s.gemScore != null ? s.gemScore : -1);
   const smCount = (s) => (s.holders != null ? s.holders : (s.walletCount || 0));
   const list = [...signals.values()].sort((a, b) =>
-    smCount(b) - smCount(a) || (b.walletCount || 0) - (a.walletCount || 0) || (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
+    gem(b) - gem(a) || smCount(b) - smCount(a) || (b.walletCount || 0) - (a.walletCount || 0) || (b.score || 0) - (a.score || 0) || b.updatedAt - a.updatedAt);
   return {
     chain: "Robinhood Chain",
     count: list.length,
