@@ -3,18 +3,20 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-13 11:54** · Total **165** commit dalam **15** hari.
+> Terakhir diperbarui: **2026-07-13 13:18** · Total **167** commit dalam **15** hari.
 
 ---
 
-## 2026-07-13 (Senin) — 3 commit
+## 2026-07-13 (Senin) — 5 commit
 
 **✨ Fitur baru / penambahan**
 - feat(wallet-intel): Wallet Intelligence v2 — vetting + audit akurasi + klasifikasi wallet  `44bc273`
 - feat(rh-sniper): watcher real-time eth_getLogs + urut sinyal live per GEM score  `0365d7e`
+- feat(chart): chart Solana pindah ke embed GMGN + deep link Axiom  `3082158`
 
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `1d8cf53`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `d5e127f`
 
 ## 2026-07-12 (Minggu) — 9 commit
 
