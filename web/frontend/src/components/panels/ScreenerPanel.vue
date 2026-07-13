@@ -66,7 +66,7 @@ const lockIcon = computed(() => {
 const usd = (n) =>
   typeof n === "number" ? "$" + Math.round(n).toLocaleString() : "—";
 
-// DexScreener embeddable chart for the deepest pair of the searched token.
+// GMGN embeddable chart for the searched token (chartUrl dibentuk server).
 const chartUrl = computed(() => report.value?.token?.chartUrl || null);
 
 function clearResult() {
@@ -179,25 +179,31 @@ async function screen() {
         </div>
       </div>
 
-      <!-- DexScreener live chart -->
+      <!-- GMGN live chart (embed) + deep link keluar ke Axiom (posisi wallet) -->
       <div class="chart" v-if="chartUrl">
         <div class="chart__head">
           <span class="chart__title">📊 {{ report.token.symbol }} chart</span>
-          <a class="chart__open" :href="report.token.url" target="_blank" rel="noopener">
-            Open on DexScreener ↗
+          <a
+            class="chart__open"
+            :href="`https://axiom.trade/t/${report.token.address}`"
+            target="_blank"
+            rel="noopener"
+            title="Buka chart Axiom (perlu login wallet) — bisa lihat posisi wallet."
+          >
+            Buka di Axiom ↗
           </a>
         </div>
         <div class="chart__frame">
           <iframe
             :src="chartUrl"
-            :title="`${report.token.symbol} price chart on DexScreener`"
+            :title="`${report.token.symbol} price chart on GMGN`"
             loading="lazy"
             allow="clipboard-write"
             referrerpolicy="no-referrer"
           />
         </div>
       </div>
-      <p class="chart__na" v-else>📊 Chart unavailable — no DexScreener pair found for this token.</p>
+      <p class="chart__na" v-else>📊 Chart unavailable for this token.</p>
 
       <!-- Liquidity lock badge -->
       <div class="lock" :style="{ '--lc': lockColor }">

@@ -42,7 +42,7 @@ const amount = (n) => {
 };
 const shortAddr = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "—");
 const solscanTx = (sig) => `https://solscan.io/tx/${sig}`;
-const dexUrl = (mint) => `https://dexscreener.com/solana/${mint}`;
+const dexUrl = (mint) => `https://axiom.trade/t/${mint}`;
 
 // `at` = detik (timestamp Helius). Jatuh balik ke `logged` (ms) bila tak ada.
 function ago(t) {

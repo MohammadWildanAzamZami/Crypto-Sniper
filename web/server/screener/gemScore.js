@@ -130,9 +130,9 @@ export function computeGemScore(metrics, holders, nowMs, lock) {
       priceUsd: metrics.priceUsd,
       url: metrics.url,
       pairAddress: metrics.pairAddress,
-      // Embeddable DexScreener chart for the deepest pair (null if unknown).
-      chartUrl: metrics.pairAddress
-        ? `https://dexscreener.com/solana/${metrics.pairAddress}?embed=1&theme=dark&info=0&trades=0`
+      // Embeddable GMGN kline chart, keyed by mint (works without a pair lookup).
+      chartUrl: metrics.address
+        ? `https://www.gmgn.cc/kline/sol/${metrics.address}?theme=dark`
         : null,
     },
     gemScore: total,

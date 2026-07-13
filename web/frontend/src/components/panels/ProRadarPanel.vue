@@ -25,7 +25,7 @@ const loading = ref(false);
 const error = ref("");
 const copiedAddr = ref("");
 const failedLogos = ref(new Set());
-// Address of the token whose DexScreener chart is currently expanded (one at a
+// Address of the token whose GMGN chart is currently expanded (one at a
 // time). Click a token (logo/name) to embed its live chart inline; click again
 // to collapse it.
 const openChart = ref("");
@@ -322,7 +322,7 @@ async function runScan() {
           <li v-for="(r, i) in m.reasons" :key="i">{{ r }}</li>
         </ul>
 
-        <!-- DexScreener chart: inline on desktop, floating overlay on mobile -->
+        <!-- GMGN chart (embed): inline on desktop, floating overlay on mobile -->
         <div v-if="openChart === m.address && m.chartUrl" class="chart">
           <div class="chart__backdrop" aria-hidden="true" @click="toggleChart(m)"></div>
           <div class="chart__panel">
@@ -342,8 +342,14 @@ async function runScan() {
                 {{ m.symbol }} chart
               </span>
               <div class="chart__head-actions">
-                <a class="chart__open" :href="m.url" target="_blank" rel="noopener">
-                  Buka di DexScreener ↗
+                <a
+                  class="chart__open"
+                  :href="`https://axiom.trade/t/${m.address}`"
+                  target="_blank"
+                  rel="noopener"
+                  title="Buka chart Axiom (perlu login wallet) — bisa lihat posisi wallet."
+                >
+                  Buka di Axiom ↗
                 </a>
                 <button type="button" class="chart__close" aria-label="Tutup chart" @click="toggleChart(m)">✕</button>
               </div>
@@ -351,18 +357,16 @@ async function runScan() {
             <div class="chart__frame">
               <iframe
                 :src="m.chartUrl"
-                :title="`Chart harga ${m.symbol} di DexScreener`"
+                :title="`Chart harga ${m.symbol} di GMGN`"
                 loading="lazy"
                 allow="clipboard-write"
                 referrerpolicy="no-referrer"
               />
-              <!-- Cover the DexScreener attribution footer inside the (cross-origin) embed. -->
-              <div class="chart__mask" aria-hidden="true"></div>
             </div>
           </div>
         </div>
         <p v-else-if="openChart === m.address" class="chart__na">
-          📊 Chart tak tersedia — tidak ada pair DexScreener untuk token ini.
+          📊 Chart tak tersedia untuk token ini.
         </p>
 
         <div class="card__actions">
@@ -541,7 +545,7 @@ async function runScan() {
 .reasons li { font-size: var(--font-size-xs); color: var(--text-muted); }
 .reasons li::before { content: "• "; color: #00c805; }
 
-/* DexScreener chart embed (inline on desktop) */
+/* GMGN chart embed (inline on desktop) */
 .chart { display: grid; gap: var(--space-3); }
 .chart__backdrop { display: none; } /* only used as a full-screen overlay on mobile */
 .chart__panel { display: grid; gap: var(--space-3); }
@@ -569,12 +573,6 @@ async function runScan() {
   overflow: hidden; background: var(--bg-card);
 }
 .chart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-/* Masks the "tracked by DexScreener" attribution bar at the bottom of the
-   (cross-origin) embed — we can't touch its DOM, so we cover it. */
-.chart__mask {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
-  background: #0b0e13; pointer-events: none;
-}
 .chart__na { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 
 .card__actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }

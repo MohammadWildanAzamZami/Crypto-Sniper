@@ -60,15 +60,14 @@ async function fetchTrack() {
   } catch { /* keep last track; a blip shouldn't clear the strip */ }
 }
 const shortMint = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "—");
-const dexUrl = (mint) => `https://dexscreener.com/solana/${mint}`;
-// Embedded DexScreener chart for a mint (resolves to the token's top pair).
-const chartUrl = (mint) => `https://dexscreener.com/solana/${mint}?embed=1&theme=dark&info=0&trades=0`;
+// Embedded GMGN kline chart for a mint (gmgn.cc allows iframing; Axiom does not).
+const chartUrl = (mint) => `https://www.gmgn.cc/kline/sol/${mint}?theme=dark`;
 // Axiom's own chart can't be embedded (it sends X-Frame-Options + is wallet-login
 // gated), so we deep-link out to it in a new tab instead.
 const axiomUrl = (mint) => `https://axiom.trade/t/${mint}`;
 
 // Mint of the signal whose chart is currently expanded (one at a time). Click a
-// signal's chart button to embed its live DexScreener chart inline; click again
+// signal's chart button to embed its live GMGN chart inline; click again
 // to collapse it.
 const openChart = ref("");
 function toggleChart(s) {
@@ -376,7 +375,7 @@ onBeforeUnmount(() => {
             <p v-else class="sn-explain__text">{{ explains[s.mint] && explains[s.mint].text }}</p>
           </div>
 
-          <!-- DexScreener chart: floating overlay (teleported to body so no
+          <!-- GMGN chart: floating overlay (teleported to body so no
                ancestor stacking context can clip it). -->
           <Teleport to="body">
           <div v-if="openChart === s.mint" class="chart">
@@ -398,15 +397,12 @@ onBeforeUnmount(() => {
                   {{ s.symbol || shortMint(s.mint) }} chart
                 </span>
                 <div class="chart__head-actions">
-                  <a class="chart__open" :href="dexUrl(s.mint)" target="_blank" rel="noopener noreferrer">
-                    DexScreener ↗
-                  </a>
                   <a
                     class="chart__open chart__open--axiom"
                     :href="axiomUrl(s.mint)"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Buka chart Axiom asli (perlu login wallet). Axiom tak bisa di-embed."
+                    title="Buka chart Axiom (perlu login wallet) — bisa lihat posisi wallet. Axiom tak bisa di-embed."
                   >
                     Axiom ↗
                   </a>
@@ -416,17 +412,15 @@ onBeforeUnmount(() => {
               <div class="chart__frame">
                 <iframe
                   :src="chartUrl(s.mint)"
-                  :title="`Chart harga ${s.symbol || shortMint(s.mint)} di DexScreener`"
+                  :title="`Chart harga ${s.symbol || shortMint(s.mint)} di GMGN`"
                   loading="lazy"
                   allow="clipboard-write"
                   referrerpolicy="no-referrer"
                 />
-                <!-- Cover the DexScreener attribution footer inside the (cross-origin) embed. -->
-                <div class="chart__mask" aria-hidden="true"></div>
               </div>
 
               <!-- Posisi Smart Money — entri tiap wallet Watchlist di sinyal ini.
-                   (Tak bisa digambar di dalam chart DexScreener yang cross-origin,
+                   (Tak bisa digambar di dalam chart GMGN yang cross-origin,
                    jadi ditampilkan sebagai tabel posisi di bawahnya.) -->
               <div v-if="s.positions && s.positions.length" class="pos">
                 <div class="pos__head">
@@ -690,7 +684,7 @@ onBeforeUnmount(() => {
 
 .sn-note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
-/* DexScreener chart embed — always a floating overlay (centered modal). */
+/* GMGN chart embed — always a floating overlay (centered modal). */
 .chart { display: contents; }
 .chart__backdrop {
   position: fixed; inset: 0; z-index: 200;
@@ -733,11 +727,6 @@ onBeforeUnmount(() => {
   overflow: hidden; background: var(--bg-card);
 }
 .chart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-/* Masks the "tracked by DexScreener" attribution bar at the bottom of the embed. */
-.chart__mask {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
-  background: #0b0e13; pointer-events: none;
-}
 
 /* Smart-money positions table under the chart. */
 .pos { display: grid; gap: var(--space-2); }

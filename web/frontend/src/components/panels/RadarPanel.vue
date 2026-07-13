@@ -147,7 +147,7 @@ async function runScan() {
         </ul>
 
         <div class="card__actions">
-          <a class="lnk" :href="m.url" target="_blank" rel="noopener">📈 Chart</a>
+          <a class="lnk" :href="`https://axiom.trade/t/${m.address}`" target="_blank" rel="noopener">📈 Chart (Axiom)</a>
         </div>
       </li>
     </ul>
