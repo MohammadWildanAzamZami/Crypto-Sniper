@@ -232,19 +232,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
 });
 
-// Infrastruktur padanan (EVM) — rujukan, bukan koneksi live.
-const infra = [
-  { k: "Chain", v: "EVM L2 (Arbitrum stack), gas ETH" },
-  { k: "Sifat", v: "Permissionless — siapa pun bisa deploy" },
-  { k: "DEX utama", v: "Uniswap (+ 1inch, Lighter, Rialto, Arcus)" },
-  { k: "Launchpad", v: "fun.noxa.fi/robinhood" },
-  { k: "Data pool", v: "GeckoTerminal API" },
-  { k: "Explorer/API", v: "robinhoodchain.blockscout.com" },
-];
-
-const explorerUrl = "https://robinhoodchain.blockscout.com";
-const geckoUrl = "https://www.geckoterminal.com";
-const docsUrl = "https://docs.robinhood.com/chain/";
 </script>
 
 <template>
@@ -440,7 +427,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
           </button>
         </div>
       </div>
-      <p class="rh__hint">by Robinhood Chain</p>
+      <p class="rh__hint">By. Robinhood Chain</p>
 
       <p v-if="sniperError" class="rh__err" role="alert">⚠️ {{ sniperError }}</p>
 
@@ -566,25 +553,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 
     </div>
 
-    <!-- Rujukan infrastruktur EVM -->
-    <div class="rh__infra">
-      <div v-for="i in infra" :key="i.k" class="rh__chip">
-        <span class="rh__chip-k">{{ i.k }}</span>
-        <span class="rh__chip-v">{{ i.v }}</span>
-      </div>
-    </div>
-
-    <div class="rh__links">
-      <a :href="docsUrl" target="_blank" rel="noopener noreferrer">📄 Docs</a>
-      <a :href="explorerUrl" target="_blank" rel="noopener noreferrer">🔎 Blockscout</a>
-      <a :href="geckoUrl" target="_blank" rel="noopener noreferrer">📊 GeckoTerminal</a>
-    </div>
-
-    <p class="rh__note">
-      Catatan: konsep Sniper Smart Money relevan di sini (chain permissionless + memecoin aktif),
-      tapi butuh <b>adapter chain EVM</b> + ganti sumber data (Helius→Blockscout/RPC,
-      DexScreener/Birdeye→GeckoTerminal, RugCheck→GoPlus). Bukan nasihat keuangan. DYOR.
-    </p>
+    <p class="rh__note">By. Robinhood Chain</p>
   </section>
 </template>
 
@@ -705,21 +674,6 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 }
 .rh__cand-catch { color: var(--text-muted); display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .rh__wl-active { font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
-
-.rh__infra { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.rh__chip {
-  display: inline-flex; align-items: baseline; gap: var(--space-2);
-  padding: var(--space-2) var(--space-3); border-radius: var(--radius-full, 999px);
-  background: var(--bg-raised); border: 1px solid var(--border-default);
-  font-size: var(--font-size-xs);
-}
-.rh__chip-k { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; }
-.rh__chip-v { color: var(--text-body); font-weight: var(--font-weight-medium); }
-
-.rh__links { display: flex; gap: var(--space-4); flex-wrap: wrap; }
-.rh__links a { color: #00a804; text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.rh__links a:hover { text-decoration: underline; }
-.rh__links a:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 .rh__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
