@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-13 13:18** · Total **167** commit dalam **15** hari.
+> Terakhir diperbarui: **2026-07-13 14:22** · Total **170** commit dalam **15** hari.
 
 ---
 
-## 2026-07-13 (Senin) — 5 commit
+## 2026-07-13 (Senin) — 8 commit
 
 **✨ Fitur baru / penambahan**
 - feat(wallet-intel): Wallet Intelligence v2 — vetting + audit akurasi + klasifikasi wallet  `44bc273`
@@ -17,6 +17,9 @@
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `1d8cf53`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `d5e127f`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `ff98c41`
+- docs(robinhood): buku panduan lengkap tool Robinhood Chain  `734fd5c`
+- docs: buku panduan lengkap tool Solana chain  `1a399cb`
 
 ## 2026-07-12 (Minggu) — 9 commit
 
