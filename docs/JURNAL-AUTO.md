@@ -3,11 +3,16 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-12 22:41** · Total **161** commit dalam **14** hari.
+> Terakhir diperbarui: **2026-07-13 11:53** · Total **163** commit dalam **15** hari.
 
 ---
 
-## 2026-07-12 (Minggu) — 8 commit
+## 2026-07-13 (Senin) — 1 commit
+
+**✨ Fitur baru / penambahan**
+- feat(wallet-intel): Wallet Intelligence v2 — vetting + audit akurasi + klasifikasi wallet  `44bc273`
+
+## 2026-07-12 (Minggu) — 9 commit
 
 **✨ Fitur baru / penambahan**
 - feat(evm-sniper): purge on-demand sinyal yang smart money-nya sudah keluar  `287bc4f`
@@ -22,6 +27,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `833d101`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `5ab6959`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `fefe60a`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `d97bca9`
 
 ## 2026-07-11 (Sabtu) — 4 commit
 
