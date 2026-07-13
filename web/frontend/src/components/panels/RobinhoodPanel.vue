@@ -207,26 +207,14 @@ function onKeydown(e) {
   if (e.key === "Escape" && openChart.value) openChart.value = "";
 }
 
-// Auto-pilot status (langkah POWER) — background loop auto-seed + sweep.
-const autoStatus = ref(null);
+// Auto-pilot (seed + sweep) berjalan otomatis di server dan TIDAK ditampilkan di UI;
+// yang dipakai panel hanya status watcher real-time (untuk baris meta Sniper).
 const rtStatus = ref(null); // watcher real-time server (eth_getLogs)
-const ticking = ref(false);
 async function loadAuto() {
   try {
     const r = await fetch(apiUrl("/api/robinhood/auto/status"));
-    if (r.ok) { const j = await r.json(); autoStatus.value = j.lastTick; rtStatus.value = j.realtime || null; }
+    if (r.ok) { const j = await r.json(); rtStatus.value = j.realtime || null; }
   } catch { /* diamkan */ }
-}
-async function runTick() {
-  if (ticking.value) return;
-  ticking.value = true;
-  try {
-    const r = await fetch(apiUrl("/api/robinhood/auto/tick"), { method: "POST" });
-    const j = await r.json();
-    if (r.ok && j.at) autoStatus.value = j;
-    await Promise.all([loadWatchlist(), loadSniper(), loadAuto()]);
-  } catch { /* diamkan */ }
-  finally { ticking.value = false; }
 }
 
 // Server memantau beli smart money real-time (watcher eth_getLogs); panel ikut
@@ -266,39 +254,17 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         <h2 id="rh-h">
           <span class="rh__dot" aria-hidden="true"></span>
           Robinhood Chain
-          <span class="rh__tag">EVM · L2</span>
-          <span class="rh__badge">Live</span>
         </h2>
-        <p class="rh__sub">
-          Ekosistem <b>Robinhood Chain</b> (EVM permissionless, mainnet 1 Juli 2026 — "meme meta").
-          Pipeline lengkap dengan data on-chain nyata: <b>Discover → Screen → Bedah → Watchlist → Sniper</b>,
-          plus <b>auto-pilot</b> yang menumbuhkan watchlist otomatis.
-        </p>
       </div>
     </div>
 
-    <!-- ===== Auto-pilot: background loop auto-seed watchlist + sniper sweep ===== -->
-    <div class="rh__auto">
-      <div class="rh__auto-main">
-        <span class="rh__auto-dot" aria-hidden="true"></span>
-        <b>🤖 Auto-pilot</b>
-        <span v-if="autoStatus" class="rh__auto-stat">
-          <template v-if="autoStatus.watchlistSize != null">watchlist {{ autoStatus.watchlistSize }}<span v-if="autoStatus.watchlistMax">/{{ autoStatus.watchlistMax }}</span> · </template>
-          {{ autoStatus.swept }} disweep · {{ autoStatus.signalCount }} sinyal
-          <span v-if="autoStatus.capped" class="rh__auto-cap" title="Watchlist penuh — berhenti tumbuh, semua tetap dipantau">🔒 penuh</span>
-          <span class="rh__auto-ago">({{ autoStatus.at ? ageOf(new Date(autoStatus.at).toISOString()) + " lalu" : "" }})</span>
-        </span>
-        <span v-else class="rh__auto-stat">menunggu tick pertama…</span>
-      </div>
-      <button class="rh__pool-btn" type="button" :disabled="ticking" @click="runTick">
-        {{ ticking ? "Menjalankan…" : "⚡ Jalankan sekarang" }}
-      </button>
-    </div>
+    <!-- Auto-pilot (seed + sweep) & watcher real-time tetap aktif di server —
+         sengaja tidak ditampilkan di UI. -->
 
-    <!-- ===== Prototipe LIVE: discover pool via GeckoTerminal ===== -->
+    <!-- ===== Discover pool via GeckoTerminal ===== -->
     <div class="rh__disc">
       <div class="rh__disc-head">
-        <span class="rh__disc-title">🚀 Discover pool <span class="rh__proto">prototipe live</span></span>
+        <span class="rh__disc-title">🚀 Discover pool</span>
         <button class="rh__btn" :disabled="loading" @click="discover">
           {{ loading ? "Memindai…" : "Scan Robinhood Chain" }}
         </button>
@@ -367,7 +333,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
     <!-- ===== Bedah Coin EVM: early buyer + kandidat smart wallet ===== -->
     <div class="rh__disc">
       <div class="rh__disc-head">
-        <span class="rh__disc-title">🩻 Bedah Coin <span class="rh__proto">prototipe live</span></span>
+        <span class="rh__disc-title">🩻 Bedah Coin</span>
       </div>
       <p class="rh__hint">
         Tempel alamat token winner (0x…) atau klik <b>🩻 bedah</b> di daftar di atas — telusuri
@@ -430,7 +396,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
     <!-- ===== Watchlist EVM: wallet 0x yang menangkap winner (langkah #4) ===== -->
     <div class="rh__disc">
       <div class="rh__disc-head">
-        <span class="rh__disc-title">👛 Watchlist EVM <span class="rh__proto">prototipe live</span></span>
+        <span class="rh__disc-title">👛 Watchlist EVM</span>
         <button class="rh__pool-btn" type="button" :disabled="wlLoading" @click="loadWatchlist">↻ Segarkan</button>
       </div>
 
@@ -464,20 +430,17 @@ const docsUrl = "https://docs.robinhood.com/chain/";
     <!-- ===== Sniper Live EVM: konfluensi beli wallet aktif Watchlist (langkah #5) ===== -->
     <div class="rh__disc">
       <div class="rh__disc-head">
-        <span class="rh__disc-title">🎯 Sniper Live <span class="rh__proto">prototipe live</span></span>
+        <span class="rh__disc-title">🎯 Sniper Live</span>
         <div class="rh__disc-actions">
-          <button class="rh__btn" :disabled="pnlLoading" @click="loadPnl">
-            {{ pnlLoading ? "Menghitung…" : "📊 Rekap PnL" }}
+          <button class="rh__pool-btn rh__pool-btn--plain" type="button" :disabled="pnlLoading" @click="loadPnl">
+            {{ pnlLoading ? "Menghitung…" : "📊 PnL" }}
           </button>
           <button class="rh__btn" :disabled="sniperSweeping" @click="sweepSniper">
             {{ sniperSweeping ? "Menyapu…" : "🔍 Sweep sekarang" }}
           </button>
         </div>
       </div>
-      <p class="rh__hint">
-        Pantau wallet <b>aktif Watchlist EVM</b> → sinyal saat <b>≥{{ sniper ? sniper.signalMin : 2 }} wallet</b> berbeda
-        memborong token fresh yang sama (lolos gate screen EVM). Bangun watchlist dulu via Bedah agar ada yang dipantau.
-      </p>
+      <p class="rh__hint">by Robinhood Chain</p>
 
       <p v-if="sniperError" class="rh__err" role="alert">⚠️ {{ sniperError }}</p>
 
@@ -560,6 +523,10 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 
       <!-- Rekap PnL: performa sinyal sejak pertama terdeteksi screener -->
       <div v-if="pnlOpen" class="rh__pnl">
+        <div class="rh__pnl-head">
+          <b>📊 Rekap PnL</b>
+          <button type="button" class="rh__pool-btn rh__pool-btn--plain" aria-label="Tutup rekap PnL" @click="pnlOpen = false">✕ Tutup</button>
+        </div>
         <p v-if="pnlError" class="rh__err" role="alert">⚠️ {{ pnlError }}</p>
         <p v-else-if="pnlLoading && !pnl" class="rh__hint">Menghitung PnL — mengambil harga kini tiap token…</p>
         <template v-if="pnl">
@@ -597,10 +564,6 @@ const docsUrl = "https://docs.robinhood.com/chain/";
         </template>
       </div>
 
-      <p class="rh__note">
-        Deteksi beli EVM = wallet menerima token non-base + membayar WETH/USDG di tx yang sama (Blockscout).
-        Kandidat di-gate lewat screen EVM (anti-rug heuristik). Heuristik — DYOR.
-      </p>
     </div>
 
     <!-- Rujukan infrastruktur EVM -->
@@ -638,38 +601,10 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 .rh__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); }
 .rh__head h2 { margin: 0; font-size: var(--font-size-lg); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .rh__dot { width: 10px; height: 10px; border-radius: 50%; background: #00c805; box-shadow: 0 0 8px #00c805; flex: none; }
-.rh__sub { margin: var(--space-2) 0 0; color: var(--text-muted); font-size: var(--font-size-sm); line-height: 1.55; max-width: 66ch; }
-.rh__tag {
-  font-size: var(--font-size-xs); font-weight: var(--font-weight-medium);
-  color: #00c805; background: color-mix(in srgb, #00c805 14%, transparent);
-  border: 1px solid color-mix(in srgb, #00c805 45%, transparent);
-  padding: 2px 8px; border-radius: var(--radius-full, 999px);
-}
-.rh__badge {
-  font-size: var(--font-size-xs); font-weight: 700; color: var(--text-on-accent, #000);
-  background: #00c805; padding: 2px 8px; border-radius: var(--radius-full, 999px);
-}
-
-/* Auto-pilot strip */
-.rh__auto {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
-  background: color-mix(in srgb, #00c805 8%, var(--bg-raised));
-  border: 1px solid color-mix(in srgb, #00c805 35%, var(--border-default));
-  border-radius: var(--control-radius);
-}
-.rh__auto-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; font-size: var(--font-size-sm); }
-.rh__auto-dot { width: 8px; height: 8px; border-radius: 50%; background: #00c805; box-shadow: 0 0 6px #00c805; flex: none; animation: rh-pulse 2s ease-in-out infinite; }
-@keyframes rh-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-.rh__auto-stat { color: var(--text-muted); }
-.rh__auto-ago { color: var(--text-muted); opacity: 0.8; }
-.rh__auto-cap { color: #d97706; font-weight: 700; }
-
-/* Discover prototipe live */
+/* Discover */
 .rh__disc { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--bg-raised); border: 1px solid var(--border-default); border-radius: var(--control-radius); }
 .rh__disc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .rh__disc-title { font-weight: 700; color: var(--text-heading); display: inline-flex; align-items: center; gap: var(--space-2); }
-.rh__proto { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #00a804; background: color-mix(in srgb, #00c805 14%, transparent); border: 1px solid color-mix(in srgb, #00c805 40%, transparent); padding: 1px 6px; border-radius: var(--radius-sm); }
 .rh__btn {
   flex: none; padding: 0 var(--space-5); height: var(--control-height);
   border: 1px solid #00a804; border-radius: var(--control-radius);
@@ -711,13 +646,16 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 }
 .rh__pool-btn:hover:not(:disabled) { border-color: #00c805; }
 .rh__pool-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Varian netral tombol (tanpa aksen hijau) — dipakai tombol PnL & tutup rekap. */
+.rh__pool-btn--plain { color: var(--text-body); }
 .rh__pool-link { color: #00a804; text-decoration: none; font-size: var(--font-size-xs); white-space: nowrap; }
 .rh__pool-link:hover { text-decoration: underline; }
 .rh__screen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--font-size-xs); padding-top: 2px; border-top: 1px dashed var(--border-default); color: var(--text-muted); }
-.rh__v { font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm); }
-.rh__v--strong { color: #04210a; background: #00c805; }
-.rh__v--watch { color: #7c5b00; background: #f5c518; }
-.rh__v--skip { color: #fff; background: var(--text-error, #ef4444); }
+/* Verdict GEM — teks kecil polos (tanpa blok warna) supaya tidak mencolok. */
+.rh__v { font-size: var(--font-size-xs); font-weight: 600; }
+.rh__v--strong { color: #00a804; }
+.rh__v--watch { color: #b45309; }
+.rh__v--skip { color: var(--text-error, #ef4444); }
 .rh__srisk { padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-default); }
 .rh__srisk--low { color: var(--text-success); }
 .rh__srisk--med { color: #d97706; }
@@ -757,6 +695,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 /* Rekap PnL: grid 6 kolom (token, GEM, terdeteksi, mcap awal, mcap kini, PnL). */
 .rh__disc-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .rh__pnl { display: grid; gap: var(--space-2); border-top: 1px dashed var(--border-default); padding-top: var(--space-3); }
+.rh__pnl-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .rh__cand--pnl { grid-template-columns: minmax(0, 1fr) 36px 70px 84px 84px 70px; }
 .rh__cand--pnl > :nth-child(n + 4) { text-align: right; }
 .rh__pnl-tok { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
