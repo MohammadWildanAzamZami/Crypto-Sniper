@@ -10,6 +10,10 @@
 > [ROBINHOOD-CHAIN.md](ROBINHOOD-CHAIN.md).
 >
 > ⚠️ Semua angka & skor di aplikasi ini heuristik — **bukan nasihat keuangan. DYOR.**
+>
+> 💾 Versi **Word** buku ini bisa diunduh langsung di
+> `http://127.0.0.1:8787/BUKU-PANDUAN-SOLANA.docx` (atau lewat URL ngrok + path
+> yang sama).
 
 ---
 
@@ -87,6 +91,10 @@ makin tajam **Sinyal Live**. Sistem belajar dari data yang kamu suapkan.
 **Apa ini:** penilai satu token. Masukkan alamat mint → keluar skor **0–100**
 dan verdict (**STRONG / WATCH / SKIP**).
 
+> ℹ️ Panel ini saat ini **disembunyikan** di UI zona Solana (atas permintaan).
+> Mesinnya tetap dipakai Radar & Pro Radar. Untuk memunculkan lagi: buka
+> `web/frontend/src/pages/ExplorerPage.vue` dan hapus komentar `<ScreenerPanel />`.
+
 **Kapan dipakai:** setiap kali kamu menemukan token dari mana pun (Twitter,
 Telegram, teman) dan mau cek cepat "layak dilirik atau tidak".
 
@@ -113,6 +121,10 @@ bukan cuma angka totalnya.
 **Apa ini:** screener otomatis. Tiap **15 menit** mengambil token trending
 (DexScreener boosts), menilai dengan GEM Score, menyaring lewat gate kualitas,
 dan menampilkan kandidat terbaik. Pick baru dikirim ke **Telegram** (jika diisi).
+
+> ℹ️ Panel ini saat ini **disembunyikan** di UI zona Solana (sama seperti GEM
+> Score) — auto-scan-nya tetap jalan di server dan hasilnya mengalir ke Pro
+> Radar. Memunculkan lagi: hapus komentar `<RadarPanel />` di `ExplorerPage.vue`.
 
 **Kapan dipakai:** sebagai "mata" pasif — kamu tidak perlu memantau pasar
 manual; buka panel ini beberapa kali sehari atau tunggu alert.
@@ -262,6 +274,9 @@ token, nilai. Klik tanda tangan tx → Solscan; klik mint → **chart Axiom**.
 **Apa ini:** SOP screening manual — daftar periksa bertahap kalau kamu mau
 menilai token **tanpa** mengandalkan skor otomatis (atau untuk belajar memahami
 apa yang dinilai mesin).
+
+> ℹ️ Panel ini juga sedang **disembunyikan** di UI (`<ChecklistPanel />` di
+> `ExplorerPage.vue`). Isinya tetap dirangkum di bawah karena berguna dibaca.
 
 Tahapannya: filter awal di DexScreener (umur, likuiditas, volume) → cek keamanan
 (RugCheck, LP lock, mint authority) → cek sosial → keputusan ukuran posisi.
