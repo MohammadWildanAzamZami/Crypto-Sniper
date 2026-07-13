@@ -553,7 +553,7 @@ onBeforeUnmount(() => {
 
     </div>
 
-    <p class="rh__note">By. Robinhood Chain</p>
+    <p class="rh__by">By. Robinhood Chain</p>
   </section>
 </template>
 
@@ -676,6 +676,9 @@ onBeforeUnmount(() => {
 .rh__wl-active { font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
 
 .rh__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
+/* Footer "By. Robinhood Chain" — rata tengah, ukuran & ketebalan sama persis
+   dengan judul "Robinhood Chain" di atas (h2 panel). */
+.rh__by { margin: 0; text-align: center; font-size: var(--font-size-lg); font-weight: var(--font-weight-medium); color: var(--text-heading); }
 
 /* Chart GeckoTerminal — overlay melayang (modal terpusat), gaya sama dengan
    chart sniper Solana tapi ber-aksen hijau Robinhood. */
