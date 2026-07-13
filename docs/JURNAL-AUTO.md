@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-13 21:33** · Total **175** commit dalam **15** hari.
+> Terakhir diperbarui: **2026-07-13 21:35** · Total **177** commit dalam **15** hari.
 
 ---
 
-## 2026-07-13 (Senin) — 13 commit
+## 2026-07-13 (Senin) — 15 commit
 
 **✨ Fitur baru / penambahan**
 - feat(wallet-intel): Wallet Intelligence v2 — vetting + audit akurasi + klasifikasi wallet  `44bc273`
@@ -24,6 +24,8 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `59703b5`
 - docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `62b8695`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `38d131b`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `0f6af0d`
+- docs: versi Word buku panduan Solana + catatan panel tersembunyi  `2acb9dd`
 
 **♻️ Refactor / rapikan**
 - ui(rh-sniper): rapikan modal chart — hapus tag chain + tombol Blockscout  `053495a`
