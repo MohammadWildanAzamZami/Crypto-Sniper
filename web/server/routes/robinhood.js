@@ -12,7 +12,7 @@ import { requireAdmin } from "../middleware/guard.js";
 import { screenEvmToken } from "../screener/evmScreen.js";
 import { bedahEvmToken } from "../screener/evmAutopsy.js";
 import { recordEvmCandidates, getEvmWatchlist } from "../screener/evmWatchlist.js";
-import { runEvmSniperSweep, getEvmSignals, purgeEvmSignals } from "../screener/evmSniper.js";
+import { runEvmSniperSweep, getEvmSignals, purgeEvmSignals, getEvmSniperPnl } from "../screener/evmSniper.js";
 import { autoSeedWatchlist, robinhoodTick, getLastTick } from "../screener/evmAuto.js";
 import { getEvmRealtimeStatus } from "../screener/evmRealtime.js";
 
@@ -170,6 +170,17 @@ router.post("/robinhood/auto/tick", scanLimit, async (_req, res) => {
 router.get("/robinhood/sniper/signals", (_req, res) => {
   try {
     res.json(getEvmSignals());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// GET /api/robinhood/sniper/pnl?limit= — rekap PnL sinyal sejak pertama terdeteksi
+// (riwayat bertahan meski sinyal live sudah di-cull). Fetch harga kini on-demand.
+router.get("/robinhood/sniper/pnl", scanLimit, async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) > 0 ? Math.min(100, Number(req.query.limit)) : undefined;
+    res.json(await getEvmSniperPnl({ limit, nowMs: Date.now() }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

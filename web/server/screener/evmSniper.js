@@ -48,12 +48,29 @@ const POOL = 5;
 
 /** @type {Map<string, object>} token → signal */
 let signals = new Map();
+/** Riwayat SEMUA sinyal yang pernah naik (untuk rekap PnL) — tetap ada meski sinyal
+ * live-nya sudah di-cull. Snapshot saat PERTAMA terdeteksi: entry price/mcap, GEM. */
+const HISTORY_MAX = 300;
+let history = [];
 try {
   const saved = JSON.parse(readFileSync(FILE_PATH, "utf8"));
   if (Array.isArray(saved.signals)) signals = new Map(saved.signals.map((s) => [s.token, s]));
+  if (Array.isArray(saved.history)) history = saved.history;
 } catch { /* start empty */ }
+// Backfill riwayat dari sinyal live lama (sebelum fitur PnL ada). Entry-nya memakai
+// harga tersimpan terakhir — bukan harga deteksi sebenarnya, tapi terbaik yang ada.
+if (!history.length && signals.size) {
+  history = [...signals.values()].map((s) => ({
+    token: s.token, symbol: s.symbol || "", logoUrl: s.logoUrl || null,
+    gemScore: s.gemScore ?? null, verdict: s.verdict ?? null,
+    walletCount: s.walletCount || 0,
+    entryPriceUsd: s.entryPriceUsd ?? s.priceUsd ?? 0,
+    entryMcap: s.entryMcap ?? s.mcap ?? 0,
+    firstDetectedAt: s.firstDetectedAt || s.updatedAt || 0,
+  }));
+}
 function save() {
-  try { writeFileSync(FILE_PATH, JSON.stringify({ signals: [...signals.values()] }, null, 2), "utf8"); }
+  try { writeFileSync(FILE_PATH, JSON.stringify({ signals: [...signals.values()], history }, null, 2), "utf8"); }
   catch { /* read-only FS */ }
 }
 
@@ -160,7 +177,7 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
   const repSum = owners.reduce((s, o) => s + (getEvmWalletMeta(o).reputation || 0), 0);
   const score = Math.round(repSum + (scr.score || 0) * 0.5);
   const existing = signals.get(token);
-  signals.set(token, {
+  const sig = {
     token,
     symbol: scr.symbol || scr.name || "",
     name: scr.name || "",
@@ -168,9 +185,14 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
     mcap,
     priceUsd: scr.metrics?.priceUsd || 0,
     liquidityUsd: scr.metrics?.liquidityUsd || 0,
+    // Snapshot ENTRY (harga/mcap saat PERTAMA terdeteksi) — tak ditimpa refresh,
+    // dasar rekap PnL performa screener.
+    entryPriceUsd: existing?.entryPriceUsd ?? (scr.metrics?.priceUsd || 0),
+    entryMcap: existing?.entryMcap ?? mcap,
     gemScore: scr.score ?? null,
     verdict: scr.verdict ?? null,
     safetyRisk: scr.safety?.risk ?? null,
+    logoUrl: scr.logoUrl || existing?.logoUrl || null,
     walletCount: owners.length,
     wallets: owners,
     score,
@@ -179,7 +201,16 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
     firstDetectedAt: existing?.firstDetectedAt || now,
     updatedAt: now,
     isNew: !existing,
-  });
+  };
+  signals.set(token, sig);
+  if (!existing) {
+    history.push({
+      token, symbol: sig.symbol, logoUrl: sig.logoUrl,
+      gemScore: sig.gemScore, verdict: sig.verdict, walletCount: owners.length,
+      entryPriceUsd: sig.entryPriceUsd, entryMcap: sig.entryMcap, firstDetectedAt: now,
+    });
+    if (history.length > HISTORY_MAX) history = history.slice(-HISTORY_MAX);
+  }
   return { isNew: !existing };
 }
 
@@ -340,5 +371,66 @@ export function getEvmSignals() {
     trackHolding: TRACK_HOLDING,
     holdGraceMin: HOLD_GRACE_MIN,
     signals: list,
+  };
+}
+
+// ---- Rekap PnL: performa sinyal sejak pertama terdeteksi screener ----
+
+const GT = "https://api.geckoterminal.com/api/v2";
+
+// Harga & mcap KINI dari pool likuiditas-terbesar (paritas evmScreen.gtMetrics,
+// versi ringan). null = token tak lagi punya pool / fetch gagal.
+async function currentMarket(token) {
+  const j = await jget(`${GT}/networks/robinhood/tokens/${token}/pools?page=1`);
+  const pools = j?.data || [];
+  if (!pools.length) return null;
+  let best = null, bl = -1;
+  for (const p of pools) { const l = Number(p.attributes?.reserve_in_usd) || 0; if (l > bl) { bl = l; best = p; } }
+  const a = best.attributes || {};
+  return {
+    priceUsd: Number(a.base_token_price_usd) || 0,
+    mcapUsd: Math.round(Number(a.market_cap_usd) || Number(a.fdv_usd) || 0),
+  };
+}
+
+/**
+ * Rekap PnL sinyal Sniper Live: bandingkan harga KINI vs harga saat sinyal PERTAMA
+ * terdeteksi (riwayat bertahan meski sinyal live sudah di-cull). Fetch harga on-demand
+ * (limit default 30 — GeckoTerminal publik ±30 req/mnt), terbaru dulu.
+ */
+export async function getEvmSniperPnl({ limit = 30, nowMs } = {}) {
+  const now = nowMs ?? Date.now();
+  const recent = history.slice(-Math.max(1, limit)).reverse();
+  const markets = await mapPool(recent, POOL, (h) => currentMarket(h.token));
+  const rows = recent.map((h, i) => {
+    const cur = markets[i];
+    // PnL dari harga; fallback mcap (FDV) bila harga entry tak sempat terekam.
+    let pnlPct = null;
+    if (cur) {
+      if (h.entryPriceUsd > 0 && cur.priceUsd > 0) pnlPct = ((cur.priceUsd - h.entryPriceUsd) / h.entryPriceUsd) * 100;
+      else if (h.entryMcap > 0 && cur.mcapUsd > 0) pnlPct = ((cur.mcapUsd - h.entryMcap) / h.entryMcap) * 100;
+    }
+    return {
+      ...h,
+      priceNow: cur?.priceUsd ?? null,
+      mcapNow: cur?.mcapUsd ?? null,
+      pnlPct: pnlPct == null ? null : Math.round(pnlPct * 10) / 10,
+      active: signals.has(h.token),
+    };
+  });
+  const graded = rows.filter((r) => r.pnlPct != null);
+  const wins = graded.filter((r) => r.pnlPct > 0).length;
+  const sum = graded.reduce((s, r) => s + r.pnlPct, 0);
+  return {
+    chain: "Robinhood Chain",
+    at: now,
+    totalTracked: history.length,
+    counted: graded.length,
+    wins,
+    winRate: graded.length ? Math.round((wins / graded.length) * 100) : null,
+    avgPnlPct: graded.length ? Math.round((sum / graded.length) * 10) / 10 : null,
+    bestPnlPct: graded.length ? Math.max(...graded.map((r) => r.pnlPct)) : null,
+    worstPnlPct: graded.length ? Math.min(...graded.map((r) => r.pnlPct)) : null,
+    rows,
   };
 }

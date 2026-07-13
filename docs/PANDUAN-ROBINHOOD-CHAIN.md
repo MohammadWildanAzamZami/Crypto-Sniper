@@ -177,6 +177,13 @@ Anatomi satu baris sinyal:
 | **📈 chart** | Modal chart GeckoTerminal melayang (Esc untuk tutup) + link keluar GeckoTerminal |
 
 - **🔍 Sweep sekarang** — paksa satu sweep tanpa menunggu.
+- **📊 Rekap PnL** — performa screener: tiap sinyal dibandingkan **harga kini vs harga
+  saat pertama terdeteksi** (entry snapshot tak ditimpa refresh; riwayat sampai 300
+  sinyal bertahan walau sinyal live sudah di-cull, ditandai `keluar`). Ringkasan berisi
+  win rate, rata-rata, terbaik, terburuk. Harga kini di-fetch on-demand (default 30
+  token terbaru, `?limit=` sampai 100 — GeckoTerminal publik ±30 req/mnt).
+- Baris sinyal & judul modal chart menampilkan **logo token** (dari GeckoTerminal;
+  token tanpa logo tampil tanpa gambar).
 - Baris meta menampilkan `⚡ real-time (cek tiap 12 dtk)` bila watcher real-time aktif.
 
 **Siklus hidup sinyal (hold-tracking):**
@@ -249,6 +256,7 @@ Semua di bawah `/api` (Express :8787):
 | POST | `/robinhood/auto/tick` | Satu putaran penuh (seed + sweep) sekarang |
 | GET | `/robinhood/sniper/signals` | Sinyal live saat ini (murah, tanpa sweep; **urut GEM Score**) |
 | GET | `/robinhood/sniper/sweep` | Sweep sekarang |
+| GET | `/robinhood/sniper/pnl?limit=` | Rekap PnL sinyal sejak pertama terdeteksi (maks 100) |
 | POST | `/robinhood/sniper/purge` | (Admin) hapus sinyal yang smart money-nya sudah keluar semua |
 
 ---

@@ -168,6 +168,33 @@ async function sweepSniper() {
   }
 }
 
+// Rekap PnL — performa sinyal sejak PERTAMA terdeteksi screener (harga kini vs entry).
+// Fetch on-demand (menembak GeckoTerminal per token), bukan auto-refresh.
+const pnl = ref(null);
+const pnlLoading = ref(false);
+const pnlError = ref("");
+const pnlOpen = ref(false);
+async function loadPnl() {
+  if (pnlLoading.value) return;
+  pnlOpen.value = true;
+  pnlLoading.value = true;
+  pnlError.value = "";
+  try {
+    const r = await fetch(apiUrl("/api/robinhood/sniper/pnl"));
+    const body = await r.json();
+    if (!r.ok) pnlError.value = body?.error || `Rekap PnL gagal (${r.status})`;
+    else pnl.value = body;
+  } catch {
+    pnlError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
+  } finally {
+    pnlLoading.value = false;
+  }
+}
+const pct = (n) => (n == null ? "—" : (n > 0 ? "+" : "") + n.toLocaleString(undefined, { maximumFractionDigits: 1 }) + "%");
+const pnlClass = (n) => (n == null ? "" : n > 0 ? "rh__up" : n < 0 ? "rh__down" : "");
+// Logo token gagal dimuat → sembunyikan (jangan tampilkan ikon broken image).
+const hideImg = (e) => { e.target.style.display = "none"; };
+
 // Chart melayang untuk sinyal sniper — embed GeckoTerminal (chartUrl dari server
 // sudah berformat ?embed=1). Satu chart terbuka pada satu waktu; Esc menutup.
 const openChart = ref("");
@@ -438,9 +465,14 @@ const docsUrl = "https://docs.robinhood.com/chain/";
     <div class="rh__disc">
       <div class="rh__disc-head">
         <span class="rh__disc-title">🎯 Sniper Live <span class="rh__proto">prototipe live</span></span>
-        <button class="rh__btn" :disabled="sniperSweeping" @click="sweepSniper">
-          {{ sniperSweeping ? "Menyapu…" : "🔍 Sweep sekarang" }}
-        </button>
+        <div class="rh__disc-actions">
+          <button class="rh__btn" :disabled="pnlLoading" @click="loadPnl">
+            {{ pnlLoading ? "Menghitung…" : "📊 Rekap PnL" }}
+          </button>
+          <button class="rh__btn" :disabled="sniperSweeping" @click="sweepSniper">
+            {{ sniperSweeping ? "Menyapu…" : "🔍 Sweep sekarang" }}
+          </button>
+        </div>
       </div>
       <p class="rh__hint">
         Pantau wallet <b>aktif Watchlist EVM</b> → sinyal saat <b>≥{{ sniper ? sniper.signalMin : 2 }} wallet</b> berbeda
@@ -465,6 +497,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
             <div class="rh__pool-row">
               <div class="rh__pool-main">
                 <span class="rh__cand-idx">{{ s.walletCount }}👛</span>
+                <img v-if="s.logoUrl" class="rh__logo" :src="s.logoUrl" alt="" loading="lazy" referrerpolicy="no-referrer" @error="hideImg" />
                 <button
                   class="rh__pool-name rh__pool-name--copy"
                   type="button"
@@ -498,6 +531,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
               <div class="rhchart__panel" role="dialog" aria-modal="true" :aria-label="'Chart ' + (s.symbol || shortAddr(s.token))">
                 <div class="rhchart__head">
                   <span class="rhchart__title">
+                    <img v-if="s.logoUrl" class="rh__logo" :src="s.logoUrl" alt="" referrerpolicy="no-referrer" @error="hideImg" />
                     {{ s.symbol || shortAddr(s.token) }} chart
                   </span>
                   <div class="rhchart__actions">
@@ -523,6 +557,46 @@ const docsUrl = "https://docs.robinhood.com/chain/";
           </li>
         </ul>
       </template>
+
+      <!-- Rekap PnL: performa sinyal sejak pertama terdeteksi screener -->
+      <div v-if="pnlOpen" class="rh__pnl">
+        <p v-if="pnlError" class="rh__err" role="alert">⚠️ {{ pnlError }}</p>
+        <p v-else-if="pnlLoading && !pnl" class="rh__hint">Menghitung PnL — mengambil harga kini tiap token…</p>
+        <template v-if="pnl">
+          <p class="rh__meta">
+            📊 <b>{{ pnl.counted }}</b>/{{ pnl.totalTracked }} sinyal terhitung
+            · win rate <b :class="pnlClass(pnl.avgPnlPct)">{{ pnl.winRate != null ? pnl.winRate + "%" : "—" }}</b> ({{ pnl.wins }} profit)
+            · rata-rata <b :class="pnlClass(pnl.avgPnlPct)">{{ pct(pnl.avgPnlPct) }}</b>
+            · terbaik <span class="rh__up">{{ pct(pnl.bestPnlPct) }}</span>
+            · terburuk <span class="rh__down">{{ pct(pnl.worstPnlPct) }}</span>
+          </p>
+          <p v-if="!pnl.rows.length" class="rh__hint">Belum ada riwayat sinyal untuk direkap.</p>
+          <ul v-else class="rh__cands">
+            <li class="rh__cand rh__cand--pnl rh__cand--head">
+              <span>token</span><span>GEM</span><span>terdeteksi</span><span>mcap awal</span><span>mcap kini</span><span>PnL</span>
+            </li>
+            <li v-for="r in pnl.rows" :key="r.token + '-' + r.firstDetectedAt" class="rh__cand rh__cand--pnl">
+              <span class="rh__pnl-tok">
+                <img v-if="r.logoUrl" class="rh__logo rh__logo--sm" :src="r.logoUrl" alt="" loading="lazy" referrerpolicy="no-referrer" @error="hideImg" />
+                <button class="rh__cand-addr" type="button" :title="'Salin: ' + r.token" @click="copyAddr(r.token)">
+                  {{ copied === r.token ? "✓" : (r.symbol || shortAddr(r.token)) }}
+                </button>
+                <span v-if="!r.active" class="rh__cand-mut" title="Sinyal sudah keluar dari daftar live">keluar</span>
+              </span>
+              <span>{{ r.gemScore ?? "—" }}</span>
+              <span class="rh__cand-mut">{{ r.firstDetectedAt ? ageOf(new Date(r.firstDetectedAt).toISOString()) + " lalu" : "—" }}</span>
+              <span>{{ usd(r.entryMcap) }}</span>
+              <span>{{ usd(r.mcapNow) }}</span>
+              <span :class="pnlClass(r.pnlPct)"><b>{{ pct(r.pnlPct) }}</b></span>
+            </li>
+          </ul>
+          <p class="rh__note">
+            PnL = harga kini vs harga saat sinyal <b>pertama terdeteksi</b> screener (riwayat bertahan
+            walau sinyal live sudah keluar). "—" = harga kini tak tersedia (pool hilang / fetch gagal). DYOR.
+          </p>
+        </template>
+      </div>
+
       <p class="rh__note">
         Deteksi beli EVM = wallet menerima token non-base + membayar WETH/USDG di tx yang sama (Blockscout).
         Kandidat di-gate lewat screen EVM (anti-rug heuristik). Heuristik — DYOR.
@@ -677,6 +751,15 @@ const docsUrl = "https://docs.robinhood.com/chain/";
 /* Watchlist rows: grid 4 kolom (#, wallet, rep, winner) */
 .rh__cand--wl { grid-template-columns: 34px auto 44px 1fr; }
 .rh__cand--active { border-color: color-mix(in srgb, #00c805 45%, var(--border-default)); }
+/* Logo token (GeckoTerminal) — di baris sinyal, judul chart, dan tabel PnL. */
+.rh__logo { width: 20px; height: 20px; flex: none; border-radius: var(--radius-full, 999px); object-fit: cover; background: var(--bg-raised); }
+.rh__logo--sm { width: 16px; height: 16px; }
+/* Rekap PnL: grid 6 kolom (token, GEM, terdeteksi, mcap awal, mcap kini, PnL). */
+.rh__disc-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.rh__pnl { display: grid; gap: var(--space-2); border-top: 1px dashed var(--border-default); padding-top: var(--space-3); }
+.rh__cand--pnl { grid-template-columns: minmax(0, 1fr) 36px 70px 84px 84px 70px; }
+.rh__cand--pnl > :nth-child(n + 4) { text-align: right; }
+.rh__pnl-tok { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .rh__cand-rep {
   text-align: center; font-weight: 700; color: #00a804;
   background: color-mix(in srgb, #00c805 12%, transparent); border-radius: var(--radius-sm); padding: 1px 4px;

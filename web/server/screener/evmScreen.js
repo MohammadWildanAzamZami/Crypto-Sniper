@@ -64,6 +64,13 @@ async function gtMetrics(token) {
   };
 }
 
+// GeckoTerminal: logo token. GT memakai URL "missing.png" saat token tak punya logo → null.
+async function gtTokenLogo(token) {
+  const j = await jget(`${GT}/networks/${NET}/tokens/${token}`);
+  const img = j?.data?.attributes?.image_url || "";
+  return img && !/missing\.png$/i.test(img) ? img : null;
+}
+
 // Blockscout: identitas + sinyal keamanan on-chain (jumlah holder, reputasi, supply).
 async function bsToken(token) {
   const t = await jget(`${BS}/tokens/${token}`);
@@ -112,7 +119,7 @@ export async function screenEvmToken(token, { minLiquidity = 10000 } = {}) {
   const addr = String(token || "").toLowerCase();
   if (!/^0x[0-9a-f]{40}$/.test(addr)) return { error: "alamat token EVM tidak valid" };
 
-  const [m, bt] = await Promise.all([gtMetrics(addr), bsToken(addr)]);
+  const [m, bt, logoUrl] = await Promise.all([gtMetrics(addr), bsToken(addr), gtTokenLogo(addr)]);
   if (!m && !bt) return { error: "token tak ditemukan di GeckoTerminal / Blockscout" };
 
   const conc = m && bt?.totalSupply ? await bsConcentration(addr, bt.totalSupply, m.poolAddress) : null;
@@ -157,6 +164,7 @@ export async function screenEvmToken(token, { minLiquidity = 10000 } = {}) {
     name: bt?.name || m?.name || "",
     symbol: bt?.symbol || "",
     chain: "Robinhood Chain",
+    logoUrl,
     metrics: m,
     holders: bt?.holdersCount ?? null,
     concentration: conc,
