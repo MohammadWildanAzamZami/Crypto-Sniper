@@ -75,7 +75,8 @@ sudah ada tetap dipantau.
 - **⚡ Jalankan sekarang** — memicu satu putaran penuh (seed + sweep) tanpa menunggu tick.
 
 Tiap tick auto-pilot melakukan:
-1. Ambil pool **trending** GeckoTerminal, saring yang mcap ≥ $250k (winner).
+1. Ambil pool **trending** (mcap ≥ $250k) **dan pool baru** (mcap ≥ $100k) dari
+   GeckoTerminal — discovery smart wallet berjalan terus dari dua arah tanpa aksi manual.
 2. Bedah maksimal 4 winner per tick (yang belum di-Bedah dalam 6 jam terakhir).
 3. Rekam kandidat smart wallet-nya ke Watchlist EVM.
 4. Jalankan sweep Sniper.
@@ -269,6 +270,7 @@ Semua di bawah `/api` (Express :8787):
 |---|---|---|
 | `RH_TICK_MIN` | 10 | Interval tick (menit); `0` = mati |
 | `RH_SEED_MIN_MCAP` | 250000 | Mcap minimum winner trending yang di-Bedah |
+| `RH_SEED_NEW_MIN_MCAP` | 100000 | Mcap minimum winner dari pool BARU yang di-Bedah |
 | `RH_SEED_MAX_BEDAH` | 4 | Maks Bedah per tick |
 | `RH_SEED_RESEED_MIN` | 360 | Jangan re-Bedah token sama dalam N menit |
 | `RH_WATCHLIST_MAX` | 300 | Cap pertumbuhan watchlist (yang ada tetap dipantau) |

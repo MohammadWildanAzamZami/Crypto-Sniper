@@ -12,7 +12,11 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const NET = "robinhood";
 
 // Ambang & batas (env-overridable).
-const SEED_MIN_MCAP = Number(process.env.RH_SEED_MIN_MCAP || 250_000);   // winner untuk di-bedah
+const SEED_MIN_MCAP = Number(process.env.RH_SEED_MIN_MCAP || 250_000);   // winner trending untuk di-bedah
+// Pool BARU ikut dipindai dengan ambang lebih rendah (setara ambang winner watchlist):
+// winner muda terdeteksi lebih cepat → early buyer-nya masuk Watchlist lebih cepat,
+// tanpa menunggu token naik ke daftar trending. Discovery jadi jalan terus sendiri.
+const SEED_NEW_MIN_MCAP = Number(process.env.RH_SEED_NEW_MIN_MCAP || 100_000);
 const SEED_MAX_BEDAH = Number(process.env.RH_SEED_MAX_BEDAH || 4);       // maks bedah per tick (hemat kuota)
 const SEED_RESEED_MIN = Number(process.env.RH_SEED_RESEED_MIN || 360);   // jangan re-bedah token sama < ini (menit)
 // Batas pertumbuhan: berhenti MENAMBAH wallet baru saat watchlist ≥ ini, supaya sweep
@@ -43,20 +47,30 @@ async function jget(url, tries = 3) {
 
 function tokenAddr(id) { if (!id) return null; const i = id.indexOf("_"); return i >= 0 ? id.slice(i + 1) : id; }
 
-// Winner trending: token dengan mcap/fdv ≥ ambang, dari pool trending GeckoTerminal.
+// Winner untuk di-Bedah: gabungan pool TRENDING (mcap ≥ SEED_MIN_MCAP) + pool BARU
+// (mcap ≥ SEED_NEW_MIN_MCAP), dedupe per token. Dua sumber = discovery smart wallet
+// berjalan terus otomatis dari dua arah: token yang sudah ramai DAN token muda yang
+// baru saja terbukti naik.
 async function trendingWinners() {
-  const j = await jget(`${GT}/networks/${NET}/trending_pools?page=1`);
-  const pools = j?.data || [];
+  const [tr, nw] = await Promise.all([
+    jget(`${GT}/networks/${NET}/trending_pools?page=1`),
+    jget(`${GT}/networks/${NET}/new_pools?page=1`),
+  ]);
   const out = [];
   const seen = new Set();
-  for (const p of pools) {
-    const a = p.attributes || {};
-    const token = tokenAddr(p.relationships?.base_token?.data?.id);
-    if (!token || seen.has(token)) continue;
-    const mcap = Math.round(Number(a.market_cap_usd) || Number(a.fdv_usd) || 0);
-    if (mcap < SEED_MIN_MCAP) continue;
-    seen.add(token);
-    out.push({ token, mcap, name: a.name || "" });
+  for (const { pools, min } of [
+    { pools: tr?.data || [], min: SEED_MIN_MCAP },
+    { pools: nw?.data || [], min: SEED_NEW_MIN_MCAP },
+  ]) {
+    for (const p of pools) {
+      const a = p.attributes || {};
+      const token = tokenAddr(p.relationships?.base_token?.data?.id);
+      if (!token || seen.has(token)) continue;
+      const mcap = Math.round(Number(a.market_cap_usd) || Number(a.fdv_usd) || 0);
+      if (mcap < min) continue;
+      seen.add(token);
+      out.push({ token, mcap, name: a.name || "" });
+    }
   }
   return out.sort((x, y) => y.mcap - x.mcap);
 }

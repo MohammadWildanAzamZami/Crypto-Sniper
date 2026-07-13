@@ -427,8 +427,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
-      <p class="rh__hint">By. Robinhood Chain</p>
-
       <p v-if="sniperError" class="rh__err" role="alert">⚠️ {{ sniperError }}</p>
 
       <template v-if="sniper">
@@ -455,14 +453,17 @@ onBeforeUnmount(() => {
                   @click="copyAddr(s.token)"
                 >{{ copied === s.token ? "✓ tersalin" : (s.symbol || shortAddr(s.token)) }}</button>
                 <span v-if="s.isNew" class="rh__pool-fresh">BARU</span>
-                <span v-if="s.verdict" class="rh__v" :class="verdictClass(s.verdict)">GEM {{ s.gemScore }} · {{ s.verdict }}</span>
               </div>
               <div class="rh__pool-stats">
                 <span v-if="s.holders != null" class="rh__up">🖐 {{ s.holders }}/{{ s.walletCount }} pegang</span>
                 <span>mcap {{ usd(s.mcap) }}</span>
                 <span v-if="s.liquidityUsd">liq {{ usd(s.liquidityUsd) }}</span>
                 <span>skor {{ s.score }}</span>
+                <span v-if="s.firstDetectedAt" :title="'Terdeteksi screener ' + new Date(s.firstDetectedAt).toLocaleString()">
+                  ⏱ {{ ageOf(new Date(s.firstDetectedAt).toISOString()) }}
+                </span>
               </div>
+              <span v-if="s.gemScore != null" class="rh__v" :class="verdictClass(s.verdict)">GEM {{ s.gemScore }}</span>
               <button
                 v-if="s.chartUrl"
                 type="button"
@@ -673,7 +674,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, #00c805 12%, transparent); border-radius: var(--radius-sm); padding: 1px 4px;
 }
 .rh__cand-catch { color: var(--text-muted); display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.rh__wl-active { font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
+.rh__wl-active { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--text-on-accent, #04210a); background: #00c805; padding: 1px 5px; border-radius: var(--radius-sm); }
 
 .rh__note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 /* Footer "By. Robinhood Chain" — rata tengah, ukuran & ketebalan sama persis
