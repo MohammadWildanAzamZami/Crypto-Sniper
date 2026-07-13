@@ -3,17 +3,18 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-13 21:35** · Total **177** commit dalam **15** hari.
+> Terakhir diperbarui: **2026-07-13 21:50** · Total **179** commit dalam **15** hari.
 
 ---
 
-## 2026-07-13 (Senin) — 15 commit
+## 2026-07-13 (Senin) — 17 commit
 
 **✨ Fitur baru / penambahan**
 - feat(wallet-intel): Wallet Intelligence v2 — vetting + audit akurasi + klasifikasi wallet  `44bc273`
 - feat(rh-sniper): watcher real-time eth_getLogs + urut sinyal live per GEM score  `0365d7e`
 - feat(chart): chart Solana pindah ke embed GMGN + deep link Axiom  `3082158`
 - feat(rh-sniper): gate GEM Score minimum 40 untuk sinyal Sniper Live  `4803f36`
+- feat(rh-sniper): rekap PnL performa sinyal + logo token  `9108d25`
 
 **📝 Dokumentasi**
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `1d8cf53`
@@ -26,6 +27,7 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `38d131b`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `0f6af0d`
 - docs: versi Word buku panduan Solana + catatan panel tersembunyi  `2acb9dd`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `3153c73`
 
 **♻️ Refactor / rapikan**
 - ui(rh-sniper): rapikan modal chart — hapus tag chain + tombol Blockscout  `053495a`
