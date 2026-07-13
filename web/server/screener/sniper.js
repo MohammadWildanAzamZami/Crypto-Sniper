@@ -16,6 +16,7 @@ import { screenToken } from "./screen.js";
 import { getParams } from "./sniperParams.js";
 import { recordSignals, gradeMatured } from "./sniperTrack.js";
 import { recordTxs } from "./txLog.js";
+import { effectiveReputation, getWalletClass } from "./walletIntel.js";
 
 const HELIUS = "https://api.helius.xyz";
 const BIRDEYE = "https://public-api.birdeye.so";
@@ -341,13 +342,16 @@ async function evaluateToken({ mint, wallets, lastAt, netFiltered = 0, now, P, b
   if (known && P.minMcap > 0 && mcap < P.minMcap) return { created: false }; // below the mcap floor
 
   // C9: per-wallet smart-money positions — reputation + entry + current PnL.
+  // Wallet Intelligence v2: saat repWeighted aktif, reputasi yang dipakai skor
+  // adalah reputasi EFEKTIF (basis × decay half-life × bobot status karantina) —
+  // wallet yang belum dikenal intel jatuh kembali ke reputasi watchlist mentah.
   const positions = [...wallets.entries()].map(([owner, e]) => {
     const meta = getWalletMeta(owner);
     const pnlX = curPrice > 0 && e.priceUsd > 0 ? curPrice / e.priceUsd : null;
     const entryMcap = known && pnlX ? Math.round(mcap / pnlX) : null;
     return {
       owner,
-      reputation: meta.reputation,
+      reputation: P.repWeighted ? effectiveReputation(owner, meta.reputation) : meta.reputation,
       established: meta.established,
       at: e.at * 1000,
       entryPriceUsd: e.priceUsd || null,
@@ -382,9 +386,15 @@ async function evaluateToken({ mint, wallets, lastAt, netFiltered = 0, now, P, b
   if (totalSize > 0) why.push(`total beli ~$${Math.round(totalSize).toLocaleString()}`);
   if (netFiltered > 0) why.push(`${netFiltered} wallet diabaikan (net jual)`);
 
+  // Wallet Intelligence v2: sinyal yang SEMUA wallet-nya berkelas INSIDER diberi
+  // label ⚠ — orang dalam borong duluan itu informasi, tapi bukan "analisis cerdas".
+  const walletOwners = [...wallets.keys()];
+  const insider = walletOwners.length > 0 && walletOwners.every((o) => getWalletClass(o) === "INSIDER");
+
   const existing = signals.get(mint);
   signals.set(mint, {
     mint, symbol, name, logoUrl, mcap,
+    insider,
     priceUsd: curPrice,
     liquidityUsd,
     unverified: !known,

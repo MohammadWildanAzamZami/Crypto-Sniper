@@ -36,6 +36,11 @@ node_modules/
 # Sniper Engine transaction log (Modul C — every monitored-wallet swap, rolling)
 .sniper-txs.json
 **/.sniper-txs.json
+# Wallet Intelligence v2 (state pipeline + override parameter WI dari Settings UI)
+.wallet-intel.json
+**/.wallet-intel.json
+.wallet-intel-params.json
+**/.wallet-intel-params.json
 # Influencer watchlist (Modul B2)
 .influencers-state.json
 **/.influencers-state.json

@@ -91,6 +91,9 @@ export function recordSignals(signalList, variant, nowMs) {
       entryPriceUsd: price,
       entryMcap: mcap,
       walletCount: s.walletCount || (Array.isArray(s.wallets) ? s.wallets.length : 0),
+      // Wallet pemicu sinyal — dibutuhkan Wallet Intelligence v2 (applyTrackFeedback)
+      // untuk mengkredit/mendebit reputasi per wallet saat record ini dinilai.
+      wallets: Array.isArray(s.wallets) ? s.wallets.slice(0, 20) : [],
       score: s.score ?? null,
       peakPriceUsd: price,
       peakMcap: mcap,
@@ -158,6 +161,12 @@ export async function gradeMatured(nowMs) {
   if (due.length) {
     await mapPool(due, GRADE_CONCURRENCY, (r) => gradeOne(r, now));
     save();
+    // Wallet Intelligence v2: hasil grading mengkredit/mendebit reputasi wallet
+    // pemicu tiap sinyal. Import lazy + try/catch — track tetap jalan bila intel error.
+    try {
+      const { applyTrackFeedback } = await import("./walletIntel.js");
+      applyTrackFeedback(mem.records, now);
+    } catch { /* intel bermasalah — grading tidak boleh ikut gagal */ }
   }
   return due.length;
 }

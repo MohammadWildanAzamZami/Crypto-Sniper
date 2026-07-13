@@ -314,6 +314,11 @@ onBeforeUnmount(() => {
               >{{ copied === s.mint ? "✓ tersalin" : (s.symbol || shortMint(s.mint)) }}</button>
               <span v-if="s.isNew" class="sn-badge">BARU</span>
               <span
+                v-if="s.insider"
+                class="sn-insider"
+                title="SEMUA wallet pemicu sinyal ini terklasifikasi INSIDER (beli pra-likuiditas / berulang di token deployer yang sama). Mereka tahu duluan — ini informasi, bukan analisis. Ekstra hati-hati."
+              >⚠ insider</span>
+              <span
                 v-if="s.unverified"
                 class="sn-unverified"
                 title="Data pasar belum terverifikasi — token belum bisa dikenali sumber mana pun (kemungkinan baru launch). Ekstra hati-hati, DYOR."
@@ -639,6 +644,14 @@ onBeforeUnmount(() => {
   color: var(--text-warning, var(--text-error));
   background: color-mix(in srgb, var(--text-warning, var(--text-error)) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-warning, var(--text-error)) 40%, transparent);
+  padding: 1px 6px; border-radius: var(--radius-sm);
+}
+/* Wallet Intelligence v2 — semua wallet pemicu terklasifikasi INSIDER. */
+.sn-insider {
+  font-size: var(--font-size-xs); font-weight: 700; cursor: help; white-space: nowrap;
+  color: var(--text-warning, var(--text-error));
+  background: color-mix(in srgb, var(--text-warning, var(--text-error)) 20%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--text-warning, var(--text-error)) 55%, transparent);
   padding: 1px 6px; border-radius: var(--radius-sm);
 }
 .sn-meta { display: flex; align-items: center; gap: var(--space-3); flex: none; }

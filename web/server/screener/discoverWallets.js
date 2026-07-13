@@ -16,6 +16,7 @@ import { discoverSolanaTokens } from "./discover.js";
 import { runAutopsy } from "./autopsy.js";
 import { birdeyeTopTraders } from "./smartMoney.js";
 import { recordCandidates, recordTopTraders } from "./watchlist.js";
+import { recordEarlySighting } from "./walletIntel.js";
 import { getParams } from "./sniperParams.js";
 
 // All four discovery tunables now live in the runtime param registry
@@ -64,6 +65,12 @@ export async function runDiscovery({ birdeyeKey, heliusKey, nowMs } = {}) {
         if (report && !report.error) {
           const rec = recordCandidates(report, now);
           if (rec.winner) summary.winnersRecorded += rec.recorded;
+          // Wallet Intelligence v2: setiap early buyer bersih (bukan bundle) tercatat
+          // sebagai "sighting" lintas token — kemunculan berulang menjadikannya kandidat
+          // pipeline vetting+audit. Bookkeeping murni, nol call API tambahan.
+          for (const b of report.earlyBuyers || []) {
+            if (!b.bundleSuspected) recordEarlySighting(b.owner, mint, now);
+          }
         }
       } catch { /* skip this token, keep going */ }
       await sleep(THROTTLE_MS);
@@ -81,6 +88,8 @@ export async function runDiscovery({ birdeyeKey, heliusKey, nowMs } = {}) {
           if (quality.length) {
             const rec = recordTopTraders(quality, { mint, symbol: "" }, now);
             summary.walletsAdded += rec.recorded;
+            // Wallet Intelligence v2: kemunculan top-trader berkualitas juga sighting.
+            for (const t of quality) recordEarlySighting(t.owner, mint, now);
           }
         }
       } catch { /* skip this token, keep going */ }

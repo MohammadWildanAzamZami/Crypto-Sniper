@@ -12,6 +12,8 @@ import { runSniperSweep, getSignals, ingestWebhookTxs } from "../screener/sniper
 import { getTxLog } from "../screener/txLog.js";
 import { getSniperTrack } from "../screener/sniperTrack.js";
 import { getParamDefs, applyParams } from "../screener/sniperParams.js";
+import { getWalletIntel, auditOne, walletIntelTick, recordEarlySighting } from "../screener/walletIntel.js";
+import { getWiParamDefs, applyWiParams } from "../screener/walletIntelParams.js";
 import { explainSignal } from "../ai/explainSignal.js";
 import { getState } from "../ai/settings.js";
 import { scanLimit } from "../middleware/limits.js";
@@ -42,6 +44,13 @@ router.get("/autopsy", scanLimit, async (req, res) => {
     } catch {
       report.watchlist = { recorded: 0, winner: false, launchToNowX: report.token?.launchToNowX ?? null };
     }
+    // Wallet Intelligence v2: Bedah manual juga pintu masuk kandidat — tiap early
+    // buyer bersih jadi "sighting". Bookkeeping murni; tak boleh mengganggu respons.
+    try {
+      for (const b of report.earlyBuyers || []) {
+        if (!b.bundleSuspected) recordEarlySighting(b.owner, mint, Date.now());
+      }
+    } catch { /* best-effort */ }
     res.json(report);
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
@@ -118,6 +127,57 @@ router.get("/sniper/txs", (req, res) => {
     res.status(502).json({ error: String(err.message || err) });
   }
 });
+
+// ---- Wallet Intelligence v2 ------------------------------------------------
+// Daftar wallet + status/klasifikasi/hitRate/rep efektif. Read-only, murah.
+router.get("/wallet-intel", (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    res.json(getWalletIntel({ limit }));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Registry parameter WI — pola sama dengan /sniper/params: GET publik (ambang
+// heuristik, bukan rahasia), POST admin-gated (mengubah perilaku mesin).
+router.get("/wallet-intel/params", (_req, res) => {
+  try {
+    res.json(getWiParamDefs());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+router.post("/wallet-intel/params", requireAdmin, (req, res) => {
+  try {
+    res.json(applyWiParams(req.body || {}));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Audit manual SATU wallet: vet + audit akurasi + klasifikasi langsung (di luar
+// antrean berjatah). Mahal (banyak call) → scanLimit, seperti /sniper/sweep.
+router.post("/wallet-intel/audit/:wallet", scanLimit, async (req, res) => {
+  const wallet = String(req.params.wallet || "").trim();
+  if (!MINT_RE.test(wallet)) {
+    return res.status(400).json({ error: "Parameter wallet tidak valid (alamat Solana base58 32–44 karakter)." });
+  }
+  try {
+    const st = getState();
+    res.json(await auditOne(wallet, { heliusKey: st.heliusKey }, Date.now()));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+// Satu putaran antrean pipeline WI (vet → audit → klasifikasi, berjatah
+// auditMaxPerTick) — dipanggil interval background di index.js.
+export async function walletIntelTickOnce() {
+  const st = getState();
+  return walletIntelTick({ heliusKey: st.heliusKey }, Date.now());
+}
 
 // Sniper v2 parameter registry. GET is public (values are heuristic thresholds, not
 // secrets — same spirit as getSignals exposing several already). POST is admin-gated

@@ -204,6 +204,13 @@ export function getWalletMeta(owner) {
   return { reputation: w.reputation, catches: w.catches.length, established: w.established };
 }
 
+/** Hook untuk Wallet Intelligence v2 (walletIntel.js): akses baca record mentah
+ * (owner, catches, reputation, …) — dipakai migrasi pertama untuk membawa anggota
+ * lama ke status QUARANTINE tanpa menghapus/mengubah data watchlist. Read-only. */
+export function getWalletsRaw() {
+  return [...wallets.values()];
+}
+
 /** The active set the live monitor should poll. Default (WATCH_SIZE=0) = ALL wallets
  * in the watchlist; a positive WATCH_SIZE caps it to the top N by reputation. */
 export function getActiveWallets() {
