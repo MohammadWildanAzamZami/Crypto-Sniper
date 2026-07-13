@@ -3,14 +3,20 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-14 01:32** · Total **181** commit dalam **16** hari.
+> Terakhir diperbarui: **2026-07-14 01:43** · Total **183** commit dalam **16** hari.
 
 ---
 
-## 2026-07-14 (Selasa) — 1 commit
+## 2026-07-14 (Selasa) — 3 commit
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `72cc566`
 
 **♻️ Refactor / rapikan**
 - ui(robinhood): rapikan panel — header polos, auto-pilot disembunyikan, PnL netral  `cba58e0`
+
+**🔧 Lainnya**
+- ui(robinhood): ganti blok footer panel jadi "By. Robinhood Chain"  `fd8356b`
 
 ## 2026-07-13 (Senin) — 18 commit
 
