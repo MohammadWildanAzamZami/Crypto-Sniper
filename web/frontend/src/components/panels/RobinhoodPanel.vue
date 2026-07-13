@@ -453,6 +453,7 @@ const docsUrl = "https://docs.robinhood.com/chain/";
       <template v-if="sniper">
         <p class="rh__meta">
           <b>{{ sniper.count }}</b> sinyal · ≥{{ sniper.signalMin }} wallet sepakat · maks mcap {{ usd(sniper.maxMcap) }}
+          <template v-if="sniper.minGem"> · GEM ≥ {{ sniper.minGem }}</template>
           · gate {{ sniper.safetyGate ? "aktif" : "off" }}
           <template v-if="rtStatus"> · ⚡ real-time (cek tiap {{ rtStatus.pollSec }} dtk)</template>
         </p>

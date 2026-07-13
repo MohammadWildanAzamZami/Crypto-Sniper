@@ -43,6 +43,7 @@ const TRACK_HOLDING = process.env.RH_SNIPER_TRACK_HOLDING !== "false"; // defaul
 // mengecek saldo → sinyal terhapus di sweep yang SAMA saat ia dibuat → panel selalu
 // kosong. Grace memberi sinyal fresh waktu tampil dulu; culling tetap jalan setelah matang.
 const HOLD_GRACE_MIN = Number(process.env.RH_SNIPER_HOLD_GRACE_MIN || 45);
+const MIN_GEM = Number(process.env.RH_SNIPER_MIN_GEM || 40); // GEM Score minimum sinyal
 const POOL = 5;
 
 /** @type {Map<string, object>} token → signal */
@@ -153,6 +154,7 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
   if (SAFETY_GATE && !scr.safety?.ok) return null;              // buang rug/high-risk
   const mcap = scr.metrics?.mcapUsd || 0;
   if (mcap > 0 && mcap > MAX_MCAP) return null;                 // kebesaran = terlambat
+  if ((scr.score || 0) < MIN_GEM) return null;                  // GEM rendah = kualitas/momentum kurang
   // Skor = Σ reputasi wallet (dari Watchlist EVM) + skor screen sebagai bumbu.
   const owners = [...ownersSet];
   const repSum = owners.reduce((s, o) => s + (getEvmWalletMeta(o).reputation || 0), 0);
@@ -314,8 +316,15 @@ export async function purgeEvmSignals({ nowMs } = {}) {
 
 /** Sinyal live EVM (terkuat dulu), plus konfigurasi untuk UI. */
 export function getEvmSignals() {
-  // Urut: GEM score (yang belum di-screen di bawah) → jumlah smart wallet
-  // (holders bila di-track, else walletCount) → skor → terbaru.
+  // Bersihkan sinyal di bawah ambang GEM (termasuk yang tersimpan dari sebelum
+  // gate MIN_GEM ada) — gate applyCandidate hanya menahan sinyal BARU.
+  let purged = false;
+  for (const [token, s] of signals) {
+    if ((s.gemScore || 0) < MIN_GEM) { signals.delete(token); purged = true; }
+  }
+  if (purged) save();
+  // Urut: GEM score → jumlah smart wallet (holders bila di-track, else walletCount)
+  // → skor → terbaru.
   const gem = (s) => (s.gemScore != null ? s.gemScore : -1);
   const smCount = (s) => (s.holders != null ? s.holders : (s.walletCount || 0));
   const list = [...signals.values()].sort((a, b) =>
@@ -324,6 +333,7 @@ export function getEvmSignals() {
     chain: "Robinhood Chain",
     count: list.length,
     signalMin: SIGNAL_MIN,
+    minGem: MIN_GEM,
     maxMcap: MAX_MCAP,
     lookbackMin: LOOKBACK_MIN,
     safetyGate: SAFETY_GATE,

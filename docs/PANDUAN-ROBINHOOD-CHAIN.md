@@ -156,7 +156,8 @@ Persistensi maks 2.000 wallet, 20 catch terakhir per wallet.
 ### 3.6 🎯 Sniper Live
 
 Panel pamungkas. Tiap sinyal = satu token yang dibeli **≥ 2 wallet Watchlist berbeda**
-dalam window 3 jam, lolos gate keamanan, dan mcap ≤ $5 juta (lebih besar = sudah telat).
+dalam window 3 jam, lolos gate keamanan, **GEM Score ≥ 40** (di bawah itu = kualitas/
+momentum kurang, dibuang), dan mcap ≤ $5 juta (lebih besar = sudah telat).
 
 **Urutan daftar sinyal: GEM Score tertinggi dulu** (sinyal yang belum ter-screen di
 bawah), tiebreaker: jumlah wallet yang masih pegang → jumlah wallet → skor sinyal →
@@ -279,6 +280,7 @@ Semua di bawah `/api` (Express :8787):
 | `RH_SNIPER_LOOKBACK_MIN` | 180 | Window beli dihitung (menit) |
 | `RH_SNIPER_RECENT_TX` | 50 | Transaksi terakhir dibaca per wallet |
 | `RH_SNIPER_MAX_MCAP` | 5000000 | Mcap maksimum sinyal (lebih besar = telat) |
+| `RH_SNIPER_MIN_GEM` | 40 | GEM Score minimum sinyal (di bawahnya dibuang) |
 | `RH_SNIPER_MAX_ENRICH` | 20 | Maks kandidat di-screen per sweep |
 | `RH_SNIPER_SAFETY_GATE` | true | Gate keamanan screen (`false` = matikan) |
 | `RH_SNIPER_TRACK_HOLDING` | true | Hold-tracking on-chain (`false` = pakai TTL) |
@@ -333,7 +335,7 @@ Keduanya fail-safe: FS read-only → tetap jalan in-memory.
 2. Belum ada konfluensi — sinyal butuh ≥ 2 wallet berbeda beli token yang sama dalam
    3 jam. Ini memang jarang; makin banyak winner di-Bedah → makin banyak wallet dipantau
    → makin sering sinyal.
-3. Kandidat terganjal gate (risk high / mcap > $5 jt) — by design.
+3. Kandidat terganjal gate (risk high / GEM < 40 / mcap > $5 jt) — by design.
 4. Wallet scalper sudah jual sebelum grace habis → sinyal ter-culling (cek `🖐 pegang`).
 
 **"Bedah gagal terus"** — error dengan tombol retry = Blockscout sibuk (transien).
