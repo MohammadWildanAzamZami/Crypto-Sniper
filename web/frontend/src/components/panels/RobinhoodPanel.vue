@@ -176,7 +176,6 @@ function toggleChart(s) {
 }
 // Link keluar ke halaman pool GeckoTerminal asli (tanpa query embed).
 const geckoPoolUrl = (s) => (s.chartUrl ? s.chartUrl.split("?")[0] : "");
-const blockscoutTokenUrl = (s) => `https://robinhoodchain.blockscout.com/token/${s.token}`;
 function onKeydown(e) {
   if (e.key === "Escape" && openChart.value) openChart.value = "";
 }
@@ -500,11 +499,9 @@ const docsUrl = "https://docs.robinhood.com/chain/";
                 <div class="rhchart__head">
                   <span class="rhchart__title">
                     {{ s.symbol || shortAddr(s.token) }} chart
-                    <span class="rh__tag">Robinhood Chain</span>
                   </span>
                   <div class="rhchart__actions">
                     <a class="rhchart__open" :href="geckoPoolUrl(s)" target="_blank" rel="noopener noreferrer">GeckoTerminal ↗</a>
-                    <a class="rhchart__open" :href="blockscoutTokenUrl(s)" target="_blank" rel="noopener noreferrer">Blockscout ↗</a>
                     <button type="button" class="rhchart__close" aria-label="Tutup chart" @click="toggleChart(s)">✕</button>
                   </div>
                 </div>

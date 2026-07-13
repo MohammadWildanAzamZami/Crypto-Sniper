@@ -174,7 +174,7 @@ Anatomi satu baris sinyal:
 | `🖐 2/3 pegang` | Hold-tracking: berapa wallet yang **masih** memegang token |
 | `mcap / liq` | Market cap & likuiditas saat screen |
 | `skor N` | Skor sinyal = Σ reputasi wallet pembeli + (GEM Score × 0,5) |
-| **📈 chart** | Modal chart GeckoTerminal melayang (Esc untuk tutup) + link keluar GeckoTerminal / Blockscout |
+| **📈 chart** | Modal chart GeckoTerminal melayang (Esc untuk tutup) + link keluar GeckoTerminal |
 
 - **🔍 Sweep sekarang** — paksa satu sweep tanpa menunggu.
 - Baris meta menampilkan `⚡ real-time (cek tiap 12 dtk)` bila watcher real-time aktif.
