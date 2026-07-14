@@ -1,8 +1,12 @@
 # 🧠 Pro Radar (Fable 5) — alur data & flowchart
 
-Pro Radar adalah versi **bertenaga AI** dari 10x Radar. Funnel penemuan token-nya
-sama, tapi finalisnya di-*enrich* dengan data liquidity-lock lalu diperingkat oleh
-model **Fable 5** (`claude-fable-5`) yang menilai *conviction*, tesis, katalis, dan
+Pro Radar adalah versi **bertenaga AI** dari 10x Radar, dengan fokus **token yang
+sedang trending**: trafik transaksinya masih ramai SEKARANG di jendela
+**5 mnt / 1 jam / 6 jam / 24 jam** (momentum multi-timeframe) dan smart money /
+whale sedang **akumulasi terus-menerus**. Funnel penemuan token-nya sama, tapi
+finalisnya di-*enrich* dengan data liquidity-lock, disaring gate kualitas +
+trending (token yang pump-nya sudah lewat dibuang), lalu diperingkat oleh model
+**Fable 5** (`claude-fable-5`) yang menilai *conviction*, tesis, katalis, dan
 red flag tiap token.
 
 > ⚠️ Heuristik + opini AI dari data pasar publik. **Bukan nasihat keuangan.**
@@ -31,12 +35,15 @@ flowchart TD
     E1 --> F[4. ENRICH finalis<br/>screenToken skipLock=false]
     F -->|RugCheck report - publik, tanpa key| F1[LP locked %, locked USD,<br/>total LP, status, flag rugged]
 
-    F1 --> G[5. AI RANK<br/>analyzeCandidates - Fable 5]
+    F1 --> F2[4b. GATE kualitas + trending<br/>qualityGate - ambang tetap]
+    F2 -->|Buang: rug, likuiditas tipis,<br/>trafik 1 jam sepi = pump sudah lewat| F3[4c. MOMENTUM 5m/1j/6j/24j<br/>computeMomentum 0-100]
+
+    F3 --> G[5. AI RANK<br/>analyzeCandidates - Fable 5]
     G -->|Mode LOCAL: CLI 'claude -p'<br/>Mode API: Anthropic SDK| G1[Kirim payload ringkas tiap finalis<br/>→ Fable 5 balas JSON:<br/>conviction, tier, thesis, catalysts, redFlags, action]
 
     G1 --> H{AI berhasil?}
-    H -->|Ya| I[6. MERGE + urut by conviction<br/>lalu action, lalu GEM]
-    H -->|Tidak / AI mati| J[Fallback: urut by GEM Score<br/>aiUsed=false]
+    H -->|Ya| I[6. MERGE + urut by quality<br/>GEM+conviction+momentum+smart money,<br/>lalu momentum, smart, action, GEM]
+    H -->|Tidak / AI mati| J[Fallback: urut heuristik<br/>aiUsed=false]
 
     I --> K[Kirim ke UI: kartu token +<br/>meter conviction, tesis, katalis, red flag]
     J --> K
@@ -83,11 +90,27 @@ Kalau Mermaid tak render (mis. di editor biasa), lihat versi ASCII di bawah.
                (Locked / Partially / Unlocked), flag "rugged"
                                    │
                                    ▼
+   4b. GATE kualitas + TRENDING  ── quality.js: qualityGate() ───────────────
+      Ambang TETAP (GATE, self-tuning dihapus): rug, GEM < 60, likuiditas
+      < $12k, volume 24j < $15k, tx 24j < 60, honeypot-shaped, LP lock < 20%,
+      dump dari ATH ≥ 80% → BUANG.
+      TRENDING: tx 1 jam < 20, volume 1 jam < $2k, atau laju 1 jam < 35% dari
+      rata-rata harian → BUANG (ramai kemarin ≠ trending sekarang).
+                                   │
+                                   ▼
+   4c. MOMENTUM multi-timeframe  ── momentum.js: computeMomentum() ──────────
+      Dari volume + txns DexScreener per jendela 5m/1j/6j/24j:
+      skor 0–100 (trafik hidup sekarang + akselerasi vs rata-rata harian +
+      tekanan beli 1 jam), pace per jendela, buy ratio, hotWindows.
+                                   │
+                                   ▼
    5. AI RANK  ── ai/analyze.js: analyzeCandidates() → FABLE 5 ──────────────
       Input ke model (payload RINGKAS per finalis):
         address, symbol, name, gemScore, marketCap, liquidityUsd,
-        volume24h, priceChange 1h/6h/24h, buys/sells 24h, buyRatio%,
-        ageHours, pairCount, lockedPct, lockStatus, rugged
+        volume24h, priceChange 5m/1h/6h/24h, buys/sells 24h, buyRatio%,
+        momentumScore, txns5m, txnsH1, volumeH1, volPaceH1/5m,
+        buyRatioH1Pct, hotWindows, ageHours, pairCount, lockedPct,
+        lockStatus, rugged, sinyal pump.fun + smart money
       Jalur :
         • Mode LOCAL  → CLI `claude -p ... --model claude-fable-5` (tanpa biaya)
         • Mode API    → Anthropic SDK messages.create (butuh ANTHROPIC_API_KEY)
@@ -97,8 +120,10 @@ Kalau Mermaid tak render (mis. di editor biasa), lihat versi ASCII di bawah.
                                    │
                                    ▼
    6. MERGE + SORT  ── proRadar.js ─────────────────────────────────────────
-      AI aktif  → urut: conviction ↓, lalu action, lalu GEM Score
-      AI mati   → fallback: urut GEM Score ↓  (aiUsed=false, badge ⚠️ di UI)
+      Quality 0–100 = 60% (GEM+conviction) + 40% momentum,
+                      + boost smart money s/d +20 (whale akumulasi terus)
+      Urut: quality ↓, lalu momentum, smart money, action, GEM Score
+      AI mati → fallback heuristik (aiUsed=false, badge ⚠️ di UI)
                                    │
                                    ▼
               UI: kartu token + meter conviction, tesis,
@@ -117,6 +142,8 @@ Kalau Mermaid tak render (mis. di editor biasa), lihat versi ASCII di bawah.
 | 2. Skor | `computeGemScore` | (lokal) | ❌ | GEM Score 0–100 |
 | 3. Pre-filter | `evaluateMoonshot` | (lokal) | ❌ | Lolos/tidak + alasan |
 | 4. Enrich | `fetchRugcheckLock` | RugCheck | ❌ | LP locked %, USD, status, rugged |
+| 4b. Gate | `qualityGate` | (lokal, ambang tetap) | ❌ | Buang rug/junk + trafik yang sudah mati |
+| 4c. Momentum | `computeMomentum` | (lokal, dari data DexScreener) | ❌ | Skor trending 0–100 per jendela 5m/1j/6j/24j |
 | 5. AI rank | `analyzeCandidates` | **Fable 5** (CLI lokal / Anthropic API) | Lokal: ❌ · API: ✅ | conviction, tier, thesis, katalis, red flag, action |
 
 ---
@@ -129,7 +156,9 @@ Kalau Mermaid tak render (mis. di editor biasa), lihat versi ASCII di bawah.
 | GEM Score | ✅ | ✅ |
 | Liquidity lock (RugCheck) | ❌ (dilewati, biar cepat) | ✅ (di-enrich untuk finalis) |
 | Peringkat AI (Fable 5) | ❌ | ✅ conviction + tesis + red flag |
-| Urutan | GEM Score | Conviction AI (fallback GEM) |
+| Momentum trending 5m/1j/6j/24j | ❌ | ✅ skor + gate "trafik masih ramai" |
+| Bobot smart money / whale | ❌ | ✅ boost quality s/d +20 |
+| Urutan | GEM Score | Quality (GEM+conviction+momentum+smart) |
 | Kecepatan | Cepat | Lebih lambat (ada langkah enrich + AI) |
 | Endpoint | `/api/auto-screen` | `/api/pro-radar` |
 

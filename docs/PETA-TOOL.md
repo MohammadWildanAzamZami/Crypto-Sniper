@@ -25,7 +25,7 @@ flowchart TB
   subgraph API["⚙️ Express :8787 (/api/*) — proxy, key server-side"]
     R1["/screen, /batch-screen"]
     R2["/auto-screen"]
-    R3["/pro-radar, /pro-radar/track"]
+    R3["/pro-radar"]
     R4["/autopsy"]
     R5["/watchlist · /influencers"]
     R6["/sniper/sweep · /signals · /params · /explain · /awal/*"]
@@ -40,7 +40,7 @@ flowchart TB
     E4["autopsy.js — Modul A"]
     E5["watchlist.js — Modul B / influencers.js — B2"]
     E6["sniper.js — Modul C + sniperParams.js"]
-    E7["smartMoney.js · quality.js · discover.js · sources.js · learn.js"]
+    E7["smartMoney.js · quality.js · momentum.js · discover.js · sources.js"]
   end
 
   subgraph EXT["🌐 Sumber data eksternal"]
@@ -81,7 +81,7 @@ flowchart TB
 |---|---|---|---|
 | 💎 **GEM Score Screener** | `/screen` | `gemScore.js` | Skor 0–100 satu token: likuiditas, momentum, trust → verdict STRONG/WATCH/SKIP. |
 | 🚀 **10x Radar** | `/auto-screen` | `autoScreen.js` | Auto-screen token trending, tampilkan yang potensi tinggi. Scan interval + alert Telegram. |
-| 🧠 **Pro Radar (AI)** | `/pro-radar` | `proRadar.js` | Sama seperti 10x Radar + **AI** menilai conviction, tesis, katalis, red flag. Self-learning track record. |
+| 🧠 **Pro Radar (AI)** | `/pro-radar` | `proRadar.js` | Fokus token **sedang trending** (momentum 5m/1j/6j/24j, trafik masih ramai) + smart money/whale akumulasi. **AI** menilai conviction, tesis, katalis, red flag. |
 | 🧮 **Kalkulator Manual** | — (client) | — | Input data DexScreener/RugCheck manual → skor. Untuk eyeballing pair by hand. |
 
 ### B. SNIPER ENGINE (3 modul berantai)
@@ -98,7 +98,6 @@ flowchart TB
 | ⚙️ **Settings** | `/settings`, `/sniper/params` | Atur key, mode AI, dan **semua parameter Sniper** (runtime, tanpa restart). |
 | 💬 **Chat AI** | `/chat` | Tanya-jawab AI dengan akses tool screener (function calling). |
 | 📤 **Telegram alert** | (internal) | Push pick radar baru ke Telegram. |
-| 🧠 **Self-learning** | `learn.js`, `/pro-radar/track` | Rekam win-rate pick radar, auto-tune ambang. |
 
 ---
 
