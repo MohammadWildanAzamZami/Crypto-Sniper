@@ -199,7 +199,9 @@ flowchart TB
 |---|---|---|
 | `RADAR_INTERVAL_MIN` | `15` | Interval auto-scan radar (menit). |
 | `RADAR_PRESET` | `balanced` | Preset filter radar. |
-| `RADAR_GRADE_AFTER_MIN` | `180` | Setelah berapa menit pick di-grade (self-learning track record). |
+
+> Ambang gate Pro Radar kini TETAP (self-tuning dihapus) — ubah konstanta `GATE`
+> di `web/server/screener/quality.js` bila perlu.
 
 ---
 

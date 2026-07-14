@@ -135,32 +135,37 @@ Claude-CLI or Anthropic API); if it's unavailable it **degrades to pure-heuristi
 ordering** and returns `aiUsed:false` (the UI shows a ⚠️ badge). Exposed at
 `GET /api/pro-radar`. Full data-flow + flowcharts live in `docs/PRO-RADAR.md`.
 
-**Quality gate (`screener/quality.js`).** After enrichment, a hard gate runs
-*before* the AI: it drops `rugged` tokens, zero-market-cap, thin liquidity/volume,
+**Quality + trending gate (`screener/quality.js`).** After enrichment, a hard gate
+runs *before* the AI: it drops `rugged` tokens, zero-market-cap, thin liquidity/volume,
 dead trade counts, one-sided books (near-all-buys ≈ honeypot, near-all-sells ≈ dump),
-and known-but-low LP lock. This is what removed the junk that used to pad the list.
+and known-but-low LP lock. Thresholds are the FIXED `GATE` constant exported from
+`quality.js` — the old self-tuning loop is gone (removed 2026-07-14, see below). The
+gate also enforces the trending focus: tokens whose traffic already died (last-hour
+tx < 20, last-hour volume < $2k, or 1h volume pace < 35% of the daily average) are
+rejected — busy yesterday ≠ trending now.
 
-**AI-drop, not just sort.** Post-AI, tokens judged `AVOID` or below the (tuned)
-conviction floor are **removed** from the results (a small top-3 floor keeps the panel
-non-empty when the AI is harsh). Each surviving token also gets a blended
-`quality = 0.5·gem + 0.5·conviction` (the **Q** badge), which is the primary sort key.
+**Momentum multi-timeframe (`screener/momentum.js`).** For every gate survivor,
+`computeMomentum` scores 0–100 how alive the token is RIGHT NOW from DexScreener's
+per-window volume/txns (5m / 1h / 6h / 24h, extracted in `sources.js` as
+`metrics.volume.m5…h24` + `metrics.txns.m5…h24`): live traffic (5m/1h tx counts),
+volume pace vs the daily average (pace 1 = average, >1 = accelerating), and last-hour
+buy pressure. `hotWindows` lists which windows are running ≥1.3× the daily pace. Fed
+to the AI (momentumScore, txns5m/H1, volPaceH1/5m, buyRatioH1Pct, hotWindows), shown
+in the UI (🔥 Momentum meter + chips per window), and part of the sort.
 
-**Self-tuning loop (`screener/learn.js`) — win-rate-target controller.** Evidence-based,
-not prediction. Every displayed pick is snapshotted with its entry price (`recordPicks`)
-into a gitignored `web/server/screener/.radar-memory.json` (file-backed, in-memory
-fallback). On a later scan, matured picks (default ≥3h, `RADAR_GRADE_AFTER_MIN`) are
-graded live — current price vs entry → **win** (≥+50%) / **loss** (≤−25%) / **rug**
-(≤10% of entry or delisted) / **flat** (`gradeAndRetune`). A closed-loop controller then
-drives the gate thresholds toward a **target win rate** (`RADAR_TARGET_WINRATE`, default
-**0.9**): when below target it tightens EVERY lever proportionally to the gap — `minGem`,
-`minLiquidity`, `minVolume`, `minTx`, `minLockedPct`, `minConviction` up and
-`maxDrawdownFromAth` down — and, on a big miss or ongoing rugs, escalates to
-`requirePumpComplete` (graduated-pump-only); above target it relaxes slightly. All values
-clamped to wide-but-sane bounds. Exposed at `GET /api/pro-radar/track` and shown in the
-UI (🧬 Self-tuning strip: 🎯 target, win rate, ⚙️ auto-tightening status, live thresholds).
-**Not a profit guarantee — 0.9 is a setpoint it *chases*, not a promise.** Chasing a high
-target mostly means FEWER, safer picks (often 0–2, or empty in strict mode); memecoins
-can't actually be won 90% of the time.
+**AI-drop, not just sort.** Post-AI, tokens judged `AVOID` or below the fixed
+conviction floor (`GATE.minConviction`) are **removed** from the results (a small
+top-3 floor keeps the panel non-empty when the AI is harsh). Each surviving token
+gets `quality = 0.6·(0.5·gem + 0.5·conviction) + 0.4·momentum`, plus a smart-money
+boost up to **+20** when top traders/whales are accumulating (extra +5 when ≥5
+traders accumulate with positive net buy) — sustained accumulation is the strongest
+"still being bought" signal. Sort: quality → momentum → smart score → action → GEM.
+
+**Self-tuning & PnL track record: REMOVED (2026-07-14).** `learn.js`,
+`.radar-memory.json`, `GET /api/pro-radar/track`, the 🧬 Self-tuning strip, and the
+"first-seen entry price" recap were deleted at the user's request. Thresholds no
+longer move on their own; edit `GATE` in `quality.js` to retune by hand. (The
+sniper's separate PnL track in `sniperTrack.js` is untouched.)
 
 **Pump.fun signals (`fetchPumpfun` in `sources.js`).** For pump-origin mints, enrichment
 also pulls the pump.fun v3 API (`frontend-api-v3.pump.fun/coins/<mint>`, key-less): bonding
@@ -434,3 +439,9 @@ Ordered by leverage. Each item is independently shippable.
   maxDrawdownFromAth→53, requirePumpComplete→true). `fetchPumpfun` on a pump mint
   returned `complete:true`, drawdown 32% from ATH, no ban/nsfw. Frontend rebuilt and
   served via ngrok (single-port :8787).
+- Pro Radar v4 (2026-07-14, trending focus — self-tuning & PnL recap REMOVED):
+  `learn.js` + `.radar-memory.json` + `/api/pro-radar/track` + 🧬 strip + first-seen
+  recap deleted; thresholds now the fixed `GATE` in `quality.js`. New `momentum.js`
+  unit-smoke-tested: busy token (18 tx/5m, pace ×3.2) → score 85, hot 5m/1h/6h;
+  dead token (0 tx/5m) → score 1 and gate-rejected ("trafik 1 jam terakhir sepi").
+  All changed server modules import clean; `vite build` → success.
