@@ -48,6 +48,13 @@ const POOL = 5;
 
 /** @type {Map<string, object>} token → signal */
 let signals = new Map();
+/** Tombstone: token → waktu di-cull (ms). Sweep membaca ulang riwayat beli sepanjang
+ * LOOKBACK_MIN, jadi tanpa penanda ini token yang baru dihapus (smart money keluar)
+ * langsung naik lagi dari beli LAMA yang sama di sweep berikutnya — ping-pong. Token
+ * ter-cull hanya boleh kembali bila ada beli BARU setelah waktu cull (smart money
+ * masuk lagi); saat itu tombstone dihapus. Entri lebih tua dari lookback di-prune
+ * (beli lama sudah keluar window, tak bisa memicu lagi). */
+let culled = new Map();
 /** Riwayat SEMUA sinyal yang pernah naik (untuk rekap PnL) — tetap ada meski sinyal
  * live-nya sudah di-cull. Snapshot saat PERTAMA terdeteksi: entry price/mcap, GEM. */
 const HISTORY_MAX = 300;
@@ -56,6 +63,7 @@ try {
   const saved = JSON.parse(readFileSync(FILE_PATH, "utf8"));
   if (Array.isArray(saved.signals)) signals = new Map(saved.signals.map((s) => [s.token, s]));
   if (Array.isArray(saved.history)) history = saved.history;
+  if (Array.isArray(saved.culled)) culled = new Map(saved.culled);
 } catch { /* start empty */ }
 // Backfill riwayat dari sinyal live lama (sebelum fitur PnL ada). Entry-nya memakai
 // harga tersimpan terakhir — bukan harga deteksi sebenarnya, tapi terbaik yang ada.
@@ -70,7 +78,7 @@ if (!history.length && signals.size) {
   }));
 }
 function save() {
-  try { writeFileSync(FILE_PATH, JSON.stringify({ signals: [...signals.values()], history }, null, 2), "utf8"); }
+  try { writeFileSync(FILE_PATH, JSON.stringify({ signals: [...signals.values()], history, culled: [...culled] }, null, 2), "utf8"); }
   catch { /* read-only FS */ }
 }
 
@@ -203,6 +211,7 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
     isNew: !existing,
   };
   signals.set(token, sig);
+  culled.delete(token); // sinyal naik lagi dari beli BARU → tombstone tak relevan lagi
   if (!existing) {
     history.push({
       token, symbol: sig.symbol, logoUrl: sig.logoUrl,
@@ -223,6 +232,10 @@ function applyCandidate(token, ownersSet, lastAt, scr, now) {
 export async function raiseEvmSignalNow(token, owners, lastAtMs, { nowMs } = {}) {
   const now = nowMs ?? Date.now();
   const t = String(token || "").toLowerCase();
+  // Token yang di-cull (smart money keluar) hanya boleh naik lagi dari beli yang
+  // terjadi SETELAH cull — beli lama yang masih tersisa di buffer watcher bukan
+  // bukti smart money masuk lagi.
+  if ((lastAtMs || now) <= (culled.get(t) || 0)) return { raised: false, reason: "culled", wallets: 0 };
   const set = new Set((owners || []).map((o) => String(o).toLowerCase()));
   for (const o of signals.get(t)?.wallets || []) set.add(o);
   if (set.size < SIGNAL_MIN) return { raised: false, reason: "kurang-konfluensi", wallets: set.size };
@@ -259,9 +272,17 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
     }
   }
 
-  // 3) Kandidat = token dengan ≥ SIGNAL_MIN wallet berbeda (konfluensi).
+  // Prune tombstone yang sudah lebih tua dari window lookback — beli selama itu
+  // sudah tak terbaca sweep, jadi penanda tak dibutuhkan lagi.
+  const tombCutoff = now - LOOKBACK_MIN * 60_000;
+  for (const [t, at] of culled) if (at < tombCutoff) culled.delete(t);
+
+  // 3) Kandidat = token dengan ≥ SIGNAL_MIN wallet berbeda (konfluensi). Token yang
+  // di-cull (smart money keluar) di-skip KECUALI ada beli lebih BARU dari waktu cull —
+  // begitu smart money membeli lagi, token boleh naik lagi (tombstone dibersihkan
+  // oleh applyCandidate).
   const candidates = [...byToken.entries()]
-    .filter(([, g]) => g.wallets.size >= SIGNAL_MIN)
+    .filter(([token, g]) => g.wallets.size >= SIGNAL_MIN && g.lastAt > (culled.get(token) || 0))
     .sort((a, b) => b[1].wallets.size - a[1].wallets.size)
     .slice(0, MAX_ENRICH);
 
@@ -274,9 +295,14 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
   });
 
   // 4.5) Hold / exit reconciliation (parity Solana). Cek apakah wallet di balik tiap
-  // sinyal masih memegang token on-chain. Buang sinyal saat wallet yang masih pegang
-  // < SIGNAL_MIN dan sudah ada yang jual; pertahankan (refresh) selama ≥ SIGNAL_MIN
-  // masih pegang. unknown (gagal fetch) tak pernah memicu penghapusan.
+  // sinyal masih memegang token on-chain. Buang sinyal begitu konfluensi patah karena
+  // exit: ≥1 wallet TERKONFIRMASI jual DAN — bahkan bila semua yang "unknown" dianggap
+  // masih pegang (best case) — yang memegang tetap < SIGNAL_MIN. Blip-safe: fetch gagal
+  // (unknown) dihitung sebagai masih pegang, jadi blip API tak pernah salah hapus,
+  // tapi satu blip juga tak lagi MEMBLOKIR penghapusan (aturan lama `unknown === 0`
+  // membuat token nyangkut selamanya di Blockscout yang labil). Token yang dihapus
+  // diberi tombstone supaya tak naik lagi dari beli lama — hanya beli BARU (smart
+  // money masuk lagi) yang menghidupkannya kembali.
   if (TRACK_HOLDING && signals.size > 0) {
     const graceCutoff = now - HOLD_GRACE_MIN * 60_000;
     for (const [token, s] of signals) {
@@ -296,13 +322,23 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
       });
       s.holders = holders;
       s.soldOff = sold;
-      if (unknown === 0 && sold > 0 && holders < SIGNAL_MIN) { signals.delete(token); continue; }
+      s.holdersUnknown = unknown;
+      if (sold > 0 && holders + unknown < SIGNAL_MIN) {
+        signals.delete(token);
+        culled.set(token, now);
+        continue;
+      }
       if (s.updatedAt < now && holders > 0) s.updatedAt = now; // masih dipegang → jaga tetap tampil
     }
   }
 
-  // 5) Kedaluwarsa berbasis waktu — FALLBACK saja saat hold-tracking OFF.
-  if (!TRACK_HOLDING) {
+  // 5) Kedaluwarsa berbasis waktu — SELALU aktif sebagai backstop (parity Solana).
+  // updatedAt hanya di-refresh saat wallet terkonfirmasi masih pegang (4.5) atau token
+  // re-kandidat sweep ini, jadi token yang wallet-nya terus "unknown" (API balance
+  // mati berkepanjangan — tak bisa ditindak culling) tetap menua dan akhirnya keluar,
+  // sementara token yang benar-benar masih dipegang terus ter-refresh dan tak pernah
+  // kedaluwarsa.
+  {
     const cutoff = now - TTL_MIN * 60_000;
     for (const [token, s] of signals) if (s.updatedAt < cutoff) signals.delete(token);
   }
@@ -313,9 +349,11 @@ export async function runEvmSniperSweep({ nowMs } = {}) {
 
 /**
  * Purge on-demand: cek saldo on-chain SEMUA sinyal (abaikan grace) dan hapus token
- * yang smart money-nya sudah tidak ada — semua wallet di balik sinyal terkonfirmasi
- * jual (saldo 0, tanpa "unknown"). unknown (gagal fetch) tak pernah memicu hapus,
- * sejajar fail-safe hold-tracking sweep. Dipanggil dari endpoint admin.
+ * yang konfluensi smart money-nya sudah patah — aturan blip-safe yang sama dengan
+ * sweep 4.5: ≥1 wallet terkonfirmasi jual DAN (pegang + unknown) < SIGNAL_MIN.
+ * unknown dianggap masih pegang, jadi blip API tak pernah salah hapus. Token yang
+ * dihapus diberi tombstone (hanya beli BARU yang menghidupkan lagi). Dipanggil dari
+ * endpoint admin.
  */
 export async function purgeEvmSignals({ nowMs } = {}) {
   const now = nowMs ?? Date.now();
@@ -333,9 +371,11 @@ export async function purgeEvmSignals({ nowMs } = {}) {
     });
     s.holders = holders;
     s.soldOff = sold;
+    s.holdersUnknown = unknown;
     s.updatedAt = now;
-    if (unknown === 0 && holders === 0) {
+    if (sold > 0 && holders + unknown < SIGNAL_MIN) {
       signals.delete(token);
+      culled.set(token, now);
       removed.push({ token, symbol: s.symbol, soldOff: sold });
     } else {
       kept.push({ token, symbol: s.symbol, holders, soldOff: sold, unknown });
