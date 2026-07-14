@@ -51,14 +51,24 @@ export async function fetchDexScreener(tokenAddress) {
     fdv: best.fdv || 0,
     marketCap: best.marketCap || best.fdv || 0,
     volume: {
+      m5: best.volume?.m5 || 0,
       h1: best.volume?.h1 || 0,
       h6: best.volume?.h6 || 0,
       h24: best.volume?.h24 || 0,
     },
     priceChange: {
+      m5: best.priceChange?.m5 || 0,
       h1: best.priceChange?.h1 || 0,
       h6: best.priceChange?.h6 || 0,
       h24: best.priceChange?.h24 || 0,
+    },
+    // Per-window buy/sell counts — the raw material for the momentum score
+    // (is traffic still busy RIGHT NOW, or did the party already end?).
+    txns: {
+      m5: { buys: best.txns?.m5?.buys || 0, sells: best.txns?.m5?.sells || 0 },
+      h1: { buys: best.txns?.h1?.buys || 0, sells: best.txns?.h1?.sells || 0 },
+      h6: { buys: best.txns?.h6?.buys || 0, sells: best.txns?.h6?.sells || 0 },
+      h24: { buys: best.txns?.h24?.buys || 0, sells: best.txns?.h24?.sells || 0 },
     },
     txns24h: {
       buys: best.txns?.h24?.buys || 0,
