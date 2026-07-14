@@ -105,7 +105,7 @@ router.get("/sniper/awal/signals", (_req, res) => {
 // Sniper PnL track record. Every raised signal is snapshotted at entry and graded a
 // few hours later against the live price (win/loss/rug/flat + return% + peak) — so
 // "when the sniper signalled, PnL = ?" is answered from real outcomes, not a guess.
-// Read-only; grading runs inside the background sweep. Mirrors /api/pro-radar/track.
+// Read-only; grading runs inside the background sweep.
 router.get("/sniper/track", (_req, res) => {
   try {
     res.json(getSniperTrack());

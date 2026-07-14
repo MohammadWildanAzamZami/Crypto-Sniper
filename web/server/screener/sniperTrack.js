@@ -1,14 +1,14 @@
 // Persistent PnL track record for the Live Sniper (SNIPER ENGINE Modul C).
 //
-// Mirrors the Pro Radar's learn.js: every signal is snapshotted with its ENTRY
-// (mcap + price at first detection — i.e. "the moment the tool signalled") and
-// graded a few hours later against the live price. The record survives even after
-// the signal expires (TTL) or its smart money exits, so the sniper's realized PnL
-// is captured automatically instead of vanishing with the live signal.
+// Every signal is snapshotted with its ENTRY (mcap + price at first detection —
+// i.e. "the moment the tool signalled") and graded a few hours later against the
+// live price. The record survives even after the signal expires (TTL) or its
+// smart money exits, so the sniper's realized PnL is captured automatically
+// instead of vanishing with the live signal.
 //
-// This is evidence, NOT prediction, and NOT financial advice. Unlike learn.js it does
-// not tune anything — the sniper's thresholds live in sniperParams.js; this module
-// only measures outcomes so the operator can see "when a signal fired, PnL = ?".
+// This is evidence, NOT prediction, and NOT financial advice. It does not tune
+// anything — the sniper's thresholds live in sniperParams.js; this module only
+// measures outcomes so the operator can see "when a signal fired, PnL = ?".
 //
 // Persistence mirrors the sniper store: file-backed (`.sniper-track.json`) with an
 // in-memory fallback on a read-only/ephemeral filesystem.

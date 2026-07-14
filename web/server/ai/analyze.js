@@ -27,8 +27,9 @@ Return ONLY a JSON array (no prose, no markdown fences). One object per input to
 
 Rules:
 - Ground every judgement in the numbers provided. Never invent data you were not given.
-- Reward: small marketCap with real liquidity, healthy buy pressure, two-sided volume, locked LP, sane age, pumpGraduated=true (survived the bonding curve), low pumpDrawdownFromAthPct, smart-money accumulation (high smartScore / smartAccumulating / positive smartNetBuyUsd / smartEstablishedWallets — real top traders are buying).
-- Punish: unlocked LP, one-sided selling, dead volume, brand-new unproven pairs, marketCap too large for 10x, high pumpDrawdownFromAthPct (already pumped & dumped), smart money net-selling (negative smartNetBuyUsd).
+- PRIORITIZE tokens that are trending RIGHT NOW across timeframes: busy recent traffic (txns5m, txnsH1), volume pace at/above the daily average (volPaceH1 / volPace5m >= 1 means the last hour / 5 minutes are accelerating; << 1 means the pump already happened), high momentumScore, hotWindows listing which timeframes are heating up.
+- Reward: small marketCap with real liquidity, healthy buy pressure now (buyRatioH1Pct > 50), two-sided volume, locked LP, sane age, pumpGraduated=true (survived the bonding curve), low pumpDrawdownFromAthPct, and ESPECIALLY sustained smart-money/whale accumulation (high smartScore / smartAccumulating / positive smartNetBuyUsd / smartEstablishedWallets — real top traders kept buying over the last 24h).
+- Punish: unlocked LP, one-sided selling, dead or fading traffic (txns5m near 0, volPaceH1 well below 1 — yesterday's pump), brand-new unproven pairs, marketCap too large for 10x, high pumpDrawdownFromAthPct (already pumped & dumped), smart money net-selling (negative smartNetBuyUsd).
 - Be decisive but honest. Most memecoins are AVOID/WATCH; reserve APE and tier S/A for genuinely strong setups.
 - This is a heuristic, not financial advice.`;
 

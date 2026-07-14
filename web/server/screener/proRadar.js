@@ -3,16 +3,21 @@
 // a Fable 5 ranking pass that scores conviction and explains each pick. Falls
 // back to pure-heuristic ordering when the AI is unavailable.
 //
+// Fokus (dirombak 2026-07-14, rekap PnL/self-tuning dihapus): token yang SEDANG
+// trending — trafik transaksi masih ramai di jendela 5 mnt / 1 jam / 6 jam /
+// 24 jam (momentum multi-timeframe), plus smart money / whale yang sedang
+// akumulasi terus-menerus. Token yang pump-nya sudah lewat dibuang gate.
+//
 // Pipeline (see docs/PRO-RADAR.md for the flowchart):
 //   discover → fast screen (all) → heuristic pre-filter → enrich top-N with lock
-//   → Fable 5 rank → merge + sort by conviction.
+//   → quality+trending gate → Fable 5 rank → merge + sort by quality/momentum.
 
 import { screenToken } from "./screen.js";
 import { discoverSolanaTokens } from "./discover.js";
 import { evaluateMoonshot, PRESETS } from "./autoScreen.js";
 import { analyzeCandidates } from "../ai/analyze.js";
-import { qualityGate } from "./quality.js";
-import { getTuning, recordPicks, gradeAndRetune, getTrackRecord, getFirstSeen, noteScanYield } from "./learn.js";
+import { qualityGate, GATE } from "./quality.js";
+import { computeMomentum } from "./momentum.js";
 
 const UPSIDE_TARGET_CAP = 10_000_000;
 
@@ -44,7 +49,7 @@ function ageHoursOf(report, nowMs) {
 }
 
 /** Condense a full report into the compact payload we hand to Fable 5. */
-function toAiCandidate(report, nowMs) {
+function toAiCandidate(report, momentum, nowMs) {
   const m = report.metrics || {};
   const { buys = 0, sells = 0 } = m.txns24h || {};
   const totalTx = buys + sells;
@@ -56,12 +61,22 @@ function toAiCandidate(report, nowMs) {
     marketCap: Math.round(m.marketCap || 0),
     liquidityUsd: Math.round(m.liquidityUsd || 0),
     volume24h: Math.round(m.volume?.h24 || 0),
+    priceChangeM5: m.priceChange?.m5 ?? 0,
     priceChangeH1: m.priceChange?.h1 ?? 0,
     priceChangeH6: m.priceChange?.h6 ?? 0,
     priceChangeH24: m.priceChange?.h24 ?? 0,
     buys24h: buys,
     sells24h: sells,
     buyRatioPct: totalTx > 0 ? Math.round((buys / totalTx) * 100) : null,
+    // Momentum multi-timeframe: is traffic busy RIGHT NOW, and accelerating?
+    momentumScore: momentum?.score ?? null,
+    txns5m: momentum?.tx?.m5 ?? null,
+    txnsH1: momentum?.tx?.h1 ?? null,
+    volumeH1: Math.round(m.volume?.h1 || 0),
+    volPaceH1: momentum?.pace?.h1 ?? null, // 1 = daily average, >1 = accelerating
+    volPace5m: momentum?.pace?.m5 ?? null,
+    buyRatioH1Pct: momentum?.buyRatio?.h1 != null ? Math.round(momentum.buyRatio.h1 * 100) : null,
+    hotWindows: momentum?.hotWindows ?? [],
     ageHours: ageHoursOf(report, nowMs),
     pairCount: m.pairCount || 1,
     lockedPct: report.liquidityLock?.lockedPct ?? null,
@@ -101,11 +116,6 @@ export async function runProRadar({
   const now = nowMs ?? Date.now();
   const criteria = PRESETS[preset] || PRESETS.balanced;
 
-  // Self-tuning: grade any matured past picks and pull the current (learned)
-  // quality-gate thresholds. Grading is time-bounded so it won't stall the scan.
-  const track = await gradeAndRetune(now).catch(() => getTrackRecord());
-  const tuning = getTuning();
-
   // 1) Discover trending mints (DexScreener boosts/profiles — public, key-less).
   const mints = (await discoverSolanaTokens({ limit: discoverLimit })).filter((m) => !SKIP.has(m));
 
@@ -144,17 +154,22 @@ export async function runProRadar({
     return r;
   });
 
-  // 4b) HARD QUALITY GATE — drop rugs, dead pairs, honeypot-shaped and unlocked
-  // tokens before they ever reach the AI or the UI. Thresholds are self-tuned.
+  // 4b) HARD QUALITY + TRENDING GATE — drop rugs, dead pairs, honeypot-shaped
+  // and unlocked tokens, PLUS tokens whose traffic already died (busy yesterday
+  // but quiet this hour = the pump is over). Thresholds are fixed (GATE).
   const rejected = [];
   const gated = finalists.filter((r) => {
-    const g = qualityGate(r.report, tuning);
+    const g = qualityGate(r.report, GATE);
     if (!g.ok) rejected.push({ address: r.report.token.address, symbol: r.report.token.symbol, rejects: g.rejects });
     return g.ok;
   });
 
+  // 4c) Momentum multi-timeframe (5m/1h/6h/24h) untuk tiap survivor — dipakai
+  // AI, skor kualitas, urutan, dan UI.
+  for (const r of gated) r.momentum = computeMomentum(r.report.metrics);
+
   // 5) Fable 5 ranking pass over the survivors (null if AI unavailable).
-  const aiPayload = gated.map((r) => toAiCandidate(r.report, now));
+  const aiPayload = gated.map((r) => toAiCandidate(r.report, r.momentum, now));
   const aiMap = await analyzeCandidates(aiPayload, ai);
   const aiUsed = Boolean(aiMap);
 
@@ -190,6 +205,7 @@ export async function runProRadar({
             established: rep.smartMoney.established,
           }
         : null,
+      momentum: r.momentum,
       upsideX: r.upsideX,
       reasons: r.reasons,
       ai: a
@@ -205,23 +221,29 @@ export async function runProRadar({
     };
   });
 
-  // 6b) Blended quality score (0-100): AI conviction and GEM Score together when
-  // we have the AI, else GEM alone. Used for the badge + as the final sort key.
+  // 6b) Blended quality score (0-100). Fokus trending: kualitas dasar (GEM +
+  // conviction AI) dicampur skor momentum, lalu smart money / whale yang sedang
+  // akumulasi memberi dorongan besar (sampai +20) — sinyal terkuat bahwa token
+  // masih dibeli terus-menerus, bukan sisa pump kemarin.
   for (const mt of matches) {
-    mt.quality = mt.ai ? Math.round(0.5 * mt.gemScore + 0.5 * mt.ai.conviction) : mt.gemScore;
-    // Smart-money accumulation is a strong tailwind — nudge quality up to +12.
+    const base = mt.ai ? Math.round(0.5 * mt.gemScore + 0.5 * mt.ai.conviction) : mt.gemScore;
+    mt.quality = Math.round(0.6 * base + 0.4 * (mt.momentum?.score ?? 0));
     if (mt.smart && mt.smart.score > 0) {
-      mt.quality = Math.min(100, mt.quality + Math.round(mt.smart.score * 0.12));
+      let boost = Math.round(mt.smart.score * 0.15);
+      // Akumulasi aktif (net beli + mayoritas top trader beli) = tailwind ekstra.
+      if (mt.smart.accumulating >= 5 && mt.smart.netBuyUsd > 0) boost += 5;
+      mt.quality += Math.min(20, boost);
     }
+    mt.quality = Math.min(100, mt.quality);
   }
 
   // 7) Post-AI filter: the AI already saw only gate-survivors, so now DROP the
-  // ones it judged AVOID or below the (self-tuned) conviction floor. This is what
-  // stops junk from padding the list. Keep a small floor so the panel isn't empty
-  // when the AI is harsh but we still have decent gems.
+  // ones it judged AVOID or below the conviction floor. This is what stops junk
+  // from padding the list. Keep a small floor so the panel isn't empty when the
+  // AI is harsh but we still have decent gems.
   let shown = matches;
   if (aiUsed) {
-    shown = matches.filter((m) => m.ai && m.ai.action !== "AVOID" && m.ai.conviction >= tuning.minConviction);
+    shown = matches.filter((m) => m.ai && m.ai.action !== "AVOID" && m.ai.conviction >= GATE.minConviction);
     if (shown.length === 0 && matches.length) {
       shown = matches
         .slice()
@@ -230,38 +252,21 @@ export async function runProRadar({
     }
   }
 
-  // 8) Sort: quality first, then AI action, then GEM Score.
+  // 8) Sort: quality first, then momentum (paling trending di atas), then smart
+  // money, then AI action, then GEM Score.
   shown.sort((x, y) => {
     if (y.quality !== x.quality) return y.quality - x.quality;
+    const mx = x.momentum?.score ?? 0;
+    const my = y.momentum?.score ?? 0;
+    if (my !== mx) return my - mx;
+    const sx = x.smart?.score ?? 0;
+    const sy = y.smart?.score ?? 0;
+    if (sy !== sx) return sy - sx;
     const ax = ACTION_RANK[x.ai?.action] ?? 0;
     const ay = ACTION_RANK[y.ai?.action] ?? 0;
     if (ay !== ax) return ay - ax;
     return y.gemScore - x.gemScore;
   });
-
-  // 9) Record what we surfaced so it can be graded on a future scan (self-learning),
-  // and feed the yield to the starvation guard so an over-tight gate reopens.
-  recordPicks(shown, now);
-  noteScanYield(shown.length, now);
-
-  // 9b) Attach the entry price at FIRST detection (recordPicks has already
-  // snapshotted brand-new tokens, so every shown pick has a first-seen row).
-  // This lets the UI show "screened at $X → now $Y (+Z%, Nx)" as live evidence of
-  // whether the radar's picks actually run toward a 10x.
-  for (const m of shown) {
-    const fs = getFirstSeen(m.address);
-    if (!fs) continue;
-    const cur = m.priceUsd;
-    const hasBoth = fs.priceUsd > 0 && typeof cur === "number" && cur > 0;
-    m.firstSeen = {
-      priceUsd: fs.priceUsd,
-      marketCap: fs.marketCap,
-      at: fs.at,
-      isNew: now - fs.at < 60_000, // detected on THIS scan
-      changePct: hasBoth ? Number((((cur - fs.priceUsd) / fs.priceUsd) * 100).toFixed(1)) : null,
-      multiple: hasBoth ? Number((cur / fs.priceUsd).toFixed(2)) : null,
-    };
-  }
 
   return {
     scannedAt: now,
@@ -274,8 +279,7 @@ export async function runProRadar({
     aiMode: ai.aiMode || "none",
     model: ai.model || null,
     smartMoneyEnabled: Boolean(smart.birdeyeKey),
-    tuning,
-    track,
+    gate: GATE,
     matches: shown,
   };
 }

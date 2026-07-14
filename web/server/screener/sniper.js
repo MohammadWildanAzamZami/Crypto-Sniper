@@ -722,7 +722,7 @@ export async function runSniperSweep({ variant = "v2", heliusKey, birdeyeKey, no
 
   save(store);
 
-  // Persistent PnL track (like Pro Radar's learn.js): snapshot each freshly-raised
+  // Persistent PnL track: snapshot each freshly-raised
   // signal's entry once, then grade matured records against the live price — so the
   // sniper's realized PnL survives signal expiry/exit. Must never break a sweep.
   const surfaced = getSignals(variant).signals;

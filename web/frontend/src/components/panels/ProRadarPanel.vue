@@ -1,26 +1,17 @@
 <script setup>
 /**
- * ProRadarPanel — "Pro Radar" powered by Fable 5. Runs the same discovery funnel
- * as the 10x Radar, then a Fable 5 pass ranks the finalists by conviction and
- * explains each (thesis, catalysts, red flags). Falls back to heuristic ordering
- * if the AI is unavailable. Heuristic + AI opinion — NOT financial advice. DYOR.
+ * ProRadarPanel — "Pro Radar" powered by Fable 5. Fokus: token yang SEDANG
+ * trending — trafik transaksi masih ramai di jendela 5 mnt / 1 jam / 6 jam /
+ * 24 jam dan smart money / whale sedang akumulasi terus-menerus. Discovery
+ * funnel sama dengan 10x Radar, lalu Fable 5 menilai conviction tiap finalis
+ * (thesis, catalysts, red flags). Falls back to heuristic ordering if the AI is
+ * unavailable. Heuristic + AI opinion — NOT financial advice. DYOR.
  */
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import { apiUrl } from "../../lib/api.js";
 
 const scan = ref({ scannedAt: 0, candidatesScanned: 0, matches: [], aiUsed: false, aiMode: "none", model: null });
-// Self-learning track record (win rate, graded count, auto-tuned thresholds).
-const track = ref(null);
 
-async function loadTrack() {
-  try {
-    const r = await fetch(apiUrl("/api/pro-radar/track"));
-    if (r.ok) track.value = await r.json();
-  } catch { /* non-fatal — the strip just stays hidden */ }
-}
-onMounted(loadTrack);
-
-const money = (n) => (typeof n === "number" ? "$" + Math.round(n).toLocaleString() : "—");
 const loading = ref(false);
 const error = ref("");
 const copiedAddr = ref("");
@@ -35,13 +26,13 @@ function toggleChart(m) {
 }
 
 const usd = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
-// Token prices are often tiny fractions ($0.0000023) — keep significant digits.
-const price = (n) => {
-  if (typeof n !== "number" || !(n > 0)) return "—";
-  if (n >= 1) return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (n >= 0.01) return "$" + n.toFixed(4);
-  return "$" + n.toPrecision(3);
-};
+
+// Momentum: label pace ("×1.8 dari rata-rata harian") + band warna skor.
+const paceLabel = (p) => (typeof p === "number" ? "×" + p.toFixed(1) : "—");
+function momClass(s) {
+  const n = Number(s) || 0;
+  return "mom--" + (n >= 60 ? "hi" : n >= 30 ? "mid" : "lo");
+}
 
 // Lettered avatar fallback when a token has no logo (or the image fails to load).
 function initials(m) {
@@ -95,7 +86,7 @@ async function runScan() {
     const r = await fetch(apiUrl("/api/pro-radar"));
     const body = await r.json();
     if (!r.ok) error.value = body?.error || `Scan gagal (${r.status})`;
-    else { scan.value = body; openChart.value = ""; if (body.track) track.value = body.track; }
+    else { scan.value = body; openChart.value = ""; }
   } catch {
     error.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
   } finally {
@@ -110,8 +101,10 @@ async function runScan() {
       <div>
         <h2 id="proradar-h">🧠 Pro Radar <span class="tag">AI</span></h2>
         <p class="panel__sub">
-          Radar bertenaga AI: memindai token trending, cek likuiditas &amp; lock, lalu <b>AI</b>
-          menilai conviction, tesis, katalis, dan red flag tiap token. Heuristik + opini AI — bukan nasihat keuangan.
+          Radar bertenaga AI, fokus token yang <b>sedang trending</b>: trafik transaksi masih ramai
+          di jendela 5 mnt / 1 jam / 6 jam / 24 jam &amp; smart money / whale sedang akumulasi
+          terus-menerus. Token yang pump-nya sudah lewat dibuang otomatis. Lalu <b>AI</b> menilai
+          conviction, tesis, katalis, dan red flag tiap token. Heuristik + opini AI — bukan nasihat keuangan.
         </p>
       </div>
       <div class="head-actions">
@@ -121,42 +114,6 @@ async function runScan() {
         <button v-if="scan.scannedAt" class="closebtn" :disabled="loading" @click="closeScan">
           Tutup
         </button>
-      </div>
-    </div>
-
-    <!-- Self-learning strip: track record + current auto-tuned thresholds -->
-    <div v-if="track" class="learn">
-      <div class="learn__row">
-        <span class="learn__tag">🧬 Self-tuning</span>
-        <span v-if="track.targetWinRate != null" class="learn__stat learn__sub">
-          🎯 Target {{ Math.round(track.targetWinRate * 100) }}%
-        </span>
-        <span v-if="track.graded" class="learn__stat">
-          Win rate <b :class="!track.belowTarget ? 'ok' : track.winRate <= 0.2 ? 'bad' : ''">
-            {{ Math.round((track.winRate || 0) * 100) }}%
-          </b>
-          <span class="learn__sub">({{ track.wins }}W · {{ track.losses }}L · {{ track.rugs }} rug dari {{ track.graded }} dinilai)</span>
-        </span>
-        <span v-else class="learn__stat learn__sub">
-          Belum ada pick yang matang untuk dinilai ({{ track.open }} dilacak) — sistem belajar setelah beberapa jam.
-        </span>
-        <span v-if="track.belowTarget" class="learn__fix">⚙️ di bawah target — mengetatkan filter otomatis</span>
-        <span v-else-if="track.graded" class="learn__stat learn__sub ok">✅ target tercapai</span>
-        <span v-if="track.avgReturnPct != null" class="learn__stat learn__sub">
-          Avg {{ track.avgReturnPct > 0 ? "+" : "" }}{{ track.avgReturnPct }}%
-        </span>
-      </div>
-      <div class="learn__row learn__thresholds">
-        <span class="learn__sub">Ambang auto-tuned:</span>
-        <span class="pill">GEM ≥ {{ track.tuning.minGem }}</span>
-        <span class="pill">Liq ≥ {{ money(track.tuning.minLiquidity) }}</span>
-        <span class="pill">Vol ≥ {{ money(track.tuning.minVolume) }}</span>
-        <span class="pill">Tx ≥ {{ track.tuning.minTx }}</span>
-        <span class="pill">Lock ≥ {{ track.tuning.minLockedPct }}%</span>
-        <span class="pill">Conv ≥ {{ track.tuning.minConviction }}</span>
-        <span class="pill">Dump &lt; {{ track.tuning.maxDrawdownFromAth }}%</span>
-        <span v-if="track.tuning.requirePumpComplete" class="pill pill--strict">🎓 graduated only</span>
-        <span v-if="track.retunes" class="learn__sub">· disetel {{ track.retunes }}×</span>
       </div>
     </div>
 
@@ -240,7 +197,12 @@ async function runScan() {
                 + (m.smart.established != null ? `, ${m.smart.established} wallet mapan (Helius)` : '')"
             >🧠 Smart {{ m.smart.score }}<span v-if="m.smart.whales">· 🐋{{ m.smart.whales }}</span></span>
             <span v-if="m.pump?.graduated" class="badge badge--grad" title="Lulus bonding curve Pump.fun (graduated)">🎓 grad</span>
-            <span v-if="m.quality != null" class="badge badge--q" :title="'Skor kualitas gabungan (GEM + conviction)'">Q {{ m.quality }}</span>
+            <span
+              v-if="m.momentum?.hotWindows?.length"
+              class="badge badge--hot"
+              :title="'Trafik terakselerasi di jendela: ' + m.momentum.hotWindows.join(', ')"
+            >🔥 {{ m.momentum.hotWindows.join(" · ") }}</span>
+            <span v-if="m.quality != null" class="badge badge--q" :title="'Skor kualitas gabungan (GEM + conviction + momentum)'">Q {{ m.quality }}</span>
             <span class="badge badge--gem">GEM {{ m.gemScore }}</span>
             <span class="badge badge--x" v-if="m.upsideX">~{{ m.upsideX }}x</span>
           </div>
@@ -292,25 +254,39 @@ async function runScan() {
           <span v-if="m.lockedPct != null">🔒 {{ m.lockedPct }}%</span>
         </div>
 
-        <!-- Entry price at first detection: evidence the radar's picks run toward 10x -->
-        <div
-          v-if="m.firstSeen"
-          class="firstseen"
-          :class="m.firstSeen.multiple >= 2 ? 'firstseen--up'
-            : (m.firstSeen.changePct != null && m.firstSeen.changePct < 0 ? 'firstseen--down' : '')"
-        >
-          <span class="firstseen__label">🎯 Harga terdeteksi pertama</span>
-          <span class="firstseen__price">{{ price(m.firstSeen.priceUsd) }}</span>
-          <template v-if="m.firstSeen.isNew">
-            <span class="firstseen__new">✨ baru terdeteksi</span>
-          </template>
-          <template v-else>
-            <span class="firstseen__arrow">→ kini {{ price(m.priceUsd) }}</span>
-            <span v-if="m.firstSeen.changePct != null" class="firstseen__chg">
-              {{ m.firstSeen.changePct > 0 ? "+" : "" }}{{ m.firstSeen.changePct }}% · {{ m.firstSeen.multiple }}x
-            </span>
-            <span class="firstseen__since">({{ ago(m.firstSeen.at) }})</span>
-          </template>
+        <!-- Momentum multi-timeframe: trafik masih ramai sekarang? -->
+        <div v-if="m.momentum" class="mom">
+          <div class="mom__row">
+            <span class="mom__label">🔥 Momentum</span>
+            <div
+              class="mom__bar"
+              role="progressbar"
+              :aria-valuenow="m.momentum.score"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`Skor momentum ${m.momentum.score} dari 100`"
+            >
+              <div class="mom__fill" :class="momClass(m.momentum.score)" :style="{ width: m.momentum.score + '%' }"></div>
+            </div>
+            <span class="mom__num" :class="momClass(m.momentum.score)">{{ m.momentum.score }}/100</span>
+          </div>
+          <div class="mom__chips">
+            <span class="mom__chip" :title="'Transaksi 5 menit terakhir'">5m: {{ m.momentum.tx.m5 }} tx</span>
+            <span class="mom__chip" :title="'Transaksi 1 jam terakhir'">1j: {{ m.momentum.tx.h1 }} tx · {{ usd(m.momentum.vol.h1) }}</span>
+            <span class="mom__chip" :title="'Transaksi 24 jam'">24j: {{ m.momentum.tx.h24 }} tx · {{ usd(m.momentum.vol.h24) }}</span>
+            <span
+              v-if="m.momentum.pace.h1 != null"
+              class="mom__chip"
+              :class="m.momentum.pace.h1 >= 1 ? 'is-up' : 'is-down'"
+              :title="'Laju volume 1 jam terakhir vs rata-rata harian (×1 = sama)'"
+            >laju 1j {{ paceLabel(m.momentum.pace.h1) }}</span>
+            <span
+              v-if="m.momentum.buyRatio.h1 != null"
+              class="mom__chip"
+              :class="m.momentum.buyRatio.h1 >= 0.5 ? 'is-up' : 'is-down'"
+              :title="'Porsi beli dari semua transaksi 1 jam terakhir'"
+            >{{ Math.round(m.momentum.buyRatio.h1 * 100) }}% beli</span>
+          </div>
         </div>
 
         <div v-if="m.ai && (m.ai.catalysts.length || m.ai.redFlags.length)" class="tags">
@@ -411,28 +387,6 @@ async function runScan() {
 .meta-ai.ok { color: var(--text-success, #16a34a); }
 .meta-ai.warn { color: #f59e0b; }
 
-/* Self-learning strip */
-.learn {
-  display: grid; gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid rgba(0, 200, 5, 0.35);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 200, 5, 0.06);
-}
-.learn__row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--font-size-sm); }
-.learn__tag { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); padding: 2px var(--space-3);
-  border-radius: 999px; background: linear-gradient(90deg, #00a804, #00c805); color: #04210a; }
-.learn__stat { color: var(--text-body); }
-.learn__stat b.ok { color: #16a34a; }
-.learn__stat b.bad { color: var(--text-error); }
-.learn__sub { color: var(--text-muted); font-size: var(--font-size-xs); }
-.learn__sub.ok { color: #16a34a; }
-.learn__fix { font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); color: #f59e0b; }
-.learn__thresholds { gap: var(--space-2); }
-.pill { font-size: 11px; padding: 1px var(--space-3); border-radius: 999px;
-  background: var(--bg-card); border: 1px solid var(--border-default); color: var(--text-body);
-  font-variant-numeric: tabular-nums; }
-.pill--strict { background: rgba(245, 158, 11, 0.16); color: #f59e0b; border-color: rgba(245, 158, 11, 0.5); }
 .hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-muted); }
 .err { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 .empty { margin: 0; color: var(--text-muted); font-size: var(--font-size-sm); }
@@ -490,6 +444,8 @@ async function runScan() {
 .badge--q { background: rgba(16, 163, 74, 0.16); color: #4ade80; border: 1px solid rgba(16, 163, 74, 0.5); }
 .badge--grad { background: rgba(0, 200, 5, 0.14); color: #7be0a0; border: 1px solid rgba(0, 200, 5, 0.42); }
 .badge--smart { background: rgba(234, 179, 8, 0.18); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.55); }
+.badge--hot { background: rgba(249, 115, 22, 0.18); color: #fdba74; border: 1px solid rgba(249, 115, 22, 0.55);
+  font-size: 8.6px; padding: 1px var(--space-2); }
 /* Shrink the WATCH / grad / Q / GEM badges ~28% */
 .badge--gem, .badge--q, .badge--grad { font-size: 8.6px; padding: 1px var(--space-2); }
 
@@ -521,20 +477,25 @@ async function runScan() {
 
 .card__stats { display: flex; gap: var(--space-5); flex-wrap: wrap; font-size: var(--font-size-sm); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
-/* Entry price at first detection */
-.firstseen { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
-  font-size: var(--font-size-xs); font-variant-numeric: tabular-nums;
-  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
-  background: rgba(0, 200, 5, 0.10); border: 1px solid rgba(0, 200, 5, 0.28); }
-.firstseen__label { color: var(--text-muted); }
-.firstseen__price { font-weight: var(--font-weight-bold); color: #86efb8; }
-.firstseen__arrow { color: var(--text-body); }
-.firstseen__chg { font-weight: var(--font-weight-bold); color: var(--text-muted); }
-.firstseen__since, .firstseen__new { color: var(--text-muted); }
-.firstseen--up { background: rgba(22, 163, 74, 0.12); border-color: rgba(22, 163, 74, 0.45); }
-.firstseen--up .firstseen__chg { color: #4ade80; }
-.firstseen--down { background: rgba(239, 68, 68, 0.10); border-color: rgba(239, 68, 68, 0.40); }
-.firstseen--down .firstseen__chg { color: #fca5a5; }
+/* Momentum multi-timeframe — mirrors the smart money meter, orange-banded. */
+.mom { display: flex; flex-direction: column; gap: var(--space-2); }
+.mom__row { display: flex; align-items: center; gap: var(--space-3); }
+.mom__label { flex: none; font-size: var(--font-size-xs); color: var(--text-muted); }
+.mom__bar { flex: 1; height: 8px; background: rgba(249, 115, 22, 0.12); border-radius: 999px; overflow: hidden; }
+.mom__fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.mom__fill.mom--hi { background: linear-gradient(90deg, #ea580c, #fb923c); }
+.mom__fill.mom--mid { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.mom__fill.mom--lo { background: linear-gradient(90deg, #78716c, #a8a29e); }
+.mom__num { flex: none; font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-medium); }
+.mom__num.mom--hi { color: #fb923c; }
+.mom__num.mom--mid { color: #fbbf24; }
+.mom__num.mom--lo { color: #a8a29e; }
+.mom__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.mom__chip { font-size: 9px; padding: 1px var(--space-2); border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14); color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.28); font-variant-numeric: tabular-nums; }
+.mom__chip.is-up { background: rgba(16, 163, 74, 0.16); color: #4ade80; border-color: rgba(16, 163, 74, 0.5); }
+.mom__chip.is-down { background: rgba(220, 38, 38, 0.16); color: #f87171; border-color: rgba(220, 38, 38, 0.5); }
 
 .tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chip { font-size: 8.6px; padding: 1px var(--space-2); border-radius: var(--radius-sm); }

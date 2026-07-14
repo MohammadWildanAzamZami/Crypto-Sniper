@@ -5,7 +5,6 @@
 import { Router } from "express";
 import { runAutoScan } from "../screener/autoScreen.js";
 import { runProRadar } from "../screener/proRadar.js";
-import { getTrackRecord } from "../screener/learn.js";
 import { sendAlert } from "../screener/telegram.js";
 import { getState } from "../ai/settings.js";
 import { getLatestScan, setLatestScan, markAlerted } from "../radarStore.js";
@@ -43,12 +42,6 @@ export async function runRadarOnce(preset) {
 }
 
 const router = Router();
-
-// Self-learning track record (win rate + current auto-tuned thresholds). Cheap:
-// reads the learn store, no scan.
-router.get("/pro-radar/track", (_req, res) => {
-  res.json(getTrackRecord());
-});
 
 router.get("/auto-screen", scanLimit, async (req, res) => {
   try {
