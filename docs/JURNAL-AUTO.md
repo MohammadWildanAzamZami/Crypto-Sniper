@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-14 21:32** · Total **192** commit dalam **16** hari.
+> Terakhir diperbarui: **2026-07-14 21:33** · Total **194** commit dalam **16** hari.
 
 ---
 
-## 2026-07-14 (Selasa) — 12 commit
+## 2026-07-14 (Selasa) — 14 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): discovery wallet dari pool baru + rapikan baris sinyal sniper  `139c177`
@@ -21,9 +21,11 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `eb81a15`
 - docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `be26bb9`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `417b506`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `ac4f829`
 
 **♻️ Refactor / rapikan**
 - ui(robinhood): rapikan panel — header polos, auto-pilot disembunyikan, PnL netral  `cba58e0`
+- refactor(radar): hapus self-tuning — ambang quality-gate kini tetap  `b51dc66`
 
 **🔧 Lainnya**
 - ui(robinhood): ganti blok footer panel jadi "By. Robinhood Chain"  `fd8356b`
