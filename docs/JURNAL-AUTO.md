@@ -3,11 +3,11 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-14 21:38** · Total **198** commit dalam **16** hari.
+> Terakhir diperbarui: **2026-07-14 21:39** · Total **200** commit dalam **16** hari.
 
 ---
 
-## 2026-07-14 (Selasa) — 18 commit
+## 2026-07-14 (Selasa) — 20 commit
 
 **✨ Fitur baru / penambahan**
 - feat(robinhood): discovery wallet dari pool baru + rapikan baris sinyal sniper  `139c177`
@@ -27,6 +27,8 @@
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `ac4f829`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `3d339f7`
 - docs(jurnal): auto-update rekap harian [jurnal-auto]  `ed7a961`
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `0c790fb`
+- docs: selaraskan PETA-TOOL & PRO-RADAR dengan fokus trending (self-tuning dihapus)  `afde575`
 
 **♻️ Refactor / rapikan**
 - ui(robinhood): rapikan panel — header polos, auto-pilot disembunyikan, PnL netral  `cba58e0`
