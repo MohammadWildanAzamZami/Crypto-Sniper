@@ -10,6 +10,7 @@ import { recordCandidates, getWatchlist } from "../screener/watchlist.js";
 import { runDiscovery, getDiscoveryStatus } from "../screener/discoverWallets.js";
 import { runSniperSweep, getSignals, ingestWebhookTxs } from "../screener/sniper.js";
 import { getTxLog } from "../screener/txLog.js";
+import { ensureTokenMetas } from "../screener/tokenMeta.js";
 import { getSniperTrack } from "../screener/sniperTrack.js";
 import { getParamDefs, applyParams } from "../screener/sniperParams.js";
 import { getWalletIntel, auditOne, walletIntelTick, recordEarlySighting } from "../screener/walletIntel.js";
@@ -115,14 +116,23 @@ router.get("/sniper/track", (_req, res) => {
 
 // Transaction log — every swap (buy & sell) of a monitored wallet the live monitor
 // has seen, newest first (rolling buffer, capped). Optional filters: ?owner= wallet,
-// ?mint= token, ?side=buy|sell, ?limit= N. Read-only.
-router.get("/sniper/txs", (req, res) => {
+// ?mint= token, ?side=buy|sell, ?limit= N. Read-only. Each row is enriched with the
+// token's identity (symbol + logoUrl) from the persistent token-meta cache; mints
+// the sniper never enriched are batch-backfilled from DexScreener (best-effort —
+// a network blip just leaves those rows showing the mint address).
+router.get("/sniper/txs", async (req, res) => {
   try {
     const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 200));
     const side = req.query.side === "buy" || req.query.side === "sell" ? req.query.side : undefined;
     const owner = typeof req.query.owner === "string" && req.query.owner.trim() ? req.query.owner.trim() : undefined;
     const mint = typeof req.query.mint === "string" && req.query.mint.trim() ? req.query.mint.trim() : undefined;
-    res.json(getTxLog({ limit, owner, mint, side }));
+    const log = getTxLog({ limit, owner, mint, side });
+    const metas = await ensureTokenMetas(log.txs.map((t) => t.mint));
+    log.txs = log.txs.map((t) => {
+      const m = metas[t.mint];
+      return m ? { ...t, symbol: m.symbol || "", logoUrl: m.logoUrl || null } : t;
+    });
+    res.json(log);
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

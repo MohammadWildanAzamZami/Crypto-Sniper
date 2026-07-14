@@ -17,6 +17,8 @@ import { getParams } from "./sniperParams.js";
 import { recordSignals, gradeMatured } from "./sniperTrack.js";
 import { recordTxs } from "./txLog.js";
 import { effectiveReputation, getWalletClass } from "./walletIntel.js";
+import { fetchDexScreener } from "./sources.js";
+import { rememberTokenMeta, getTokenMeta } from "./tokenMeta.js";
 
 const HELIUS = "https://api.helius.xyz";
 const BIRDEYE = "https://public-api.birdeye.so";
@@ -321,12 +323,23 @@ async function evaluateToken({ mint, wallets, lastAt, netFiltered = 0, now, P, b
   const signals = store.signals;
   if (snap === undefined) snap = await tokenSnapshot(mint, birdeyeKey);
   if (safety === undefined) safety = P.safetyGate ? await safetyCheck(mint, { heliusKey }, P) : null;
-  const dsm = safety?.metrics || null; // DexScreener metrics — second source
+  let dsm = safety?.metrics || null; // DexScreener metrics — second source
+  // Fallback identitas: Birdeye gagal/kuota habis DAN tak ada metrics dari gate
+  // (varian tanpa safety-gate, mis. "awal") → tarik DexScreener langsung. Tanpa
+  // ini seluruh stream awal jadi unverified permanen saat kuota Birdeye habis.
+  if (!snap && !dsm) {
+    try { dsm = await fetchDexScreener(mint); } catch { /* biarkan unverified */ }
+  }
 
-  // Identity/price: prefer Birdeye, fall back to DexScreener (from the safety check).
-  const symbol = snap?.symbol || dsm?.symbol || "";
-  const name = snap?.name || dsm?.name || "";
-  const logoUrl = snap?.logoUrl || dsm?.logoUrl || null;
+  // Identity/price: prefer Birdeye, fall back to DexScreener (from the safety
+  // check), then the persistent token-meta cache (warmed by past enrichments).
+  const cachedMeta = getTokenMeta(mint);
+  const symbol = snap?.symbol || dsm?.symbol || cachedMeta?.symbol || "";
+  const name = snap?.name || dsm?.name || cachedMeta?.name || "";
+  const logoUrl = snap?.logoUrl || dsm?.logoUrl || cachedMeta?.logoUrl || null;
+  // Warm the cache with the identity this evaluation already paid for — the tx
+  // log serves logos/symbols from here without extra API calls.
+  rememberTokenMeta(mint, { symbol, name, logoUrl });
   const mcap = snap && snap.mcap > 0 ? snap.mcap : Math.round(dsm?.marketCap || 0);
   const curPrice = snap?.priceUsd || dsm?.priceUsd || 0;
   const liquidityUsd = dsm ? Math.round(dsm.liquidityUsd || 0) : null;
@@ -537,6 +550,7 @@ export async function ingestWebhookTxs(txs, { heliusKey, birdeyeKey } = {}) {
     const g = liveByToken.get(mint);
     if (!g) continue;
     const snap = await tokenSnapshot(mint, birdeyeKey); // ONE identity/mcap fetch per touched token, shared below
+    if (snap) rememberTokenMeta(mint, snap); // warm the identity cache even when no signal forms (tx log logos)
     for (const variant of ["v2", "awal"]) {
       const prof = profileFor(variant);
       const store = STORES[variant];

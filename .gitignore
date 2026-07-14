@@ -36,6 +36,9 @@ node_modules/
 # Sniper Engine transaction log (Modul C — every monitored-wallet swap, rolling)
 .sniper-txs.json
 **/.sniper-txs.json
+# Token identity cache (mint → symbol/logo) for tx-log & sniper rows
+.token-meta.json
+**/.token-meta.json
 # Wallet Intelligence v2 (state pipeline + override parameter WI dari Settings UI)
 .wallet-intel.json
 **/.wallet-intel.json

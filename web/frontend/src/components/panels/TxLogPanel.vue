@@ -29,7 +29,11 @@ const rows = computed(() => {
   const all = data.value?.txs || [];
   const q = query.value.trim().toLowerCase();
   if (!q) return all;
-  return all.filter((t) => (t.owner || "").toLowerCase().includes(q) || (t.mint || "").toLowerCase().includes(q));
+  return all.filter((t) =>
+    (t.owner || "").toLowerCase().includes(q) ||
+    (t.mint || "").toLowerCase().includes(q) ||
+    (t.symbol || "").toLowerCase().includes(q)
+  );
 });
 
 const money = (n) => (typeof n === "number" && n > 0 ? "$" + Math.round(n).toLocaleString() : "—");
@@ -42,7 +46,29 @@ const amount = (n) => {
 };
 const shortAddr = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "—");
 const solscanTx = (sig) => `https://solscan.io/tx/${sig}`;
-const dexUrl = (mint) => `https://axiom.trade/t/${mint}`;
+// Chart melayang: embed GMGN (mengizinkan iframe); Axiom hanya deep-link keluar
+// (X-Frame-Options + login wallet, tak bisa di-embed) — pola sama dgn SniperPanel.
+const gmgnChart = (mint) => `https://www.gmgn.cc/kline/sol/${mint}?theme=dark`;
+const axiomUrl = (mint) => `https://axiom.trade/t/${mint}`;
+
+// Mint yang chart melayangnya sedang terbuka ("" = tertutup, satu per waktu).
+const chartMint = ref("");
+function toggleChart(mint) {
+  chartMint.value = chartMint.value === mint ? "" : mint;
+}
+// Baris tx milik mint yang chartnya terbuka — untuk logo + simbol di judul chart.
+const chartTx = computed(() => rows.value.find((t) => t.mint === chartMint.value) || null);
+
+// Avatar token: logo dari server (cache token-meta), jatuh balik ke inisial huruf
+// saat token tak punya logo / gambarnya gagal dimuat — pola sama dgn SniperPanel.
+const failedLogos = ref(new Set());
+function initials(t) {
+  return (t.symbol || t.mint || "?").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "?";
+}
+function logoFailed(mint) {
+  failedLogos.value = new Set(failedLogos.value).add(mint);
+}
+const tokenLabel = (t) => t.symbol || shortAddr(t.mint);
 
 // `at` = detik (timestamp Helius). Jatuh balik ke `logged` (ms) bila tak ada.
 function ago(t) {
@@ -148,9 +174,26 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
             <span class="tx-side-badge" :class="t.side === 'buy' ? 'tx-side-badge--buy' : 'tx-side-badge--sell'">
               {{ t.side === 'buy' ? 'BELI' : 'JUAL' }}
             </span>
-            <a class="tx-mint" :href="dexUrl(t.mint)" target="_blank" rel="noopener noreferrer" :title="'Buka chart: ' + t.mint">
-              {{ shortAddr(t.mint) }}
-            </a>
+            <button
+              type="button"
+              class="tx-logo"
+              :title="'Lihat chart ' + tokenLabel(t)"
+              :aria-pressed="chartMint === t.mint"
+              @click="toggleChart(t.mint)"
+            >
+              <img
+                v-if="t.logoUrl && !failedLogos.has(t.mint)"
+                :src="t.logoUrl"
+                :alt="t.symbol || 'token'"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="logoFailed(t.mint)"
+              />
+              <span v-else class="tx-logo-fallback">{{ initials(t) }}</span>
+            </button>
+            <button class="tx-mint" type="button" :title="'Salin alamat token: ' + t.mint" @click="copy(t.mint)">
+              {{ copied === t.mint ? "✓ tersalin" : tokenLabel(t) }}
+            </button>
             <span class="tx-amt" :title="'Jumlah token'">{{ amount(t.tokens) }}</span>
             <span class="tx-usd" :title="'Nilai (USD) saat transaksi'">{{ money(t.sizeUsd) }}</span>
             <button class="tx-owner" type="button" :title="'Salin wallet: ' + t.owner" @click="copy(t.owner)">
@@ -165,9 +208,61 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
               rel="noopener noreferrer"
               title="Lihat transaksi di Solscan"
             >↗</a>
+            <button
+              class="tx-chart"
+              type="button"
+              :title="'Lihat chart melayang: ' + shortAddr(t.mint)"
+              :aria-pressed="chartMint === t.mint"
+              @click="toggleChart(t.mint)"
+            >📈</button>
           </li>
         </ul>
       </div>
+
+      <!-- Chart melayang (teleport ke body agar tak terpotong stacking context).
+           Embed GMGN + deep link Axiom (posisi wallet; Axiom tak bisa di-embed). -->
+      <Teleport to="body">
+        <div v-if="chartMint" class="txchart">
+          <div class="txchart__backdrop" aria-hidden="true" @click="chartMint = ''"></div>
+          <div class="txchart__panel" role="dialog" aria-modal="true" :aria-label="'Chart ' + shortAddr(chartMint)">
+            <div class="txchart__head">
+              <span class="txchart__title">
+                <span class="txchart__logo" aria-hidden="true">
+                  <img
+                    v-if="chartTx && chartTx.logoUrl && !failedLogos.has(chartMint)"
+                    :src="chartTx.logoUrl"
+                    :alt="chartTx.symbol || 'token'"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    @error="logoFailed(chartMint)"
+                  />
+                  <span v-else class="txchart__logo-fallback">{{ chartTx ? initials(chartTx) : "?" }}</span>
+                </span>
+                {{ chartTx ? tokenLabel(chartTx) : shortAddr(chartMint) }} chart
+              </span>
+              <div class="txchart__actions">
+                <a
+                  class="txchart__open"
+                  :href="axiomUrl(chartMint)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Buka chart Axiom (perlu login wallet) — bisa lihat posisi wallet."
+                >Axiom ↗</a>
+                <button type="button" class="txchart__close" aria-label="Tutup chart" @click="chartMint = ''">✕</button>
+              </div>
+            </div>
+            <div class="txchart__frame">
+              <iframe
+                :src="gmgnChart(chartMint)"
+                :title="'Chart harga ' + shortAddr(chartMint) + ' di GMGN'"
+                loading="lazy"
+                allow="clipboard-write"
+                referrerpolicy="no-referrer"
+              />
+            </div>
+          </div>
+        </div>
+      </Teleport>
       <p v-if="rows.length > 6" class="tx-scroll-hint">
         Menampilkan 6 dari <b>{{ rows.length }}</b> transaksi — scroll di dalam kotak untuk lihat sisanya.
       </p>
@@ -196,7 +291,8 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
 .scanbtn:hover:not(:disabled) { border-color: var(--text-success); }
 .scanbtn:disabled { opacity: 0.55; cursor: not-allowed; }
 .scanbtn:focus-visible, .tx-side:focus-visible, .tx-search:focus-visible,
-.tx-owner:focus-visible, .tx-mint:focus-visible, .tx-scan:focus-visible {
+.tx-owner:focus-visible, .tx-mint:focus-visible, .tx-scan:focus-visible,
+.tx-chart:focus-visible, .txchart__close:focus-visible, .txchart__open:focus-visible {
   outline: 2px solid var(--border-focus); outline-offset: 2px;
 }
 
@@ -233,7 +329,7 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
 /* Scroll box: 6 baris default, sisanya di-scroll di dalam kotak. */
 .tx-scroll {
   --tx-rows: 6;
-  --tx-row-h: 40px;
+  --tx-row-h: 46px; /* avatar logo 26px + padding baris */
   border: 1px solid var(--border-default); border-radius: var(--control-radius);
   background: var(--bg-raised); padding: var(--space-2);
 }
@@ -271,9 +367,20 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
   background: color-mix(in srgb, var(--text-error) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-error) 32%, transparent);
 }
+/* Avatar token — logo bulat kecil, klik = buka chart melayang. Jatuh balik ke
+   inisial huruf saat token tanpa logo (pola sama dgn SniperPanel). */
+.tx-logo {
+  flex: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg-raised); border: 1px solid var(--border-default);
+  cursor: pointer;
+}
+.tx-logo:hover { border-color: var(--text-success); }
+.tx-logo:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.tx-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tx-logo-fallback { font-size: 9px; font-weight: 700; color: var(--text-success); letter-spacing: 0.2px; }
 .tx-mint {
   flex: none; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: var(--font-size-sm);
-  color: var(--text-body); text-decoration: none;
+  color: var(--text-body); cursor: pointer;
   background: var(--bg-raised); border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   padding: 2px 8px;
 }
@@ -296,4 +403,63 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
   padding: 0 4px; border-radius: var(--radius-sm);
 }
 .tx-scan:hover { color: var(--text-success); }
+
+/* Tombol chart di ujung baris → buka chart melayang. */
+.tx-chart {
+  flex: none; font: inherit; font-size: var(--font-size-sm); line-height: 1; cursor: pointer;
+  padding: 2px 6px; border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--bg-raised); color: var(--text-body);
+}
+.tx-chart:hover { border-color: var(--text-success); }
+
+/* Chart melayang — pola sama dengan overlay chart SniperPanel. */
+.txchart__backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(2px);
+}
+.txchart__panel {
+  position: fixed; z-index: 201;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 2 * var(--space-6)));
+  max-height: 88vh; overflow: auto;
+  display: grid; gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.txchart__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.txchart__title {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  color: var(--text-heading); font-weight: var(--font-weight-medium);
+}
+.txchart__logo { flex: none; width: 22px; height: 22px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border-default); }
+.txchart__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.txchart__logo-fallback { font-size: 9px; font-weight: var(--font-weight-bold); color: var(--text-muted); letter-spacing: 0.2px; }
+.txchart__actions { display: flex; align-items: center; gap: var(--space-4); }
+.txchart__open { color: var(--text-link, #86efb8); text-decoration: none; font-size: var(--font-size-sm); white-space: nowrap; }
+.txchart__open:hover { text-decoration: underline; }
+.txchart__close {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; flex: none; padding: 0;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--bg-card); color: var(--text-body); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.txchart__close:hover { border-color: var(--text-error); color: var(--text-error); }
+.txchart__frame {
+  position: relative; width: 100%;
+  aspect-ratio: 16 / 10; max-height: 460px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--bg-card);
+}
+.txchart__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+@media (max-width: 640px) {
+  .txchart__panel {
+    top: 12px; left: 10px; right: 10px; transform: none;
+    width: auto; max-height: 86vh; padding: var(--space-4);
+  }
+  .txchart__frame { aspect-ratio: auto; height: 62vh; max-height: none; }
+}
 </style>
