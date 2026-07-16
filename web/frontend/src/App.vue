@@ -1,6 +1,7 @@
 <script setup>
 import ExplorerPage from "./pages/ExplorerPage.vue";
 import ChatWidget from "./components/chat/ChatWidget.vue";
+import RugCheckWidget from "./components/panels/RugCheckWidget.vue";
 </script>
 
 <template>
@@ -13,6 +14,9 @@ import ChatWidget from "./components/chat/ChatWidget.vue";
 
   <!-- WhatsApp-style floating, resizable chat assistant -->
   <ChatWidget />
+
+  <!-- Pemeriksa keamanan token — FAB "rugcheck" di kiri-bawah -->
+  <RugCheckWidget />
 </template>
 
 <style scoped>
