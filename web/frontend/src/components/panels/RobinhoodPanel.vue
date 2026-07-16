@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
       </template>
       <p class="rh__note">
         Reputasi = jumlah winner ditangkap + seberapa awal beli. <b>Semua wallet terdaftar dipantau</b>
-        oleh <b>Sniper EVM</b> (tanpa batas). Heuristik, DYOR.
+        oleh <b>Sniper EVM</b> (tanpa batas).
       </p>
     </div>
 
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
                   />
                 </div>
                 <p class="rh__note">
-                  Chart live pool likuiditas-terbesar token ini (GeckoTerminal). Heuristik — bukan nasihat keuangan. DYOR.
+                  Chart live pool likuiditas-terbesar token ini (GeckoTerminal).
                 </p>
               </div>
             </div>
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
           </ul>
           <p class="rh__note">
             PnL = harga kini vs harga saat sinyal <b>pertama terdeteksi</b> screener (riwayat bertahan
-            walau sinyal live sudah keluar). "—" = harga kini tak tersedia (pool hilang / fetch gagal). DYOR.
+            walau sinyal live sudah keluar). "—" = harga kini tak tersedia (pool hilang / fetch gagal).
           </p>
         </template>
       </div>

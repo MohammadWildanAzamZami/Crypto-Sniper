@@ -129,61 +129,7 @@ function switchMode(m) {
   if (m === "influencer" && !inf.value) loadInfluencers();
 }
 
-// ---- Wallet Intelligence v2 ------------------------------------------------
-// Pipeline reputasi: kandidat → vetting → audit akurasi → klasifikasi → karantina.
-const intel = ref(null);          // { total, queued, counts, params, wallets: [...] }
-const intelLoading = ref(false);
-const intelError = ref("");
-const auditing = ref("");         // owner yang sedang diaudit manual
-
-async function loadIntel() {
-  if (intelLoading.value) return;
-  intelLoading.value = true;
-  intelError.value = "";
-  try {
-    const r = await fetch(apiUrl("/api/wallet-intel?limit=100"));
-    const body = await r.json();
-    if (!r.ok) intelError.value = body?.error || `Gagal memuat (${r.status})`;
-    else intel.value = body;
-  } catch {
-    intelError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
-  } finally {
-    intelLoading.value = false;
-  }
-}
-
-// Audit manual satu wallet (di luar antrean berjatah) — mahal, jadi per klik.
-async function auditIntel(owner) {
-  if (auditing.value) return;
-  auditing.value = owner;
-  intelError.value = "";
-  try {
-    const r = await fetch(apiUrl(`/api/wallet-intel/audit/${owner}`), { method: "POST" });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) intelError.value = body?.error || `Audit gagal (${r.status})`;
-    else await loadIntel();
-  } catch {
-    intelError.value = "Gangguan jaringan — apakah backend (:8787) jalan?";
-  } finally {
-    auditing.value = "";
-  }
-}
-
-// Badge kelas → label + kelas CSS. SMART hijau, INSIDER kuning ⚠, REJECTED merah.
-const klassBadge = (k) => ({
-  SMART_MONEY: { text: "SMART", cls: "wi-badge--smart" },
-  INSIDER: { text: "⚠ INSIDER", cls: "wi-badge--insider" },
-  REJECTED: { text: "REJECTED", cls: "wi-badge--rejected" },
-  UNRATED: { text: "UNRATED", cls: "wi-badge--unrated" },
-}[k] || { text: k, cls: "wi-badge--unrated" });
-const statusBadge = (s) => ({
-  ACTIVE: { text: "ACTIVE", cls: "wi-badge--active" },
-  QUARANTINE: { text: "KARANTINA", cls: "wi-badge--quarantine" },
-  CANDIDATE: { text: "KANDIDAT", cls: "wi-badge--quarantine" },
-  EVICTED: { text: "EVICTED", cls: "wi-badge--rejected" },
-}[s] || { text: s, cls: "wi-badge--unrated" });
-
-onMounted(() => { load(); loadIntel(); });
+onMounted(() => { load(); });
 </script>
 
 <template>
@@ -197,7 +143,7 @@ onMounted(() => { load(); loadIntel(); });
         </p>
         <p v-else class="panel__sub">
           Wallet <b>influencer yang kamu masukkan sendiri</b> — dipantau monitor live. <b>Satu</b> influencer beli
-          token fresh sudah cukup memunculkan sinyal (tak perlu menunggu ≥2 wallet). Heuristik, bukan nasihat keuangan.
+          token fresh sudah cukup memunculkan sinyal (tak perlu menunggu ≥2 wallet).
         </p>
       </div>
       <div class="wl-head-actions">
@@ -295,73 +241,7 @@ onMounted(() => { load(); loadIntel(); });
         Menampilkan 4 dari <b>{{ data.wallets.length }}</b> wallet — scroll di dalam kotak untuk lihat sisanya.
       </p>
 
-      <p class="wl-note">
-        📡 Monitor live (Modul C) memantau wallet aktif secara real-time (push detik via webhook Helius) dan memunculkan
-        sinyal saat mereka mulai borong token baru — lihat panel <b>🎯 Sinyal Sniper Live</b>. Mode real-time aktif jika
-        <code>PUBLIC_URL</code>/ngrok diset. Track record heuristik, bukan nasihat keuangan.
-      </p>
     </template>
-
-    <!-- ============ Wallet Intelligence v2 ============ -->
-    <div class="wi">
-      <div class="wi__head">
-        <h3 class="wi__title">🧠 Wallet Intelligence <span class="tag">v2</span></h3>
-        <button class="scanbtn scanbtn--ghost" :disabled="intelLoading" @click="loadIntel">
-          {{ intelLoading ? "Memuat…" : "↻ Segarkan" }}
-        </button>
-      </div>
-      <p class="panel__sub">
-        Reputasi berbasis <b>akurasi terbukti + bukan pelaku</b>: kandidat divetting (umur, aktivitas, sumber dana),
-        diaudit hit-rate historisnya, lalu diklasifikasi. Wallet baru masuk <b>karantina</b> (bobot skor dikurangi)
-        sampai terbukti lewat sinyal ternilai. Insider tidak dibuang — sinyalnya berlabel ⚠.
-      </p>
-      <p v-if="intelError" class="panel__error" role="alert">{{ intelError }}</p>
-
-      <template v-if="intel">
-        <div class="wl-summary">
-          <div class="wl-chip"><b>{{ intel.total }}</b> wallet dinilai</div>
-          <div class="wl-chip wl-chip--ok"><b>{{ intel.counts.smart }}</b> smart</div>
-          <div class="wl-chip"><b>{{ intel.counts.insider }}</b> insider</div>
-          <div class="wl-chip"><b>{{ intel.counts.quarantine }}</b> karantina · <b>{{ intel.counts.active }}</b> active</div>
-          <div class="wl-chip" :title="'Antrean kandidat menunggu jatah audit (' + intel.queued + ')'"><b>{{ intel.queued }}</b> antre audit</div>
-        </div>
-
-        <p v-if="!intel.wallets.length" class="wl-empty">
-          Belum ada wallet di pipeline. Kandidat masuk otomatis dari Bedah Coin / discovery
-          (kemunculan berulang sebagai early buyer) — atau audit manual wallet mana pun lewat tombol di baris watchlist.
-        </p>
-
-        <div v-else class="wl-scroll" :class="intel.wallets.length > 4 ? 'wl-scroll--more' : ''">
-          <ul class="wl-list">
-            <li v-for="w in intel.wallets" :key="w.owner" class="wl-row">
-              <button class="wl-addr" type="button" :title="'Salin: ' + w.owner" @click="copy(w.owner)">
-                {{ copied === w.owner ? "✓ tersalin" : shortAddr(w.owner) }}
-              </button>
-              <span class="wi-badge" :class="klassBadge(w.klass).cls">{{ klassBadge(w.klass).text }}</span>
-              <span class="wi-badge" :class="statusBadge(w.status).cls">{{ statusBadge(w.status).text }}</span>
-              <span v-if="w.fastTracked" class="wi-badge wi-badge--smart" title="Bukti sejarah kuat — karantina dipersingkat, bobot 80%">⚡ fast-track</span>
-              <span v-if="w.sharedFunding" class="wi-badge wi-badge--insider" title="Didanai induk yang sama dengan kandidat lain — indikasi jaringan sybil">dana bersama</span>
-              <span class="wi-stat" :title="'Akurasi historis: ' + (w.hitRate ?? '—') + '% dari ' + (w.sample ?? 0) + ' entry early'">
-                🎯 {{ w.hitRate != null ? w.hitRate + "%" : "—" }}<span v-if="w.sample != null" class="wi-dim"> /{{ w.sample }}</span>
-              </span>
-              <span class="wi-stat" :title="'Reputasi efektif (basis × decay × bobot status): ' + w.effectiveRep + ' — basis ' + w.reputation">
-                ⚖ {{ w.effectiveRep }}
-              </span>
-              <span class="wi-spacer"></span>
-              <button
-                class="wi-audit" type="button" :disabled="auditing !== ''"
-                :title="'Audit ulang akurasi historis wallet ini sekarang (mahal — beberapa call API)'"
-                @click="auditIntel(w.owner)"
-              >{{ auditing === w.owner ? "mengaudit…" : "🔬 audit" }}</button>
-            </li>
-          </ul>
-        </div>
-        <p class="wl-note">
-          Reputasi membusuk (half-life) tanpa bukti baru; sinyal ternilai WIN menambah, RUG mengurangi.
-          Ambang & bobot diatur di <b>Settings → 🧠 Wallet Intelligence</b>. Heuristik, bukan nasihat keuangan.
-        </p>
-      </template>
-    </div>
     </template>
 
     <!-- ============ TAB: INFLUENCER (Modul B2) ============ -->
@@ -432,7 +312,7 @@ onMounted(() => { load(); loadIntel(); });
         </p>
 
         <p class="wl-note">
-          Sinyal “influencer beli” muncul di panel <b>🎯 Sinyal Sniper Live</b>. Tetap DYOR — bukan nasihat keuangan.
+          Sinyal “influencer beli” muncul di panel <b>🎯 Sinyal Sniper Live</b>.
         </p>
       </template>
     </template>
@@ -606,45 +486,6 @@ onMounted(() => { load(); loadIntel(); });
 }
 
 .wl-note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
-
-/* Wallet Intelligence v2 */
-.wi { display: grid; gap: var(--space-4); border-top: 1px solid var(--border-default); padding-top: var(--space-5); }
-.wi__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.wi__title { margin: 0; font-size: var(--font-size-md, 1rem); }
-.wi-badge {
-  font-size: var(--font-size-xs); font-weight: 700; padding: 1px 7px; white-space: nowrap;
-  border-radius: var(--radius-sm); border: 1px solid var(--border-default);
-  background: var(--bg-raised); color: var(--text-muted);
-}
-.wi-badge--smart {
-  color: var(--text-success);
-  border-color: color-mix(in srgb, var(--text-success) 45%, transparent);
-  background: color-mix(in srgb, var(--text-success) 12%, transparent);
-}
-.wi-badge--insider {
-  color: var(--text-warning, #eab308); cursor: help;
-  border-color: color-mix(in srgb, var(--text-warning, #eab308) 45%, transparent);
-  background: color-mix(in srgb, var(--text-warning, #eab308) 14%, transparent);
-}
-.wi-badge--rejected {
-  color: var(--text-error);
-  border-color: color-mix(in srgb, var(--text-error) 45%, transparent);
-  background: color-mix(in srgb, var(--text-error) 12%, transparent);
-}
-.wi-badge--unrated { color: var(--text-muted); border-style: dashed; }
-.wi-badge--active { color: var(--text-on-accent); background: var(--bg-accent); border-color: transparent; }
-.wi-badge--quarantine { color: var(--text-muted); }
-.wi-stat { font-size: var(--font-size-sm); color: var(--text-body); white-space: nowrap; cursor: help; font-variant-numeric: tabular-nums; }
-.wi-dim { color: var(--text-muted); }
-.wi-spacer { flex: 1 1 auto; }
-.wi-audit {
-  flex: none; padding: 2px 10px; font: inherit; font-size: var(--font-size-xs); cursor: pointer;
-  background: var(--bg-raised); color: var(--text-muted);
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-}
-.wi-audit:hover:not(:disabled) { color: var(--text-success); border-color: var(--text-success); }
-.wi-audit:disabled { opacity: 0.55; cursor: not-allowed; }
-.wi-audit:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .wl-catches { flex-basis: 100%; order: 5; }

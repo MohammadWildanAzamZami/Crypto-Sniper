@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
         <h2 id="sniper-h">🎯 Sinyal Sniper Live <span class="tag">Live</span></h2>
         <p class="panel__sub">
           Token yang <b>sedang diborong beberapa smart wallet sekaligus</b> (dari Watchlist) selagi masih kecil —
-          sinyal akumulasi <b>sebelum</b> pump. Server memantau otomatis; tekan tombol untuk cek sekarang. Bukan nasihat keuangan.
+          sinyal akumulasi <b>sebelum</b> pump.
         </p>
       </div>
       <button class="scanbtn" :disabled="loading" @click="sweep">
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
             PnL terekam otomatis ~{{ track.gradeAfterMin }} mnt setelah sinyal muncul.
           </span>
         </div>
-        <p class="sn-track__foot">Entry di-snapshot saat tool memberi sinyal, dinilai vs harga live. Bukti, bukan nasihat keuangan.</p>
+        <p class="sn-track__foot">Entry di-snapshot saat tool memberi sinyal, dinilai vs harga live.</p>
       </div>
 
       <p v-if="!visibleSignals.length" class="sn-empty">
@@ -266,7 +266,6 @@ onBeforeUnmount(() => {
         </template>
         <template v-else>
           Belum ada sinyal. Monitor menunggu ≥{{ data.signalMin }} wallet Watchlist membeli token kecil yang sama.
-          Makin banyak winner yang kamu Bedah → makin pintar Watchlist → makin tajam sinyalnya.
         </template>
       </p>
 
@@ -444,7 +443,7 @@ onBeforeUnmount(() => {
                     <span class="pos__pnl" :class="pnlClass(p.pnlX)">{{ p.pnlX ? xFmt(p.pnlX) : "—" }}</span>
                   </li>
                 </ul>
-                <p class="pos__note">Entri = pembelian pertama wallet dalam jendela pantau; harga/PnL perkiraan. Bukan nasihat keuangan.</p>
+                <p class="pos__note">Entri = pembelian pertama wallet dalam jendela pantau; harga/PnL perkiraan.</p>
               </div>
             </div>
           </div>
@@ -456,10 +455,6 @@ onBeforeUnmount(() => {
         Menampilkan 4 dari <b>{{ visibleSignals.length }}</b> sinyal — scroll di dalam kotak untuk lihat sisanya.
       </p>
 
-      <p class="sn-note">
-        Sinyal = beberapa wallet berpengalaman menumpuk token yang sama saat masih kecil. <b>Tetap DYOR</b> —
-        smart wallet bisa salah, dan token kecil sangat berisiko. Bukan nasihat keuangan.
-      </p>
     </template>
   </section>
 </template>
@@ -682,7 +677,6 @@ onBeforeUnmount(() => {
 .sn-explain__error { margin: 0; color: var(--text-error); font-size: var(--font-size-sm); }
 .sn-explain__text { margin: 0; color: var(--text-body); font-size: var(--font-size-sm); line-height: 1.6; white-space: pre-wrap; }
 
-.sn-note { margin: 0; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 
 /* GMGN chart embed — always a floating overlay (centered modal). */
 .chart { display: contents; }

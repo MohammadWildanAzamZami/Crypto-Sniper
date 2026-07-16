@@ -103,8 +103,7 @@ async function runScan() {
         <p class="panel__sub">
           Radar bertenaga AI, fokus token yang <b>sedang trending</b>: trafik transaksi masih ramai
           di jendela 5 mnt / 1 jam / 6 jam / 24 jam &amp; smart money / whale sedang akumulasi
-          terus-menerus. Token yang pump-nya sudah lewat dibuang otomatis. Lalu <b>AI</b> menilai
-          conviction, tesis, katalis, dan red flag tiap token. Heuristik + opini AI — bukan nasihat keuangan.
+          terus-menerus.
         </p>
       </div>
       <div class="head-actions">
@@ -116,10 +115,6 @@ async function runScan() {
         </button>
       </div>
     </div>
-
-    <p v-if="!scan.scannedAt && !loading && !error" class="hint">
-      Klik <b>Scan AI</b> — analisis AI butuh beberapa detik lebih lama dari 10x Radar biasa.
-    </p>
 
     <p v-if="scan.scannedAt" class="meta">
       Pindai terakhir: <b>{{ ago(scan.scannedAt) }}</b>

@@ -69,7 +69,7 @@ async function runScan() {
       <div>
         <h2 id="radar-h">🚀 10x Radar</h2>
         <p class="panel__sub">
-          Auto-screening token Solana berpotensi tinggi. Heuristik, bukan nasihat keuangan — DYOR.
+          Auto-screening token Solana berpotensi tinggi.
         </p>
       </div>
       <div class="head-actions">

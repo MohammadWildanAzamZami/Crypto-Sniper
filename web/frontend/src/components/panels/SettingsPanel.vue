@@ -73,60 +73,6 @@ async function loadSniper() {
 const sniperByGroup = (group) => sniperParams.value.filter((p) => p.group === group);
 const fmtDef = (p) => (p.type === "bool" ? (p.envDefault ? "on" : "off") : p.envDefault);
 
-// Wallet Intelligence v2 — registry kedua, pola data-driven yang sama persis:
-// param baru di server (WI_PARAM_DEFS) langsung muncul di sini tanpa ubah Vue.
-const wiParams = ref([]);
-const wiGroups = ref([]);
-const wiForm = reactive({});
-const wiMsg = ref("");
-const savingWi = ref(false);
-
-function fillWi(body) {
-  wiParams.value = body.params || [];
-  wiGroups.value = body.groups || [];
-  for (const p of wiParams.value) wiForm[p.key] = p.value;
-}
-
-async function loadWi() {
-  try {
-    const r = await fetch(apiUrl("/api/wallet-intel/params"));
-    if (r.ok) fillWi(await r.json());
-  } catch { /* backend down — seksi WI kosong, Settings lain tetap jalan */ }
-}
-
-const wiByGroup = (group) => wiParams.value.filter((p) => p.group === group);
-
-async function saveWi() {
-  savingWi.value = true;
-  wiMsg.value = "";
-  persistAdminToken();
-  try {
-    const patch = {};
-    for (const p of wiParams.value) {
-      const v = wiForm[p.key];
-      patch[p.key] = v === p.envDefault ? null : v;
-    }
-    const r = await fetch(apiUrl("/api/wallet-intel/params"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(patch),
-    });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) { wiMsg.value = `⚠️ ${body.error || `Gagal (${r.status})`}`; return; }
-    fillWi(body);
-    wiMsg.value = "✅ Tersimpan — berlaku di putaran berikutnya";
-  } catch {
-    wiMsg.value = "⚠️ Network error — backend tidak terjangkau.";
-  } finally {
-    savingWi.value = false;
-  }
-}
-
-function resetWi(p) {
-  wiForm[p.key] = p.envDefault;
-  saveWi();
-}
-
 async function saveSniper() {
   savingSniper.value = true;
   sniperMsg.value = "";
@@ -215,7 +161,7 @@ async function test(target) {
   await load();
 }
 
-onMounted(() => { load(); loadSniper(); loadWi(); });
+onMounted(() => { load(); loadSniper(); });
 </script>
 
 <template>
@@ -410,56 +356,6 @@ onMounted(() => { load(); loadSniper(); loadWi(); });
         <div class="row">
           <AppButton :loading="savingSniper" @click="saveSniper">Simpan parameter</AppButton>
           <span class="hint" aria-live="polite">{{ sniperMsg }}</span>
-        </div>
-      </section>
-
-      <!-- Wallet Intelligence v2 (data-driven dari registry WI) -->
-      <section class="grp" v-if="wiParams.length">
-        <div class="grp__head">
-          <h3>🧠 Wallet Intelligence</h3>
-          <span class="pill pill--ok">v2</span>
-        </div>
-        <p class="hint">
-          Pipeline reputasi wallet: kandidat → vetting KTP → audit akurasi historis →
-          klasifikasi (SMART / INSIDER / REJECTED) → karantina → umpan balik track record.
-          Perubahan berlaku di <b>putaran berikutnya</b> tanpa restart. Env <code>WI_*</code> jadi nilai default.
-        </p>
-
-        <div v-for="g in wiGroups" :key="g" class="pgroup">
-          <h4 class="pgroup__title">{{ g }}</h4>
-          <div v-for="p in wiByGroup(g)" :key="p.key" class="param">
-            <div class="param__row">
-              <label class="lbl" :for="`wi-${p.key}`">
-                {{ p.label }}
-                <span v-if="p.overridden" class="tag-diff">diubah</span>
-              </label>
-              <label v-if="p.type === 'bool'" class="switch">
-                <input :id="`wi-${p.key}`" type="checkbox" v-model="wiForm[p.key]" />
-                <span>{{ wiForm[p.key] ? "aktif" : "nonaktif" }}</span>
-              </label>
-              <input
-                v-else
-                :id="`wi-${p.key}`"
-                class="inp inp--num"
-                type="number"
-                :min="p.min"
-                :max="p.max"
-                :step="p.step"
-                v-model.number="wiForm[p.key]"
-              />
-            </div>
-            <p class="hint param__hint">
-              {{ p.hint }}
-              <button v-if="p.overridden" class="reset" type="button" @click="resetWi(p)">
-                ↺ default ({{ fmtDef(p) }})
-              </button>
-            </p>
-          </div>
-        </div>
-
-        <div class="row">
-          <AppButton :loading="savingWi" @click="saveWi">Simpan parameter</AppButton>
-          <span class="hint" aria-live="polite">{{ wiMsg }}</span>
         </div>
       </section>
 

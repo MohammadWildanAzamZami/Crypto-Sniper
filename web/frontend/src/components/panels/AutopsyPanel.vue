@@ -62,9 +62,8 @@ function reset() {
       <div>
         <h2 id="autopsy-h">🔬 Bedah Coin <span class="tag">Sniper</span></h2>
         <p class="panel__sub">
-          Tempel alamat token yang sudah naik → dibongkar <b>siapa yang beli lebih awal</b> (saat market cap masih kecil),
-          siapa yang <b>hold vs jual</b>, mana yang <b>bundle/bot</b>, dan <b>kandidat smart wallet</b> untuk dibuntuti.
-          Forensik on-chain — bukan nasihat keuangan.
+          Tempel alamat token yang sudah naik → dibongkar <b>siapa yang beli lebih awal</b> (saat market cap masih kecil)
+          dan siapa yang <b>hold vs jual</b>.
         </p>
       </div>
     </div>

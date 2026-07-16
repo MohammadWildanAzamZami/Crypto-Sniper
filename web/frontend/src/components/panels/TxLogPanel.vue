@@ -124,7 +124,7 @@ onBeforeUnmount(() => { timer && clearInterval(timer); });
         <h2 id="txlog-h">🧾 Riwayat Transaksi Wallet <span class="tag">Log</span></h2>
         <p class="panel__sub">
           Setiap <b>beli &amp; jual</b> dari wallet yang dipantau yang dilihat monitor live — terbaru di atas.
-          Buffer bergulir (yang lama otomatis dibuang). Heuristik, bukan nasihat keuangan.
+          Buffer bergulir (yang lama otomatis dibuang).
         </p>
       </div>
       <button class="scanbtn" :disabled="refreshing" @click="refresh">
