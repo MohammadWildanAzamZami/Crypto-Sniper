@@ -3,9 +3,17 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-17 01:58** · Total **203** commit dalam **16** hari.
+> Terakhir diperbarui: **2026-07-17 02:48** · Total **205** commit dalam **17** hari.
 
 ---
+
+## 2026-07-17 (Jumat) — 2 commit
+
+**✨ Fitur baru / penambahan**
+- feat(ui): hapus seksi Wallet Intelligence (Solana) & seluruh teks disclaimer  `d2340ad`
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `8a3458b`
 
 ## 2026-07-14 (Selasa) — 23 commit
 
