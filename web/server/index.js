@@ -11,7 +11,7 @@ import settingsRoutes from "./routes/settings.js";
 import chatRoutes from "./routes/chat.js";
 import screenRoutes from "./routes/screen.js";
 import radarRoutes, { runRadarOnce } from "./routes/radar.js";
-import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce, walletIntelTickOnce } from "./routes/autopsy.js";
+import autopsyRoutes, { sniperSweepOnce, discoverWalletsOnce, walletIntelTickOnce, cabalspySyncOnce } from "./routes/autopsy.js";
 import { sniperLiveMaintenance } from "./screener/sniper.js";
 import { startWebhookAutoSync } from "./screener/heliusWebhook.js";
 import { startEvmAuto } from "./screener/evmAuto.js";
@@ -97,6 +97,16 @@ const discoveryMins = Number(process.env.SNIPER_DISCOVERY_MIN || 20);
 if (discoveryMins > 0) {
   setInterval(() => discoverWalletsOnce().catch(() => {}), discoveryMins * 60_000);
   console.log(`[discovery] auto-isi watchlist tiap ${discoveryMins} menit`);
+}
+
+// CabalSpy: sumber wallet berlabel (KOL/smart terkurasi). Saat key diset, ini
+// MENGGANTIKAN discovery Birdeye (discoverWalletsOnce skip sendiri). Sync segera
+// setelah boot lalu tiap CABALSPY_SYNC_MIN menit (murah: 2 request/sync).
+const cabalspyMins = Number(process.env.CABALSPY_SYNC_MIN || 360);
+if (cabalspyMins > 0) {
+  setTimeout(() => cabalspySyncOnce().catch(() => {}), 15_000);
+  setInterval(() => cabalspySyncOnce().catch(() => {}), cabalspyMins * 60_000);
+  console.log(`[cabalspy] sync wallet berlabel tiap ${cabalspyMins} menit (aktif jika key diset)`);
 }
 
 // Wallet Intelligence v2: putaran antrean pipeline (vet → audit akurasi →

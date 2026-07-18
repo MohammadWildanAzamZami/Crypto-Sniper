@@ -8,6 +8,7 @@ import { Router } from "express";
 import { runAutopsy } from "../screener/autopsy.js";
 import { recordCandidates, getWatchlist } from "../screener/watchlist.js";
 import { runDiscovery, getDiscoveryStatus } from "../screener/discoverWallets.js";
+import { syncCabalspy, getCabalspyStatus } from "../screener/cabalspy.js";
 import { runSniperSweep, getSignals, ingestWebhookTxs } from "../screener/sniper.js";
 import { getTxLog } from "../screener/txLog.js";
 import { ensureTokenMetas } from "../screener/tokenMeta.js";
@@ -60,7 +61,7 @@ router.get("/autopsy", scanLimit, async (req, res) => {
 
 router.get("/watchlist", (_req, res) => {
   try {
-    res.json({ ...getWatchlist(), discovery: getDiscoveryStatus() });
+    res.json({ ...getWatchlist(), discovery: getDiscoveryStatus(), cabalspy: getCabalspyStatus() });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
@@ -69,10 +70,31 @@ router.get("/watchlist", (_req, res) => {
 // Auto-discovery: populate the watchlist live from on-chain data (no manual Bedah).
 // Also runs on a background interval in index.js. One cycle = auto-Bedah on a few
 // trending winners (A) + Birdeye top-trader harvest (B). Bounded/throttled.
+// Saat CabalSpy key diset, discovery Birdeye NONAKTIF — sumber wallet 100% CabalSpy
+// (permintaan user; runtime-switchable: kosongkan key untuk kembali ke Birdeye).
 export async function discoverWalletsOnce() {
   const st = getState();
+  if (st.cabalspyKey) {
+    return { disabled: true, reason: "discovery Birdeye nonaktif — sumber wallet: CabalSpy", ...getDiscoveryStatus() };
+  }
   return runDiscovery({ birdeyeKey: st.birdeyeKey, heliusKey: st.heliusKey, nowMs: Date.now() });
 }
+
+// Sync CabalSpy: tarik wallet KOL+smart berlabel → watchlist. Berjalan juga di
+// interval background (index.js). POST admin-gated karena memicu penggantian data
+// (wipe non-CabalSpy sekali per boot saat CABALSPY_REPLACE aktif).
+export async function cabalspySyncOnce() {
+  const st = getState();
+  return syncCabalspy({ key: st.cabalspyKey, nowMs: Date.now() });
+}
+
+router.post("/watchlist/cabalspy/sync", requireAdmin, async (_req, res) => {
+  try {
+    res.json(await cabalspySyncOnce());
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
 
 router.get("/watchlist/discover", scanLimit, async (_req, res) => {
   try {

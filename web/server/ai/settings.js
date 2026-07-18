@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const STORE_PATH = fileURLToPath(new URL("../.settings.json", import.meta.url));
 
 // Fields we persist. solscanTier is a runtime probe result, deliberately not saved.
-const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "claudePath", "telegram", "birdeyeKey", "heliusKey"];
+const PERSISTED = ["solscanKey", "aiMode", "aiProvider", "aiKey", "model", "claudePath", "telegram", "birdeyeKey", "heliusKey", "cabalspyKey"];
 
 const state = {
   solscanKey: process.env.SOLSCAN_API_KEY || "",
@@ -24,6 +24,9 @@ const state = {
   // radar degrades to no-smart-money when absent).
   birdeyeKey: process.env.BIRDEYE_API_KEY || "",
   heliusKey: process.env.HELIUS_API_KEY || "",
+  // CabalSpy = sumber wallet berlabel (KOL/smart money terkurasi). Saat diisi,
+  // watchlist diisi DARI SINI dan discovery Birdeye otomatis nonaktif.
+  cabalspyKey: process.env.CABALSPY_API_KEY || "",
   // Default ke mode lokal: pakai CLI `claude` (tanpa API key, tanpa biaya).
   // Catatan: mode lokal butuh CLI `claude` di mesin yang menjalankan server.
   // Di host publik (mis. Render) yang tak punya CLI itu, chat belum berfungsi
@@ -83,6 +86,7 @@ export function publicStatus() {
     telegramConfigured: Boolean(state.telegram.botToken && state.telegram.chatId),
     birdeyeConfigured: Boolean(state.birdeyeKey),
     heliusConfigured: Boolean(state.heliusKey),
+    cabalspyConfigured: Boolean(state.cabalspyKey),
     // Smart money needs Birdeye at minimum; Helius only enriches it.
     smartMoneyEnabled: Boolean(state.birdeyeKey),
   };
@@ -104,6 +108,7 @@ export function applySettings(patch = {}) {
   if (typeof patch.claudePath === "string" && patch.claudePath !== "") state.claudePath = patch.claudePath;
   if (typeof patch.birdeyeKey === "string" && patch.birdeyeKey !== "") state.birdeyeKey = patch.birdeyeKey;
   if (typeof patch.heliusKey === "string" && patch.heliusKey !== "") state.heliusKey = patch.heliusKey;
+  if (typeof patch.cabalspyKey === "string" && patch.cabalspyKey !== "") state.cabalspyKey = patch.cabalspyKey;
   if (patch.telegram && typeof patch.telegram === "object") {
     if (typeof patch.telegram.botToken === "string" && patch.telegram.botToken !== "")
       state.telegram.botToken = patch.telegram.botToken;
@@ -161,6 +166,20 @@ export async function testTarget(target) {
       return { ok: true, detail: `Birdeye key valid.${helius}` };
     } catch (err) {
       return { ok: false, detail: `Uji Birdeye gagal: ${err?.message || err}` };
+    }
+  }
+
+  if (target === "cabalspy") {
+    if (!state.cabalspyKey) return { ok: false, detail: "Belum ada CabalSpy key (daftar gratis di cabalspy.xyz)." };
+    try {
+      const res = await fetch("https://api.cabalspy.xyz/v1/wallets?blockchain=solana&type=kol&limit=1", {
+        headers: { Authorization: `Bearer ${state.cabalspyKey}`, accept: "application/json" },
+      });
+      if (res.status === 401 || res.status === 403) return { ok: false, detail: "CabalSpy key ditolak/kredit habis (401/403)." };
+      if (!res.ok) return { ok: false, detail: `CabalSpy merespons ${res.status}.` };
+      return { ok: true, detail: "CabalSpy key valid — watchlist akan diisi dari wallet berlabel KOL/smart." };
+    } catch (err) {
+      return { ok: false, detail: `Uji CabalSpy gagal: ${err?.message || err}` };
     }
   }
 

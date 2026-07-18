@@ -63,6 +63,13 @@ function computeReputation(w) {
   // signal (max +10) so it never outranks a catch-driven wallet; a top-trader that
   // never catches a winner stays low and won't crowd the active set.
   s += Math.min(10, (w.sightings?.length || 0) * 2);
+  // Label CabalSpy: baseline kurasi eksternal (smart > kol) + bonus win-rate, agar
+  // wallet import langsung layak dipantau tapi tetap di bawah wallet yang terbukti
+  // menangkap winner di sistem sendiri (catches tetap dominan).
+  if (w.cabal) {
+    s += w.cabal.type === "smart" ? 30 : 22;
+    if (typeof w.cabal.winRate === "number") s += Math.min(15, (w.cabal.winRate / 100) * 15);
+  }
   return Math.round(Math.min(100, s));
 }
 
@@ -144,6 +151,58 @@ export function recordTopTraders(traders, { mint, symbol } = {}, nowMs) {
   return { recorded, walletsTouched: touched };
 }
 
+/**
+ * Import wallet berlabel dari CabalSpy (cabalspy.js). Upsert idempoten per owner:
+ * wallet baru masuk dengan source "cabalspy" + established; wallet lama yang ternyata
+ * ada di daftar CabalSpy hanya ditempeli label (catches/sightings-nya tetap).
+ * @param {Array<{owner:string,type:string,name:string,twitter:string,winRate:number|null}>} list
+ * @returns {{imported:number, updated:number}}
+ */
+export function importCabalspyWallets(list, nowMs) {
+  const now = nowMs ?? Date.now();
+  let imported = 0;
+  let updated = 0;
+  for (const c of Array.isArray(list) ? list : []) {
+    if (!c?.owner) continue;
+    let w = wallets.get(c.owner);
+    if (!w) {
+      w = { owner: c.owner, firstSeen: now, lastSeen: now, established: true, catches: [], sightings: [], source: "cabalspy", reputation: 0 };
+      wallets.set(c.owner, w);
+      imported++;
+    } else {
+      updated++;
+    }
+    w.lastSeen = now;
+    w.established = true; // lolos kurasi CabalSpy = wallet nyata
+    w.cabal = { type: c.type, name: c.name || "", twitter: c.twitter || "", winRate: c.winRate ?? null };
+    w.reputation = computeReputation(w);
+  }
+  if (imported + updated > 0) save();
+  return { imported, updated };
+}
+
+/**
+ * Mode pengganti penuh: hapus semua wallet TANPA label CabalSpy (data discovery
+ * lama), dengan backup otomatis seluruh store ke file .backup-<tanggal> dulu.
+ * Dipanggil cabalspy.js sekali per boot setelah sync pertama sukses.
+ * @returns {number} jumlah wallet yang dihapus
+ */
+export function resetNonCabalspy(nowMs) {
+  const before = wallets.size;
+  try {
+    const stamp = new Date(nowMs ?? Date.now()).toISOString().slice(0, 10);
+    const backupPath = FILE_PATH.replace(/\.json$/, `.backup-${stamp}.json`);
+    writeFileSync(backupPath, JSON.stringify({ wallets: [...wallets.values()] }, null, 2), "utf8");
+  } catch {
+    /* backup best-effort — jangan blokir penggantian */
+  }
+  for (const [owner, w] of wallets) {
+    if (!w.cabal) wallets.delete(owner);
+  }
+  if (wallets.size !== before) save();
+  return before - wallets.size;
+}
+
 // Total "winner power": sum of every catch's entry→now multiple. This is the
 // ranking metric — from biggest total winners down to smallest.
 const winnerSum = (w) => w.catches.reduce((s, c) => s + (c.xFromEntry || 0), 0);
@@ -158,7 +217,8 @@ function toPublic(w, rank, watchSize, noLimit) {
     reputation: w.reputation,
     catches: w.catches.length,
     sightings: (w.sightings?.length || 0),           // Path B: recurring top-trader appearances
-    source: w.source || "bedah",                     // "bedah" (Modul A) | "toptrader" (Path B)
+    source: w.source || "bedah",                     // "bedah" (Modul A) | "toptrader" (Path B) | "cabalspy"
+    cabal: w.cabal ? { type: w.cabal.type, name: w.cabal.name, twitter: w.cabal.twitter, winRate: w.cabal.winRate } : null,
     winnerScore: Math.round(winnerSum(w) * 10) / 10, // Σ kelipatan semua winner (sort key)
     established: w.established,
     active: noLimit || rank <= watchSize,
