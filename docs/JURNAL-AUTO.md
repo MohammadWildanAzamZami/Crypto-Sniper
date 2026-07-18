@@ -3,14 +3,17 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-18 15:26** · Total **210** commit dalam **18** hari.
+> Terakhir diperbarui: **2026-07-18 20:00** · Total **211** commit dalam **18** hari.
 
 ---
 
-## 2026-07-18 (Sabtu) — 1 commit
+## 2026-07-18 (Sabtu) — 2 commit
 
 **✨ Fitur baru / penambahan**
 - feat(sniper): CabalSpy jadi sumber wallet watchlist (ganti discovery Birdeye)  `3566a67`
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian [jurnal-auto]  `7791f0b`
 
 ## 2026-07-17 (Jumat) — 6 commit
 
