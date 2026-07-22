@@ -3,9 +3,14 @@
 > ⚙️ File ini **dibuat otomatis** oleh `scripts/update-jurnal.js` dari riwayat git.
 > Jangan diedit manual — perubahan akan tertimpa. Untuk jurnal naratif, lihat `JURNAL-HARIAN.md`.
 >
-> Terakhir diperbarui: **2026-07-20 23:27** · Total **213** commit dalam **19** hari.
+> Terakhir diperbarui: **2026-07-22 20:01** · Total **214** commit dalam **20** hari.
 
 ---
+
+## 2026-07-20 (Senin) — 1 commit
+
+**📝 Dokumentasi**
+- docs(jurnal): auto-update rekap harian terjadwal [jurnal-auto]  `5f25b58`
 
 ## 2026-07-19 (Minggu) — 1 commit
 
